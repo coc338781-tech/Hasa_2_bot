@@ -54,8 +54,8 @@ async function requestPairingCode(sock, state, generation) {
   pairingRequestedFor = generation;
 
   try {
-    // Match the working NOX setup: allow the new socket to initialize first.
-    await sleep(1500);
+    // The qr event is emitted only after the server sends pair-device;
+    // request the pairing code only after that readiness signal.
     if (generation !== socketGeneration || state.creds.registered) return;
 
     const code = await sock.requestPairingCode(phoneNumber);
@@ -117,9 +117,6 @@ async function startBot() {
     }
   });
 
-  if (!state.creds.registered) {
-    void requestPairingCode(sock, state, generation);
-  }
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
