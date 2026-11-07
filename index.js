@@ -100,7 +100,7 @@ async function startBot() {
     version,
     auth: state,
     logger,
-    browser: ["Hasa_2_bot", "Chrome", "1.0.0"],
+    browser: ["Ubuntu", "Chrome", "122.0.0.0"],
     printQRInTerminal: false,
     markOnlineOnConnect: false,
     syncFullHistory: false,
