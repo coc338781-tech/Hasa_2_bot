@@ -52,7 +52,7 @@ async function requestPairingCode(sock, state, generation) {
   pairingRequestedFor = generation;
   try {
     const phone = await askPhone();
-    if (phone.length < 8 || phone.length > 15) throw new Error("Invalid phone number. Include country code, digits only.");
+    if (phone.length < 8 || phone.length > 15) { phoneNumber = ""; throw new Error("Invalid phone number. Include country code, digits only."); }
     const deadline = Date.now() + 60_000;
     // Baileys requires an open websocket before requesting a pairing code.
     while (generation === socketGeneration && !state.creds.registered &&
@@ -68,6 +68,7 @@ async function requestPairingCode(sock, state, generation) {
   } catch (error) {
     console.error("Pairing code error:", error.message);
     console.error("No QR login is enabled. The bot will reconnect safely; keep auth_info intact.");
+    try { sock.end(error); } catch {}
   }
 }
 
