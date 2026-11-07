@@ -53,31 +53,10 @@ async function requestPairingCode(sock, state, generation) {
   pairingRequestedFor = generation;
 
   try {
-    const deadline = Date.now() + 45_000;
-    while (
-      generation === socketGeneration &&
-      !state.creds.registered &&
-      sock.ws?.isOpen !== true &&
-      Date.now() < deadline
-    ) {
-      await sleep(250);
-    }
-
-    if (generation !== socketGeneration || state.creds.registered || sock.ws?.isOpen !== true) return;
-
-    const phone = await askPhone();
-    if (!/^[1-9]\\d{7,14}$/.test(phone)) {
-      phoneNumber = "";
-      throw new Error("Invalid number. Country code එකත් එක්ක, 0 නැතුව. උදා: 9477XXXXXXX");
-    }
-
-    await sleep(6000);
-
     if (generation !== socketGeneration || sock.ws?.isOpen !== true) return;
-
-    const code = await sock.requestPairingCode(phone);
+    const code = await sock.requestPairingCode(phoneNumber);
     pairingIssued = true;
-    console.log("\\n PAIRING CODE: " + code.match(/.{1,4}/g).join("-"));
+    console.log("\nPAIRING CODE: " + code.match(/.{1,4}/g).join("-"));
     console.log("WhatsApp > Linked devices > Link a device > Link with phone number instead");
   } catch (error) {
     console.error("Pairing code error:", error.message);
@@ -93,7 +72,7 @@ async function startBot() {
     version,
     auth: state,
     logger,
-    browser: ["Ubuntu", "Chrome", "122.0.0.0"],
+    browser: ["Mac OS", "Chrome", "122.0.0.0"],
     printQRInTerminal: false,
     markOnlineOnConnect: false,
     syncFullHistory: false,
@@ -103,9 +82,9 @@ async function startBot() {
   });
 
   sock.ev.on("creds.update", saveCreds);
-  sock.ev.on("connection.update", ({ connection, lastDisconnect }) => {
+  sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
     if (generation !== socketGeneration) return;
-    if (connection === "connecting" && !state.creds.registered) {
+    if (qr && !state.creds.registered) {
       void requestPairingCode(sock, state, generation);
     }
     if (connection === "open") {
@@ -187,6 +166,10 @@ async function main() {
   plugins = await loadPlugins();
   globalThis.__hasaPlugins = plugins;
   console.log("Loaded " + plugins.count + " active plugins:", plugins.names.join(", "));
+  phoneNumber = await askPhone();
+  if (!/^[1-9]\d{7,14}$/.test(phoneNumber)) {
+    throw new Error("Invalid number. Country code එකත් එක්ක, 0 නැතුව. උදා: 9477XXXXXXX");
+  }
   await startBot();
 }
 
