@@ -72,7 +72,6 @@ async function startBot() {
     version,
     auth: state,
     logger,
-    browser: ["Mac OS", "Chrome", "122.0.0.0"],
     printQRInTerminal: false,
     markOnlineOnConnect: false,
     syncFullHistory: false,
