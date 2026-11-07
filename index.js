@@ -119,10 +119,12 @@ async function startBot(authState = null) {
 
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify") return;
+    if (type !== "notify" && type !== "append") return;
     for (const msg of messages || []) {
       if (!msg?.key?.remoteJid || !msg.message) continue;
       remember(msg);
+      // Append events can populate the cache, but only live notifications run plugins.
+      if (type !== "notify") continue;
       const jid = msg.key.remoteJid;
       if (jid === "status@broadcast") {
         if (config.autoStatusSeen) await sock.readMessages([msg.key]).catch(() => {});
