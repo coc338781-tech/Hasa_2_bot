@@ -1,0 +1,17 @@
+{
+  "prefix": ".",
+  "owner": [
+    "947XXXXXXXX"
+  ],
+  "botName": "Hasa_2_bot",
+  "autoReply": false,
+  "autoStatusSeen": true,
+  "antiDelete": true,
+  "viewOnce": true,
+  "aiChat": false,
+  "aiModel": "gemini-2.0-flash",
+  "groupCommands": true,
+  "publicMode": true,
+  "autoReadMessages": false,
+  "downloadDir": "downloads"
+}
