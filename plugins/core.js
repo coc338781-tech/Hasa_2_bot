@@ -1,18 +1,53 @@
 import fs from "node:fs";
+import os from "node:os";
 import { downloadContentFromMessage } from "@whiskeysockets/baileys";
 
-const SETTINGS = {
-  autoreply: ["autoReply", "Auto Reply"],
-  statusseen: ["autoStatusSeen", "Auto Status Seen"],
-  antidelete: ["antiDelete", "Anti Delete"],
-  viewonce: ["viewOnce", "View Once"],
-  aichat: ["aiChat", "AI Chat"],
-  groupcmd: ["groupCommands", "Group Commands"],
-  composing: ["composing", "Typing Presence"],
-  autovoice: ["autoVoice", "Auto Voice"]
+const SETTINGS = [
+  { id: "1.1", key: "autoReply", label: "Auto Reply", value: true },
+  { id: "1.2", key: "autoReply", label: "Auto Reply", value: false },
+  { id: "2.1", key: "autoStatusSeen", label: "Auto Status Seen", value: true },
+  { id: "2.2", key: "autoStatusSeen", label: "Auto Status Seen", value: false },
+  { id: "3.1", key: "antiDelete", label: "Anti Delete", value: true },
+  { id: "3.2", key: "antiDelete", label: "Anti Delete", value: false },
+  { id: "4.1", key: "viewOnce", label: "View Once", value: true },
+  { id: "4.2", key: "viewOnce", label: "View Once", value: false },
+  { id: "5.1", key: "aiChat", label: "AI Chat", value: true },
+  { id: "5.2", key: "aiChat", label: "AI Chat", value: false },
+  { id: "6.1", key: "groupCommands", label: "Group Commands", value: true },
+  { id: "6.2", key: "groupCommands", label: "Group Commands", value: false },
+  { id: "7.1", key: "composing", label: "Typing Presence", value: true },
+  { id: "7.2", key: "composing", label: "Typing Presence", value: false },
+  { id: "8.1", key: "autoVoice", label: "Auto Voice", value: true },
+  { id: "8.2", key: "autoVoice", label: "Auto Voice", value: false }
+];
+
+const CATEGORIES = {
+  "1": ["BASIC & MAIN", [
+    ".menu", ".list", ".ping", ".alive", ".uptime", ".fastmode", ".loadavg"
+  ]],
+  "2": ["GROUP", [
+    ".tagall [message]", ".hidetag [message]", ".promote @user",
+    ".demote @user", ".kick @user", ".groupinfo"
+  ]],
+  "3": ["DOWNLOAD", [".dl <url>", ".fb <url>"]],
+  "4": ["AI & PRANK", [".ai <question>", ".hack"]],
+  "5": ["AUTO REPLY", [
+    ".addreply word-reply", ".replaceeply word-reply", ".getreply",
+    ".removereply word", ".resetreply"
+  ]],
+  "6": ["OWNER & SETTINGS", [
+    ".settings", ".apply", "set 1.1 Bot Name", "set 1.3 Footer",
+    "set 1.4 Alive Message", ".autoreply on/off", ".statusseen on/off",
+    ".antidelete on/off", ".viewonce on/off", ".aichat on/off",
+    ".groupcmd on/off", ".composing on/off", ".autovoice on/off"
+  ]],
+  "7": ["SUBBOT", [
+    ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
+    ".restartsubbot", ".delsubbot", ".helpsubbot"
+  ]]
 };
 
-function enabled(value) {
+function isEnabled(value) {
   if (typeof value === "string") return !["off", "false", "0"].includes(value.toLowerCase());
   return Boolean(value);
 }
@@ -21,28 +56,36 @@ function saveConfig(config) {
   fs.writeFileSync("./config.json", JSON.stringify(config, null, 2));
 }
 
-function settingsText(config, prefix) {
-  const rows = Object.entries(SETTINGS).map(([command, [key, label]]) =>
-    (enabled(config[key]) ? "🟢 ON " : "🔴 OFF") + "  " + label + "  (" + prefix + command + " on/off)"
+function isOwner(sender, message, config) {
+  if (message.key?.fromMe) return true;
+  const number = String(sender || "").split("@")[0].split(":")[0].replace(/\D/g, "");
+  return (config.owner || []).some(item =>
+    String(item).replace(/\D/g, "") === number
   );
-  return [
-    "╭━━〔 ⚙️ *HASA 2 SETTINGS* 〕━━╮",
-    ...rows,
-    "╰━━━━━━━━━━━━━━━━━━━━━━╯",
-    "",
-    "🛠️ වෙනස් කිරීමට: " + prefix + "antidelete on හෝ " + prefix + "antidelete off",
-    "📌 සියලුම Commands: " + prefix + "menu"
-  ].join("\n");
+}
+
+function getBody(message) {
+  return message.message?.conversation ||
+    message.message?.extendedTextMessage?.text ||
+    message.message?.imageMessage?.caption ||
+    message.message?.videoMessage?.caption || "";
+}
+
+function getQuotedBody(message) {
+  const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+  if (!quoted) return "";
+  return quoted.conversation ||
+    quoted.extendedTextMessage?.text ||
+    quoted.imageMessage?.caption ||
+    quoted.videoMessage?.caption || "";
 }
 
 function getQuotedImage(message) {
   const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-  if (quoted?.imageMessage) return quoted.imageMessage;
-  if (message.message?.imageMessage) return message.message.imageMessage;
-  return null;
+  return quoted?.imageMessage || message.message?.imageMessage || null;
 }
 
-async function saveLogo(sock, message, imageMessage) {
+async function downloadLogo(imageMessage) {
   const stream = await downloadContentFromMessage(imageMessage, "image");
   const chunks = [];
   for await (const chunk of stream) chunks.push(chunk);
@@ -51,39 +94,179 @@ async function saveLogo(sock, message, imageMessage) {
   fs.writeFileSync("./bot_logo.jpg", buffer);
 }
 
+async function sendWithLogo(sock, jid, message, caption, config) {
+  const logoPath = config.BOT_LOGO || "./bot_logo.jpg";
+  if (fs.existsSync(logoPath)) {
+    try {
+      return await sock.sendMessage(jid, {
+        image: fs.readFileSync(logoPath),
+        caption
+      }, { quoted: message });
+    } catch (error) {
+      console.error("Panel logo send failed:", error.message);
+    }
+  }
+  return sock.sendMessage(jid, { text: caption }, { quoted: message });
+}
+
+function makeMainMenu(config) {
+  const total = (os.totalmem() / 1024 / 1024).toFixed(0);
+  const free = (os.freemem() / 1024 / 1024).toFixed(0);
+  const used = total - free;
+  const names = [
+    "1   BASIC & MAIN",
+    "2   GROUP",
+    "3   DOWNLOAD",
+    "4   AI & PRANK",
+    "5   AUTO REPLY",
+    "6   OWNER & SETTINGS",
+    "7   SUBBOT"
+  ];
+  return [
+    "*HELLO! WELCOME TO HASA 2 BOT*",
+    "╭───「 *COMMANDS PANEL* 」",
+    "│ ◈ RAM USAGE - *" + used + "MB / " + total + "MB*",
+    "│ ◈ RUNTIME - *" + Math.floor(process.uptime() / 60) + " MINUTES*",
+    "╰────────────────────",
+    "",
+    "⛵ *LIST MENU*",
+    ...names.map(line => "│ " + line),
+    "╰────────────────────",
+    "",
+    "*Reply to this message with the number you want to select.*",
+    "",
+    "📜 Full command list: .list",
+    "⚙️ Settings: .settings"
+  ].join("\n");
+}
+
+function makeCommandList(config, prefix) {
+  const groups = [
+    ["BASIC & MAIN COMMANDS", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"fastmode", prefix+"loadavg"]],
+    ["GROUP COMMANDS", [prefix+"tagall", prefix+"hidetag", prefix+"promote", prefix+"demote", prefix+"kick", prefix+"groupinfo"]],
+    ["DOWNLOAD COMMANDS", [prefix+"dl <url>", prefix+"fb <url>"]],
+    ["AI & PRANK COMMANDS", [prefix+"ai <question>", prefix+"hack"]],
+    ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replaceeply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
+    ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
+    ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
+  ];
+  return [
+    "*HELLO! HASA 2 BOT COMMAND LIST*",
+    "╭───「 *COMMANDS PANEL* 」",
+    "│ ◈ RUNTIME - *" + Math.floor(process.uptime() / 60) + " MINUTES*",
+    "╰────────────────────",
+    ...groups.flatMap(([title, commands]) => [
+      "",
+      "╭──────────●●►",
+      "*│📜 " + title + "*",
+      "│   ───────",
+      ...commands.map(command => "*│►* " + command),
+      "╰───────────●●►"
+    ]),
+    "",
+    "✨ *Hasa_2_bot | Command Center*"
+  ].join("\n");
+}
+
+function makeSettingsMenu(config, prefix) {
+  const current = key => isEnabled(config[key]) ? "🟢 ON" : "🔴 OFF";
+  return [
+    "⚙️ *HASA 2 BOT SETTINGS*",
+    "╭── 🤖 AUTOMATIONS",
+    "│",
+    "├─ *[1] AUTO REPLY*",
+    "│  1.1 | Enable  " + (current("autoReply") === "🟢 ON" ? "🟢" : ""),
+    "│  1.2 | Disable",
+    "│",
+    "├─ *[2] AUTO STATUS SEEN*",
+    "│  2.1 | Enable  " + (current("autoStatusSeen") === "🟢 ON" ? "🟢" : ""),
+    "│  2.2 | Disable",
+    "│",
+    "├─ *[3] ANTI-DELETE*",
+    "│  3.1 | Enable  " + (current("antiDelete") === "🟢 ON" ? "🟢" : ""),
+    "│  3.2 | Disable",
+    "│",
+    "├─ *[4] VIEW ONCE*",
+    "│  4.1 | Enable  " + (current("viewOnce") === "🟢 ON" ? "🟢" : ""),
+    "│  4.2 | Disable",
+    "│",
+    "├─ *[5] AI CHAT*",
+    "│  5.1 | Enable  " + (current("aiChat") === "🟢 ON" ? "🟢" : ""),
+    "│  5.2 | Disable",
+    "│",
+    "├─ *[6] GROUP COMMANDS*",
+    "│  6.1 | Enable  " + (current("groupCommands") === "🟢 ON" ? "🟢" : ""),
+    "│  6.2 | Disable",
+    "│",
+    "├─ *[7] TYPING PRESENCE*",
+    "│  7.1 | Enable  " + (current("composing") === "🟢 ON" ? "🟢" : ""),
+    "│  7.2 | Disable",
+    "│",
+    "└─ *[8] AUTO VOICE*",
+    "   8.1 | Enable  " + (current("autoVoice") === "🟢 ON" ? "🟢" : ""),
+    "   8.2 | Disable",
+    "",
+    "📌 *Setting එක ON/OFF කිරීමට අදාල අංකය Reply කරන්න.*",
+    "🔹 Prefix commands: " + prefix + "settings"
+  ].join("\n");
+}
+
 export default async function core({ sock, message, config }) {
   const jid = message.key?.remoteJid;
-  if (!jid) return;
+  if (!jid || jid === "status@broadcast") return;
   const sender = message.key.participant || jid;
-  const body = message.message?.conversation ||
-    message.message?.extendedTextMessage?.text ||
-    message.message?.imageMessage?.caption ||
-    message.message?.videoMessage?.caption || "";
+  const body = getBody(message).trim();
   if (!body) return;
 
   const prefix = config.prefix || ".";
-  const trimmed = body.trim();
-  const isPlainSet = /^set\s+/i.test(trimmed);
-  if (!trimmed.startsWith(prefix) && !isPlainSet) return;
+  const owner = isOwner(sender, message, config);
+  const send = text => sock.sendMessage(jid, { text }, { quoted: message });
+  const quotedBody = getQuotedBody(message).toUpperCase();
 
-  const commandBody = isPlainSet ? trimmed : trimmed.slice(prefix.length).trim();
+  // Number replies are accepted only when replying to this bot's menu/settings panel.
+  if (/^\d+(?:\.\d+)?$/.test(body)) {
+    if (quotedBody.includes("COMMANDS PANEL") || quotedBody.includes("LIST MENU")) {
+      const category = CATEGORIES[body];
+      if (!category) return send("❌ ඒ Menu අංකය හමු වුණේ නැහැ. .menu යවලා නැවත තෝරන්න.");
+      const caption = [
+        "╭━━━〔 " + category[0] + " 〕━━━┈",
+        ...category[1].map(item => "│► " + item),
+        "╰━━━━━━━━━━━━━━━━━━━┈",
+        "",
+        "📌 ආපසු Main Menu එකට: " + prefix + "menu"
+      ].join("\n");
+      return sendWithLogo(sock, jid, message, caption, config);
+    }
+
+    if (quotedBody.includes("HASA 2 BOT SETTINGS")) {
+      if (!owner) return send("⛔ Settings වෙනස් කළ හැක්කේ Ownerට පමණයි.");
+      const setting = SETTINGS.find(item => item.id === body);
+      if (!setting) return send("❌ ඒ Setting අංකය හමු වුණේ නැහැ. " + prefix + "settings යවන්න.");
+      config[setting.key] = setting.value;
+      try {
+        saveConfig(config);
+      } catch (error) {
+        console.error("Numeric setting save failed:", error);
+        return send("❌ Setting Save කරන්න බැරි වුණා: " + error.message);
+      }
+      return send("✅ *" + setting.label + "* " + (setting.value ? "Enabled 🟢" : "Disabled 🔴") + "\n\n" + makeSettingsMenu(config, prefix));
+    }
+  }
+
+  const isPlainSet = /^set\s+/i.test(body);
+  if (!body.startsWith(prefix) && !isPlainSet) return;
+  const commandBody = isPlainSet ? body : body.slice(prefix.length).trim();
   const [rawCommand, ...args] = commandBody.split(/\s+/);
   const command = (rawCommand || "").toLowerCase();
   const arg = args.join(" ").trim();
-  const number = sender.split("@")[0].split(":")[0].replace(/\D/g, "");
-  const owner = message.key.fromMe || (config.owner || []).some(value =>
-    String(value).replace(/\D/g, "") === number
-  );
-  const send = text => sock.sendMessage(jid, { text }, { quoted: message });
 
-  // .apply / .applyy — show the logo control panel or save a replied photo as the logo.
   if (command === "apply" || command === "applyy") {
     const imageMessage = getQuotedImage(message);
     if (imageMessage) {
       if (!owner) return send("⛔ Bot Logo එක වෙනස් කළ හැක්කේ Ownerට පමණයි.");
       try {
         await send("⏳ *Bot Logo එක Save කරමින් පවතී...*");
-        await saveLogo(sock, message, imageMessage);
+        await downloadLogo(imageMessage);
         config.BOT_LOGO = "./bot_logo.jpg";
         saveConfig(config);
         return send("✅ *Bot Logo එක සාර්ථකව Update වුණා!* දැන් .alive ගහලා බලන්න.");
@@ -92,42 +275,25 @@ export default async function core({ sock, message, config }) {
         return send("❌ Logo එක Save කරන්න බැරි වුණා: " + error.message);
       }
     }
-
-    const panelText = [
+    const panel = [
       "╭━━〔 ⚙️ *HASA 2 CONTROL PANEL* 〕━━╮",
-      "┃",
       "┃ *BOT IDENTITY & APPEARANCE*",
-      "┃ 1.1 | Bot Name වෙනස් කිරීම",
-      "┃ 1.2 | Bot Logo වෙනස් කිරීම",
-      "┃ 1.3 | Bot Footer වෙනස් කිරීම",
-      "┃ 1.4 | Alive Message වෙනස් කිරීම",
-      "┃",
+      "┃ 1.1 | Bot Name",
+      "┃ 1.2 | Bot Logo",
+      "┃ 1.3 | Bot Footer",
+      "┃ 1.4 | Alive Message",
       "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯",
       "",
-      "📌 *භාවිතා කරන ආකාරය*",
       "• Logo: Photo එකකට Reply කර .apply යවන්න.",
       "• Name: set 1.1 Hasa 2 Bot",
       "• Footer: set 1.3 Hasa 2 Bot",
-      "• Alive Message: set 1.4 Your message",
+      "• Alive: set 1.4 Your message",
       "",
-      "🔹 Logo වෙනස් කිරීම Ownerට පමණයි."
+      "🔹 Logo / Text වෙනස් කිරීම Ownerට පමණයි."
     ].join("\n");
-
-    const logoPath = config.BOT_LOGO || "./bot_logo.jpg";
-    if (fs.existsSync(logoPath)) {
-      try {
-        return await sock.sendMessage(jid, {
-          image: fs.readFileSync(logoPath),
-          caption: panelText
-        }, { quoted: message });
-      } catch (error) {
-        console.error("Control panel logo send failed:", error.message);
-      }
-    }
-    return send(panelText);
+    return sendWithLogo(sock, jid, message, panel, config);
   }
 
-  // Supports both the old plain "set 1.x ..." syntax and ".set 1.x ...".
   if (command === "set") {
     if (!owner) return send("⛔ මේ වෙනස්කම් කළ හැක්කේ Ownerට පමණයි.");
     const [setting, ...valueParts] = args;
@@ -139,11 +305,8 @@ export default async function core({ sock, message, config }) {
     if (setting === "1.1") {
       config.BOT_NAME = value;
       config.botName = value;
-    } else if (setting === "1.3") {
-      config.FOOTER = value;
-    } else if (setting === "1.4") {
-      config.ALIVE_MSG = value;
-    }
+    } else if (setting === "1.3") config.FOOTER = value;
+    else config.ALIVE_MSG = value;
     try {
       saveConfig(config);
       return send("✅ *Setting [" + setting + "] Update වුණා:* " + value);
@@ -154,56 +317,11 @@ export default async function core({ sock, message, config }) {
   }
 
   if (command === "menu" || command === "help") {
-    return send([
-      "╭━━〔 🤖 *HASA 2 BOT* 〕━━╮",
-      "┃",
-      "┃ 🟢 *BASIC COMMANDS*",
-      "┃ " + prefix + "ping  - Bot response check",
-      "┃ " + prefix + "alive - Bot status + Logo",
-      "┃ " + prefix + "uptime - Running time",
-      "┃ " + prefix + "menu - Full command list",
-      "┃",
-      "┃ 👥 *GROUP COMMANDS* (Admin)",
-      "┃ " + prefix + "tagall [message]",
-      "┃ " + prefix + "hidetag [message]",
-      "┃ " + prefix + "promote @user",
-      "┃ " + prefix + "demote @user",
-      "┃ " + prefix + "kick @user",
-      "┃ " + prefix + "groupinfo",
-      "┃",
-      "┃ 🧠 *AI & MEDIA*",
-      "┃ " + prefix + "ai <question> (Gemini key)",
-      "┃ " + prefix + "dl <url> / " + prefix + "fb <url> (yt-dlp)",
-      "┃ " + prefix + "hack (Owner prank simulation)",
-      "┃",
-      "┃ 💬 *AUTO REPLY* (Owner)",
-      "┃ " + prefix + "addreply word-reply",
-      "┃ " + prefix + "replaceeply word-reply",
-      "┃ " + prefix + "getreply",
-      "┃ " + prefix + "removereply word",
-      "┃ " + prefix + "resetreply",
-      "┃",
-      "┃ ⚙️ *BOT SETTINGS* (Owner)",
-      "┃ " + prefix + "settings - View all settings",
-      "┃ " + prefix + "apply - Logo / Bot appearance",
-      "┃ " + prefix + "autoreply on/off",
-      "┃ " + prefix + "statusseen on/off",
-      "┃ " + prefix + "antidelete on/off",
-      "┃ " + prefix + "viewonce on/off",
-      "┃ " + prefix + "aichat on/off",
-      "┃ " + prefix + "groupcmd on/off",
-      "┃ " + prefix + "composing on/off",
-      "┃ " + prefix + "autovoice on/off",
-      "┃",
-      "┃ 🤝 *SUBBOT* (Owner)",
-      "┃ " + prefix + "subbot <number>",
-      "┃ " + prefix + "subcheck / " + prefix + "getsubbot",
-      "┃ " + prefix + "stopsubbot / " + prefix + "restartsubbot",
-      "┃ " + prefix + "delsubbot / " + prefix + "helpsubbot",
-      "┃",
-      "╰━━━━━━━━━━━━━━━━━━━━━━╯",
-      "✨ *Hasa_2_bot | Command Center*"
-    ].join("\n"));
+    return sendWithLogo(sock, jid, message, makeMainMenu(config), config);
+  }
+
+  if (command === "list" || command === "listcmd" || command === "listcommands") {
+    return sendWithLogo(sock, jid, message, makeCommandList(config, prefix), config);
   }
 
   if (command === "ping") return send("🏓 *PONG!*\nHasa_2_bot is active.");
@@ -218,38 +336,39 @@ export default async function core({ sock, message, config }) {
       "⏱️ *Uptime:* " + Math.floor(process.uptime() / 60) + " minutes",
       config.FOOTER ? "\n_" + config.FOOTER + "_" : ""
     ].join("\n");
-    const logoPath = config.BOT_LOGO || "./bot_logo.jpg";
-    if (fs.existsSync(logoPath)) {
-      try {
-        return await sock.sendMessage(jid, {
-          image: fs.readFileSync(logoPath),
-          caption
-        }, { quoted: message });
-      } catch (error) {
-        console.error("Alive logo send failed:", error.message);
-      }
-    }
-    return send(caption);
+    return sendWithLogo(sock, jid, message, caption, config);
   }
 
   if (command === "settings" || command === "setting") {
     if (!owner) return send("⛔ Owner only.");
-    return send(settingsText(config, prefix));
+    return send(makeSettingsMenu(config, prefix));
   }
 
-  if (Object.hasOwn(SETTINGS, command)) {
+  if (command === "autoreply" || command === "statusseen" ||
+      command === "antidelete" || command === "viewonce" ||
+      command === "aichat" || command === "groupcmd" ||
+      command === "composing" || command === "autovoice") {
     if (!owner) return send("⛔ මේ setting එක වෙනස් කළ හැක්කේ Ownerට පමණයි.");
     if (!["on", "off"].includes(arg.toLowerCase())) {
-      return send("භාවිතය: " + prefix + command + " on/off\n\n" + settingsText(config, prefix));
+      return send("භාවිතය: " + prefix + command + " on/off\n\n" + makeSettingsMenu(config, prefix));
     }
-    const [key] = SETTINGS[command];
-    config[key] = arg.toLowerCase() === "on";
+    const keyMap = {
+      autoreply: "autoReply",
+      statusseen: "autoStatusSeen",
+      antidelete: "antiDelete",
+      viewonce: "viewOnce",
+      aichat: "aiChat",
+      groupcmd: "groupCommands",
+      composing: "composing",
+      autovoice: "autoVoice"
+    };
+    config[keyMap[command]] = arg.toLowerCase() === "on";
     try {
       saveConfig(config);
     } catch (error) {
       console.error("Config save failed:", error.message);
       return send("❌ Setting save කරන්න බැරි වුණා: " + error.message);
     }
-    return send("✅ *" + SETTINGS[command][1] + "* " + (arg.toLowerCase() === "on" ? "ON 🟢" : "OFF 🔴") + "\n\n" + settingsText(config, prefix));
+    return send("✅ *" + command + "* " + (arg.toLowerCase() === "on" ? "ON 🟢" : "OFF 🔴") + "\n\n" + makeSettingsMenu(config, prefix));
   }
 }
