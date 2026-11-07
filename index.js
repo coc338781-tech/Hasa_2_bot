@@ -59,7 +59,7 @@ async function requestPairingCode(sock, state, generation) {
            sock.ws?.isOpen !== true && Date.now() < deadline) await sleep(500);
     if (generation !== socketGeneration || state.creds.registered) return;
     if (sock.ws?.isOpen !== true) throw new Error("WhatsApp websocket did not open within 60 seconds.");
-    await sleep(1200);
+    // Allow Baileys' initial handshake to settle before asking for a pairing code.\n    await sleep(5000);
     const code = await sock.requestPairingCode(phone);
     console.log("\n================================");
     console.log(" WHATSAPP PAIRING CODE: " + code.match(/.{1,4}/g).join("-"));
