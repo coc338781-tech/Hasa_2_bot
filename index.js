@@ -53,7 +53,21 @@ async function requestPairingCode(sock, state, generation) {
   pairingRequestedFor = generation;
 
   try {
-    if (generation !== socketGeneration || sock.ws?.isOpen !== true) return;
+    // Wait briefly for the WebSocket to open; do not depend on a QR event.
+    // Pairing-code login can be requested as soon as the socket is ready.
+    let attempts = 0;
+    while (generation === socketGeneration && sock.ws?.isOpen !== true && attempts < 40) {
+      await sleep(250);
+      attempts++;
+    }
+
+    if (generation !== socketGeneration || state.creds.registered) return;
+    if (sock.ws?.isOpen !== true) {
+      console.error("Pairing code not requested: WhatsApp WebSocket did not open.");
+      console.error("The saved auth_info folder was not deleted.");
+      return;
+    }
+
     const code = await sock.requestPairingCode(phoneNumber);
     pairingIssued = true;
     console.log("\nPAIRING CODE: " + code.match(/.{1,4}/g).join("-"));
@@ -110,6 +124,11 @@ async function startBot() {
       }
     }
   });
+
+  // Request the pairing code when the socket becomes ready, without waiting for QR.
+  if (!state.creds.registered) {
+    void requestPairingCode(sock, state, generation);
+  }
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
