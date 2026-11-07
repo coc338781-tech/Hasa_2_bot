@@ -1,6 +1,9 @@
 node_modules/
 auth_info/
+subbot_sessions/
 config.json
 .env
 downloads/
+tmp/
+replies.json
 *.log
