@@ -1,35 +1,47 @@
 export default async function core({ sock, message, config }) {
-  const jid = message.key.remoteJid;
+  const jid = message.key?.remoteJid;
+  if (!jid) return;
   const sender = message.key.participant || jid;
   const text = message.message?.conversation || message.message?.extendedTextMessage?.text || "";
   if (!text) return;
   const prefix = config.prefix || ".";
-  const isCommand = text.startsWith(prefix);
-  if (config.autoReply && !isCommand && !message.key.fromMe && !jid.endsWith("@g.us")) {
-    await sock.sendMessage(jid, { text: "Thanks for your message! I'll get back to you soon." }, { quoted: message });
-  }
-  if (!isCommand) return;
-  const [command, ...args] = text.slice(prefix.length).trim().split(/\\s+/);
+  if (!text.startsWith(prefix)) return;
+  const [command, ...args] = text.slice(prefix.length).trim().split(/\s+/);
   const arg = args.join(" ");
-  const owner = (config.owner || []).some(number => sender.startsWith(number.replace(/\\D/g, "")));
+  const number = sender.split("@")[0].split(":")[0].replace(/\D/g, "");
+  const owner = message.key.fromMe || (config.owner || []).some(value => String(value).replace(/\D/g, "") === number);
   if (command === "menu" || command === "help") {
     return sock.sendMessage(jid, { text: [
       "*HASA 2 BOT COMMANDS*",
       ".ping - Check bot",
       ".alive - Bot status",
-      ".tagall - Mention group members (admin)",
-      ".hidetag - Hidden tag group (admin)",
-      ".promote @user / .demote @user / .kick @user (admin)",
+      ".uptime - Running time",
+      ".tagall / .hidetag - Group mentions (admin)",
+      ".promote / .demote / .kick @user - Group admin commands",
+      ".groupinfo - Group information",
       ".ai <question> - AI response (Gemini key required)",
-      ".dl <url> - Download via yt-dlp (if installed)",
+      ".dl <url> / .fb <url> - Download video (yt-dlp required)",
+      ".addreply word-reply / .replaceeply word-reply",
+      ".getreply / .removereply word / .resetreply",
       ".autoreply on|off - Owner setting",
-      ".statusseen on|off - Owner setting"
-    ].join("\\n") }, { quoted: message });
+      ".statusseen on|off - Owner setting",
+      ".helpsubbot - Subbot help (when enabled)"
+    ].join("\n") }, { quoted: message });
   }
   if (command === "ping") return sock.sendMessage(jid, { text: "Pong! 🏓" }, { quoted: message });
   if (command === "alive") return sock.sendMessage(jid, { text: "Hasa_2_bot is running ✅" }, { quoted: message });
-  if (["autoreply","statusseen"].includes(command) && owner) {
+  if (["autoreply", "statusseen"].includes(command)) {
+    if (!owner) return sock.sendMessage(jid, { text: "⛔ Owner only." }, { quoted: message });
+    if (!["on", "off"].includes(arg.toLowerCase())) {
+      return sock.sendMessage(jid, { text: "Use: " + prefix + command + " on|off" }, { quoted: message });
+    }
     config[command === "autoreply" ? "autoReply" : "autoStatusSeen"] = arg.toLowerCase() === "on";
-    return sock.sendMessage(jid, { text: command + " set to " + arg }, { quoted: message });
+    try {
+      const fs = await import("node:fs");
+      fs.writeFileSync("./config.json", JSON.stringify(config, null, 2));
+    } catch (error) {
+      console.error("Config save failed:", error.message);
+    }
+    return sock.sendMessage(jid, { text: command + " set to " + arg.toLowerCase() }, { quoted: message });
   }
 }
