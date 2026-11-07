@@ -1,17 +1,20 @@
 {
   "prefix": ".",
-  "owner": [
-    "947XXXXXXXX"
-  ],
+  "owner": ["947XXXXXXXX"],
   "botName": "Hasa_2_bot",
   "autoReply": false,
   "autoStatusSeen": true,
   "antiDelete": true,
+  "antiDeleteToInbox": false,
   "viewOnce": true,
   "aiChat": false,
   "aiModel": "gemini-2.0-flash",
   "groupCommands": true,
   "publicMode": true,
   "autoReadMessages": false,
+  "composing": false,
+  "autoVoice": false,
+  "autoVoiceText": "Hello, I received your voice message.",
+  "fastMode": true,
   "downloadDir": "downloads"
 }
