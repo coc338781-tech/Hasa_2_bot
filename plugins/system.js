@@ -17,7 +17,7 @@ export default async function system({ sock, message, config }) {
   const jid = message.key?.remoteJid;
   const body = (message.message?.conversation || message.message?.extendedTextMessage?.text || "").trim();
   const prefix = config.prefix || ".";
-  const cmd = body.toLowerCase().split(/\\s+/)[0];
+  const cmd = body.toLowerCase().split(/\s+/)[0];
   if (!jid || !body.startsWith(prefix)) return;
 
   if (cmd === prefix + "system" || cmd === prefix + "ram") {
@@ -59,7 +59,7 @@ export default async function system({ sock, message, config }) {
     const load = os.loadavg().map((value) => value.toFixed(2));
     return sock.sendMessage(
       jid,
-      { text: "📊 Load average\\n1m: " + load[0] + "\\n5m: " + load[1] + "\\n15m: " + load[2] },
+      { text: "📊 Load average\n1m: " + load[0] + "\n5m: " + load[1] + "\n15m: " + load[2] },
       { quoted: message }
     );
   }
