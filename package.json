@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && node --check lib/plugin-loader.js && for f in plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\""
+    "check": "node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\""
   },
   "engines": { "node": ">=20.0.0" },
   "dependencies": {
