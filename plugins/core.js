@@ -20,6 +20,7 @@ export default async function core({ sock, message, config }) {
       ".promote / .demote / .kick @user - Group admin commands",
       ".groupinfo - Group information",
       ".ai <question> - AI response (Gemini key required)",
+      ".hack - Owner-only prank simulation",
       ".dl <url> / .fb <url> - Download video (yt-dlp required)",
       ".addreply word-reply / .replaceeply word-reply",
       ".getreply / .removereply word / .resetreply",
