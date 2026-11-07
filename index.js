@@ -2,7 +2,7 @@ import "dotenv/config";
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion,
+  fetchLatestWaWebVersion,
   downloadContentFromMessage
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
@@ -95,7 +95,7 @@ async function requestPairingCode(sock, state, generation) {
 async function startBot() {
   const generation = ++socketGeneration;
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
-  const { version } = await fetchLatestBaileysVersion();
+  const { version } = await fetchLatestWaWebVersion({});
   const sock = makeWASocket({
     version,
     auth: state,
