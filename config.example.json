@@ -4,6 +4,7 @@
   "botName": "Hasa_2_bot",
   "autoReply": false,
   "autoStatusSeen": true,
+  "statusReact": "off",
   "antiDelete": true,
   "antiDeleteToInbox": false,
   "viewOnce": true,
