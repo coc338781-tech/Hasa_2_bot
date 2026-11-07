@@ -50,16 +50,37 @@ function remember(message) {
 async function requestPairingCode(sock, state, generation) {
   if (state.creds.registered || pairingRequestedFor === generation) return;
   pairingRequestedFor = generation;
+
   try {
-    const phone = await askPhone();
-    if (phone.length < 8 || phone.length > 15) { phoneNumber = ""; throw new Error("Invalid phone number. Include country code, digits only."); }
-    const deadline = Date.now() + 60_000;
-    // Baileys requires an open websocket before requesting a pairing code.
-    while (generation === socketGeneration && !state.creds.registered &&
-           sock.ws?.isOpen !== true && Date.now() < deadline) await sleep(500);
+    // Do not ask for the phone number until WhatsApp's websocket is actually open.
+    // This avoids accepting input while the initial connection is still failing.
+    const deadline = Date.now() + 45_000;
+    while (
+      generation === socketGeneration &&
+      !state.creds.registered &&
+      sock.ws?.isOpen !== true &&
+      Date.now() < deadline
+    ) {
+      await sleep(250);
+    }
+
     if (generation !== socketGeneration || state.creds.registered) return;
-    if (sock.ws?.isOpen !== true) throw new Error("WhatsApp websocket did not open within 60 seconds.");
-    // Allow Baileys' initial handshake to settle before asking for a pairing code.\n    await sleep(5000);
+    if (sock.ws?.isOpen !== true) {
+      throw new Error("WhatsApp connection did not become ready. No pairing code was requested. Check the connection error above.");
+    }
+
+    const phone = await askPhone();
+    if (phone.length < 8 || phone.length > 15) {
+      phoneNumber = "";
+      throw new Error("Invalid phone number. Include country code, digits only.");
+    }
+
+    // Re-check the socket after the user enters the number.
+    if (generation !== socketGeneration || sock.ws?.isOpen !== true) {
+      throw new Error("WhatsApp disconnected before the pairing code could be requested. Please restart the bot.");
+    }
+
+    await sleep(1500);
     const code = await sock.requestPairingCode(phone);
     console.log("\n================================");
     console.log(" WHATSAPP PAIRING CODE: " + code.match(/.{1,4}/g).join("-"));
@@ -67,8 +88,7 @@ async function requestPairingCode(sock, state, generation) {
     console.log("WhatsApp > Linked devices > Link a device > Link with phone number instead");
   } catch (error) {
     console.error("Pairing code error:", error.message);
-    console.error("No QR login is enabled. The bot will reconnect safely; keep auth_info intact.");
-    try { sock.end(error); } catch {}
+    console.error("The saved auth_info folder was not deleted.");
   }
 }
 
