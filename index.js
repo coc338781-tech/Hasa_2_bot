@@ -68,9 +68,9 @@ async function requestPairingCode(sock, state, generation) {
   }
 }
 
-async function startBot() {
+async function startBot(authState = null) {
   const generation = ++socketGeneration;
-  const { state, saveCreds } = await useMultiFileAuthState(authDir);
+  const { state, saveCreds } = authState || await useMultiFileAuthState(authDir);
   const sock = makeWASocket({
     auth: {
       creds: state.creds,
@@ -172,11 +172,17 @@ async function main() {
   plugins = await loadPlugins();
   globalThis.__hasaPlugins = plugins;
   console.log("Loaded " + plugins.count + " active plugins:", plugins.names.join(", "));
-  phoneNumber = await askPhone();
-  if (!/^[1-9]\d{7,14}$/.test(phoneNumber)) {
-    throw new Error("Invalid number. Country code එකත් එක්ක, 0 නැතුව. උදා: 9477XXXXXXX");
+  const authState = await useMultiFileAuthState(authDir);
+  if (authState.state.creds.registered) {
+    phoneNumber = "";
+    console.log("Existing WhatsApp session found. Connecting without pairing...");
+  } else {
+    phoneNumber = await askPhone();
+    if (!/^[1-9]\d{7,14}$/.test(phoneNumber)) {
+      throw new Error("Invalid number. Country code එකත් එක්ක, 0 නැතුව. උදා: 9477XXXXXXX");
+    }
   }
-  await startBot();
+  await startBot(authState);
 }
 
 function shutdown() {
