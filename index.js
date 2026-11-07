@@ -21,6 +21,7 @@ let reconnectTimer;
 let reconnectAttempts = 0;
 let shuttingDown = false;
 let pairingRequestedFor = -1;
+let pairingIssued = false;
 let phoneNumber = process.env.BOT_PHONE_NUMBER || "";
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -48,12 +49,10 @@ function remember(message) {
 }
 
 async function requestPairingCode(sock, state, generation) {
-  if (state.creds.registered || pairingRequestedFor === generation) return;
+  if (state.creds.registered || pairingIssued || pairingRequestedFor === generation) return;
   pairingRequestedFor = generation;
 
   try {
-    // Do not ask for the phone number until WhatsApp's websocket is actually open.
-    // This avoids accepting input while the initial connection is still failing.
     const deadline = Date.now() + 45_000;
     while (
       generation === socketGeneration &&
@@ -64,27 +63,21 @@ async function requestPairingCode(sock, state, generation) {
       await sleep(250);
     }
 
-    if (generation !== socketGeneration || state.creds.registered) return;
-    if (sock.ws?.isOpen !== true) {
-      throw new Error("WhatsApp connection did not become ready. No pairing code was requested. Check the connection error above.");
-    }
+    if (generation !== socketGeneration || state.creds.registered || sock.ws?.isOpen !== true) return;
 
     const phone = await askPhone();
-    if (phone.length < 8 || phone.length > 15) {
+    if (!/^[1-9]\\d{7,14}$/.test(phone)) {
       phoneNumber = "";
-      throw new Error("Invalid phone number. Include country code, digits only.");
+      throw new Error("Invalid number. Country code එකත් එක්ක, 0 නැතුව. උදා: 9477XXXXXXX");
     }
 
-    // Re-check the socket after the user enters the number.
-    if (generation !== socketGeneration || sock.ws?.isOpen !== true) {
-      throw new Error("WhatsApp disconnected before the pairing code could be requested. Please restart the bot.");
-    }
+    await sleep(6000);
 
-    await sleep(1500);
+    if (generation !== socketGeneration || sock.ws?.isOpen !== true) return;
+
     const code = await sock.requestPairingCode(phone);
-    console.log("\n================================");
-    console.log(" WHATSAPP PAIRING CODE: " + code.match(/.{1,4}/g).join("-"));
-    console.log("================================\n");
+    pairingIssued = true;
+    console.log("\\n PAIRING CODE: " + code.match(/.{1,4}/g).join("-"));
     console.log("WhatsApp > Linked devices > Link a device > Link with phone number instead");
   } catch (error) {
     console.error("Pairing code error:", error.message);
@@ -132,7 +125,7 @@ async function startBot() {
       if (code === DisconnectReason.loggedOut || code === DisconnectReason.badSession) {
         console.error("Session is logged out or invalid. auth_info was NOT deleted.");
       } else if (!shuttingDown) {
-        const delay = Math.min(60_000, 3000 * (2 ** Math.min(reconnectAttempts++, 4)));
+        const delay = Math.min(60_000, (pairingIssued ? 10_000 : 3_000) * (2 ** Math.min(reconnectAttempts++, 4)));
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => startBot().catch(err => console.error("Reconnect failed:", err)), delay);
         console.log("Reconnecting in " + Math.round(delay / 1000) + " seconds...");
