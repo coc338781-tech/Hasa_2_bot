@@ -3,6 +3,7 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestWaWebVersion,
+  Browsers,
   downloadContentFromMessage
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
@@ -85,6 +86,7 @@ async function startBot() {
   const sock = makeWASocket({
     version,
     auth: state,
+    browser: Browsers.ubuntu("Chrome"),
     logger,
     printQRInTerminal: false,
     markOnlineOnConnect: false,
