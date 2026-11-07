@@ -122,6 +122,13 @@ async function startBot() {
     if (connection === "close") {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
       console.log("WhatsApp connection closed:", code ?? "unknown");
+      const disconnectError = lastDisconnect?.error;
+      console.error("Disconnect details:", JSON.stringify({
+        message: disconnectError?.message,
+        statusCode: disconnectError?.output?.statusCode,
+        payload: disconnectError?.output?.payload,
+        data: disconnectError?.data
+      }, null, 2));
       if (code === DisconnectReason.loggedOut || code === DisconnectReason.badSession) {
         console.error("Session is logged out or invalid. auth_info was NOT deleted.");
       } else if (!shuttingDown) {
