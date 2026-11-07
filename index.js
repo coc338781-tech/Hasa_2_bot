@@ -53,15 +53,24 @@ async function startBot() {
   sock.ev.on("creds.update", saveCreds);
   sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
     if (generation !== socketGeneration) return;
-    if (connection === "connecting" && !sock.authState?.creds?.registered && pairingRequestedFor !== generation) {
+    if (connection === "connecting" && !state.creds.registered && pairingRequestedFor !== generation) {
       pairingRequestedFor = generation;
-      setTimeout(async () => {
-        if (generation !== socketGeneration || sock.authState?.creds?.registered) return;
+      (async () => {
         try {
           const phone = await askPhone();
           if (!phone || phone.length < 8) {
             console.log("Invalid phone number. Restart the bot and try again.");
             return;
+          }
+          // Wait for the WebSocket to become ready before requesting a code.
+          const deadline = Date.now() + 30_000;
+          while (generation === socketGeneration && !state.creds.registered &&
+                 sock.ws?.isOpen !== true && Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          if (generation !== socketGeneration || state.creds.registered) return;
+          if (sock.ws?.isOpen !== true) {
+            throw new Error("WhatsApp socket did not become ready within 30 seconds");
           }
           const code = await sock.requestPairingCode(phone);
           console.log("\\n================================");
@@ -70,9 +79,9 @@ async function startBot() {
           console.log("WhatsApp > Linked devices > Link a device > Link with phone number instead");
         } catch (error) {
           console.error("Pairing code request failed:", error.message);
-          console.error("Socket may not be ready yet. The bot will reconnect automatically if disconnected.");
+          console.error("The bot will retry on the next connection. Do not delete auth_info unless the session is confirmed invalid.");
         }
-      }, 2500);
+      })();
     }
     if (connection === "open") {
       reconnectAttempts = 0;
