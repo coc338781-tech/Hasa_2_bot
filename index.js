@@ -164,6 +164,7 @@ async function main() {
   fs.mkdirSync(authDir, { recursive: true });
   fs.mkdirSync(config.downloadDir || "downloads", { recursive: true });
   plugins = await loadPlugins();
+  globalThis.__hasaPlugins = plugins;
   console.log("Loaded " + plugins.count + " active plugins:", plugins.names.join(", "));
   await startBot();
 }
