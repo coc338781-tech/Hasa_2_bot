@@ -127,7 +127,27 @@ async function startBot(authState = null) {
       if (type !== "notify") continue;
       const jid = msg.key.remoteJid;
       if (jid === "status@broadcast") {
-        if (config.autoStatusSeen) await sock.readMessages([msg.key]).catch(() => {});
+        if (config.autoStatusSeen) {
+          await sock.readMessages([msg.key]).catch(error =>
+            console.error("Auto status seen failed:", error.message)
+          );
+        }
+
+        const statusReactMode = String(config.statusReact || "off").toLowerCase();
+        const statusOwner = msg.key.participant;
+        if (statusOwner && ["green", "random"].includes(statusReactMode)) {
+          const emojis = ["👍", "❤️", "🔥", "💯", "😊", "💚"];
+          const reaction = statusReactMode === "green"
+            ? "💚"
+            : emojis[Math.floor(Math.random() * emojis.length)];
+          await sock.sendMessage(
+            jid,
+            { react: { text: reaction, key: msg.key } },
+            { statusJidList: [statusOwner] }
+          ).catch(error =>
+            console.error("Status reaction failed:", error.message)
+          );
+        }
         continue;
       }
 
