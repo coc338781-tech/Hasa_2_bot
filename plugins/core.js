@@ -18,7 +18,10 @@ const SETTINGS = [
   { id: "7.1", key: "composing", label: "Typing Presence", value: true },
   { id: "7.2", key: "composing", label: "Typing Presence", value: false },
   { id: "8.1", key: "autoVoice", label: "Auto Voice", value: true },
-  { id: "8.2", key: "autoVoice", label: "Auto Voice", value: false }
+  { id: "8.2", key: "autoVoice", label: "Auto Voice", value: false },
+  { id: "9.1", key: "statusReact", label: "Status React: Green Heart 💚", value: "green" },
+  { id: "9.2", key: "statusReact", label: "Status React: Random Emoji 🎲", value: "random" },
+  { id: "9.3", key: "statusReact", label: "Status React", value: "off" }
 ];
 
 const CATEGORIES = {
@@ -38,7 +41,7 @@ const CATEGORIES = {
   "6": ["OWNER & SETTINGS", [
     ".settings", ".apply", "set 1.1 Bot Name", "set 1.3 Footer",
     "set 1.4 Alive Message", ".autoreply on/off", ".statusseen on/off",
-    ".antidelete on/off", ".viewonce on/off", ".aichat on/off",
+    ".statusreact green|random|off", ".antidelete on/off", ".viewonce on/off", ".aichat on/off",
     ".groupcmd on/off", ".composing on/off", ".autovoice on/off"
   ]],
   "7": ["SUBBOT", [
@@ -147,7 +150,7 @@ function makeCommandList(config, prefix) {
     ["DOWNLOAD COMMANDS", [prefix+"dl <url>", prefix+"fb <url>"]],
     ["AI & PRANK COMMANDS", [prefix+"ai <question>", prefix+"hack"]],
     ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replaceeply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
-    ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
+    ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
     ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
   ];
   return [
@@ -181,6 +184,11 @@ function makeSettingsMenu(config, prefix) {
     "├─ *[2] AUTO STATUS SEEN*",
     "│  2.1 | Enable  " + (current("autoStatusSeen") === "🟢 ON" ? "🟢" : ""),
     "│  2.2 | Disable",
+    "│",
+    "├─ *[9] STATUS REACTION*",
+    "│  9.1 | Green Heart 💚  " + (config.statusReact === "green" ? "🟢" : ""),
+    "│  9.2 | Random Emoji 🎲  " + (config.statusReact === "random" ? "🟢" : ""),
+    "│  9.3 | Disable Status React",
     "│",
     "├─ *[3] ANTI-DELETE*",
     "│  3.1 | Enable  " + (current("antiDelete") === "🟢 ON" ? "🟢" : ""),
@@ -342,6 +350,23 @@ export default async function core({ sock, message, config }) {
   if (command === "settings" || command === "setting") {
     if (!owner) return send("⛔ Owner only.");
     return send(makeSettingsMenu(config, prefix));
+  }
+
+  if (command === "statusreact") {
+    if (!owner) return send("⛔ Status reaction setting එක වෙනස් කළ හැක්කේ Ownerට පමණයි.");
+    const mode = arg.toLowerCase();
+    if (!["green", "random", "off"].includes(mode)) {
+      return send("භාවිතය: " + prefix + "statusreact green | random | off");
+    }
+    config.statusReact = mode;
+    try {
+      saveConfig(config);
+    } catch (error) {
+      console.error("Status reaction config save failed:", error.message);
+      return send("❌ Status reaction setting save කරන්න බැරි වුණා: " + error.message);
+    }
+    const label = mode === "green" ? "Green Heart 💚" : mode === "random" ? "Random Emoji 🎲" : "OFF 🔴";
+    return send("✅ *Status Reaction:* " + label);
   }
 
   if (command === "autoreply" || command === "statusseen" ||
