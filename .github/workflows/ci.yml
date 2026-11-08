@@ -42,9 +42,40 @@ jobs:
       - name: Test system information
         run: npm run test:system-info
 
+  oracle-health:
+    name: Verify restricted Oracle access (read-only)
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/assistant-workflow'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Configure SSH
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          test -n "$ORACLE_HOST"
+          test -n "$ORACLE_USER"
+          test -n "$ORACLE_SSH_KEY"
+          test -n "$ORACLE_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\\n' "$ORACLE_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          printf 'ORACLE_HOST=%s\\nORACLE_USER=%s\\n' "$ORACLE_HOST" "$ORACLE_USER" >> "$GITHUB_ENV"
+
+      - name: Run read-only health check
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$ORACLE_USER@$ORACLE_HOST" health
+
   deploy:
     name: Deploy to Oracle with rollback
-    needs: check
+    needs: [check, oracle-health]
     if: github.event_name == 'push' && github.ref == 'refs/heads/assistant-workflow' && vars.ORACLE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
