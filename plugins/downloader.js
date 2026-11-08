@@ -36,12 +36,12 @@ export default async function downloader({ sock, message, config, execCommand = 
   const input = body.trim().slice((prefix + command).length).trim();
   const isAudio = command === "song";
   const supportsSearch = command === "video" || isAudio;
-  if (!input || (!supportsSearch && !/^https?:\\///i.test(input))) {
+  if (!input || (!supportsSearch && !/^https?:\/\/i.test(input))) {
     return sock.sendMessage(jid, {
       text: "⚠️ *භාවිතය:* " + prefix + command + (supportsSearch ? " song name / public URL" : " https://...")
     }, { quoted: message });
   }
-  const target = supportsSearch && !/^https?:\\///i.test(input) ? "ytsearch1:" + input : input;
+  const target = supportsSearch && !/^https?:\/\/i.test(input) ? "ytsearch1:" + input : input;
   const sizeLimit = isAudio ? 16 * 1024 * 1024 : MAX_BYTES;
   const dir = path.resolve(config.downloadDir || "downloads");
   fileSystem.mkdirSync(dir, { recursive: true });
@@ -49,7 +49,7 @@ export default async function downloader({ sock, message, config, execCommand = 
 
   try {
     await sock.sendMessage(jid, {
-      text: "╭─「 ⏳ *" + (isAudio ? "SONG" : "VIDEO") + " DOWNLOADING* 」\\n│\\n│ 🔎 " + (supportsSearch && !/^https?:\\///i.test(input) ? "Search කරමින්..." : "Link එක පරීක්ෂා කරමින්...") + "\\n│ " + (isAudio ? "🎵 Audio එක සූදානම් කරමින්" : "🎬 වීඩියෝ එක සූදානම් කරමින්") + "\\n│\\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\\n╰──────────────"
+      text: "╭─「 ⏳ *" + (isAudio ? "SONG" : "VIDEO") + " DOWNLOADING* 」\n│\n│ 🔎 " + (supportsSearch && !/^https?:\/\/i.test(input) ? "Search කරමින්..." : "Link එක පරීක්ෂා කරමින්...") + "\n│ " + (isAudio ? "🎵 Audio එක සූදානම් කරමින්" : "🎬 වීඩියෝ එක සූදානම් කරමින්") + "\n│\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\n╰──────────────"
     }, { quoted: message });
 
     await execCommand("yt-dlp", ["--version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
@@ -80,7 +80,7 @@ export default async function downloader({ sock, message, config, execCommand = 
     } else {
       await sock.sendMessage(jid, {
         video: data,
-        caption: "✅ *DOWNLOAD COMPLETED*\\n\\n🎬 " + path.basename(file) + "\\n📦 " + (size / (1024 * 1024)).toFixed(1) + " MB\\n❤️ *POWERED BY HASA*"
+        caption: "✅ *DOWNLOAD COMPLETED*\n\n🎬 " + path.basename(file) + "\n📦 " + (size / (1024 * 1024)).toFixed(1) + " MB\n❤️ *POWERED BY HASA*"
       }, { quoted: message });
     }
   } catch (error) {
