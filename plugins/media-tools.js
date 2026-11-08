@@ -68,7 +68,7 @@ export default async function mediaTools({ sock, message, config }) {
   const [type, media] = getQuotedContent(message);
   if (!media) {
     return send(
-      "╭─〔 🎞️ *HASА MEDIA TOOLS* 〕\n" +
+      "╭─〔 🎞️ *HASA MEDIA TOOLS* 〕\n" +
       "│ .sticker — Image/Video එකකට Reply කරන්න\n" +
       "│ .toaudio — Video එකකට Reply කරන්න\n" +
       "│ .toimage — Sticker එකකට Reply කරන්න\n" +
