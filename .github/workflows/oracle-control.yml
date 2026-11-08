@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|restart|rollback) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|restart|rollback|remove-old) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -102,6 +102,50 @@ jobs:
               pm2 restart hasa2 --update-env
               sleep 6
               print_status
+              ;;
+            remove-old)
+              # Only remove the known legacy PM2 app; refuse if its script path differs.
+              OLD_SCRIPT="$(pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasamd");
+                  console.log(p && p.pm2_env ? (p.pm2_env.pm_exec_path || "") : "NOT_FOUND");
+                });
+              ')"
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ] && [ "$OLD_SCRIPT" != "/home/opc/HASA-MD_next-Bot/index.js" ]; then
+                echo "Refusing removal: legacy PM2 script path did not match the expected old bot."
+                exit 1
+              fi
+              mkdir -p "$BACKUPS"
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                ARCHIVE="$BACKUPS/legacy-HASA-MD_next-Bot-$(date +%Y%m%d-%H%M%S).tar.gz"
+                tar -czf "$ARCHIVE" -C /home/opc HASA-MD_next-Bot
+                echo "Legacy bot archive created: $ARCHIVE"
+              fi
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ]; then
+                pm2 stop hasamd
+                pm2 delete hasamd
+              fi
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                rm -rf -- /home/opc/HASA-MD_next-Bot
+              fi
+              pm2 save
+              echo "Legacy hasamd process removed."
+              if pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasa2");
+                  if (!p || !p.pm2_env || p.pm2_env.status !== "online") process.exitCode = 1;
+                });
+              '; then
+                echo "New hasa2 process remains online."
+              else
+                echo "ERROR: new hasa2 process is not online."
+                exit 1
+              fi
+              pm2 status
               ;;
             rollback)
               test -s "$BACKUPS/last-good-commit"
