@@ -1,0 +1,163 @@
+name: Oracle Remote Control
+
+on:
+  push:
+    branches:
+      - assistant-workflow
+    paths:
+      - '.github/oracle-control/request.json'
+
+concurrency:
+  group: hasa2-oracle-control
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out control request
+        uses: actions/checkout@v4
+
+      - name: Validate request and prepare SSH
+        id: prepare
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
+          SSH_USER: ${{ secrets.ORACLE_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
+          REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
+          case "$ACTION" in
+            status|logs|restart|rollback) ;;
+            *) echo "Invalid operation"; exit 1 ;;
+          esac
+          [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_HOST"
+          test -n "$SSH_USER"
+          echo "action=$ACTION" >> "$GITHUB_OUTPUT"
+          echo "request_id=$REQUEST_ID" >> "$GITHUB_OUTPUT"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Run allowlisted operation and publish private report
+        env:
+          ACTION: ${{ steps.prepare.outputs.action }}
+          REQUEST_ID: ${{ steps.prepare.outputs.request_id }}
+          SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
+          SSH_USER: ${{ secrets.ORACLE_SSH_USER }}
+          REPORT_TOKEN: ${{ secrets.BOT_TEST_REPORT_TOKEN }}
+          REPORT_REPO: ${{ secrets.BOT_TEST_REPORT_REPO }}
+        run: |
+          set -euo pipefail
+          test -n "$REPORT_TOKEN"
+          test -n "$REPORT_REPO"
+
+          set +e
+          RESULT="$(ssh -i ~/.ssh/oracle_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1 <<'REMOTE'
+          set -Eeuo pipefail
+          APP=/home/opc/Hasa_2_bot
+          BACKUPS=/home/opc/hasa-backups
+          cd "$APP"
+
+          print_status() {
+            pm2 jlist | node -e '
+              let s = "";
+              process.stdin.on("data", d => s += d);
+              process.stdin.on("end", () => {
+                const p = JSON.parse(s).find(x => x.name === "hasa2");
+                if (!p) { console.log("PM2 process hasa2: NOT FOUND"); process.exitCode = 1; return; }
+                const e = p.pm2_env || {};
+                const m = p.monit || {};
+                console.log("PM2 status: " + (e.status || "unknown"));
+                console.log("Restart count: " + (e.restart_time ?? "unknown"));
+                console.log("Uptime: " + (e.pm_uptime ? Math.floor((Date.now()-e.pm_uptime)/1000) + " seconds" : "unknown"));
+                console.log("Memory: " + (m.memory != null ? Math.round(m.memory/1048576) + " MB" : "unknown"));
+                console.log("CPU: " + (m.cpu != null ? m.cpu + "%" : "unknown"));
+              });
+            '
+          }
+
+          echo "Request: $REQUEST_ID"
+          echo "Operation: $ACTION"
+          echo "Current commit: $(git rev-parse --short HEAD)"
+          case "$ACTION" in
+            status)
+              print_status
+              ;;
+            logs)
+              echo "Filtered recent diagnostics (message/chat payload-like lines excluded):"
+              FOUND=0
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  MATCHES="$(tail -n 160 "$f" | grep -Ei 'error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|uncaught|rejection' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 35 || true)"
+                  if [ -n "$MATCHES" ]; then
+                    echo "--- $(basename "$f") ---"
+                    printf '%s\n' "$MATCHES"
+                    FOUND=1
+                  fi
+                fi
+              done
+              [ "$FOUND" -eq 1 ] || echo "No matching error/warning lines in the recent log window."
+              print_status
+              ;;
+            restart)
+              pm2 restart hasa2 --update-env
+              sleep 6
+              print_status
+              ;;
+            rollback)
+              test -s "$BACKUPS/last-good-commit"
+              TARGET="$(cat "$BACKUPS/last-good-commit")"
+              CURRENT="$(git rev-parse HEAD)"
+              git cat-file -e "$TARGET^{commit}"
+              printf '%s\n' "$CURRENT" > "$BACKUPS/last-good-commit"
+              git reset --hard "$TARGET"
+              npm install --no-audit --no-fund
+              npm run check
+              pm2 restart hasa2 --update-env
+              sleep 8
+              print_status
+              echo "Rolled back to: $(git rev-parse --short HEAD)"
+              ;;
+          esac
+          REMOTE
+          )"
+          SSH_RC=$?
+          set -e
+
+          if [ "$SSH_RC" -ne 0 ]; then
+            STATE="FAILED"
+            RESULT="Remote operation failed (exit $SSH_RC). $RESULT"
+          else
+            STATE="SUCCESS"
+          fi
+
+          TITLE="Oracle $ACTION $STATE [$REQUEST_ID]"
+          BODY="Request: $REQUEST_ID
+Operation: $ACTION
+Result: $STATE
+
+$RESULT"
+          RESPONSE="$(jq -n --arg title "$TITLE" --arg body "$BODY" '{title:$title,body:$body}')"
+          API_RESULT="$(curl --fail-with-body --silent --show-error \
+            -X POST "https://api.github.com/repos/$REPORT_REPO/issues" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $REPORT_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Content-Type: application/json" \
+            -d "$RESPONSE")"
+          ISSUE_URL="$(printf '%s' "$API_RESULT" | jq -r '.html_url // empty')"
+          test -n "$ISSUE_URL"
+          echo "Private Oracle report created: $ISSUE_URL"
+          if [ "$STATE" = "FAILED" ]; then
+            exit 1
+          fi
