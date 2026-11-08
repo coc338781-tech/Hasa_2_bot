@@ -5,7 +5,7 @@ export function parseTranslationInput(input) {
   const value = String(input || "").trim();
   if (!value) throw new Error("භාවිතය: .trt [language] text");
   const match = value.match(/^([a-z]{2,5})\s+([\s\S]+)$/i);
-  return match ? { target: match[1].toLowerCase(), text: match[2].trim() } : { target: "si", text: value };
+  const supported = new Set(["si", "en", "ta", "hi", "ur", "ar", "fr", "de", "es", "it", "ja", "zh", "ru", "ko", "pt", "nl", "tr", "th", "id", "ms", "ne", "bn", "gu", "mr", "pa", "fa", "he", "sw", "vi", "pl", "uk"]);\n  return match && supported.has(match[1].toLowerCase())\n    ? { target: match[1].toLowerCase(), text: match[2].trim() }\n    : { target: "si", text: value };
 }
 
 export async function lookupDictionary(word, fetchImpl = globalThis.fetch) {
