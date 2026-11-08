@@ -49,7 +49,7 @@ const CATEGORIES = {
   ]],
   "9": ["SUBBOT MANAGER", [
     ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
-    ".restartsubbot", ".delsubbot", ".helpsubbot"
+    ".restartsubbot", ".delsubbot", ".delallsubbot confirm", ".restartallsubbot", ".helpsubbot"
   ]],
   "10": ["UTILITY TOOLS", [
     ".math <expression>", ".cal <expression>", ".mathstep <expression>",
@@ -166,7 +166,7 @@ function makeCommandList(config, prefix) {
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
     ["OWNER CONTROL", [prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
-    ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]],
+    ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"delallsubbot confirm", prefix+"restartallsubbot", prefix+"helpsubbot"]],
     ["UTILITY TOOLS", [prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"quote (reply to message)", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>"]]
   ];
   return [
