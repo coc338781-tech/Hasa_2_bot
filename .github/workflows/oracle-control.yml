@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes|inspect-guard-script) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -109,6 +109,10 @@ jobs:
               echo "--- untracked non-ignored files ---"
               git ls-files --others --exclude-standard
               print_status
+              ;;
+            inspect-guard-script)
+              echo "Read-only inspection of deploy guard script."
+              sed -n "1,240p" /home/opc/bin/hasa2-deploy
               ;; 
             restart)
               pm2 restart hasa2 --update-env
