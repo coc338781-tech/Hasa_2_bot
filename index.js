@@ -49,9 +49,14 @@ function remember(message) {
 }
 
 async function handleStatusMessage(sock, message) {
-  if (config.autoStatusSeen) {
-    try { await sock.readMessages([message.key]); }
-    catch (error) { console.error("Auto status seen failed:", error.message); }
+  if (config.autoStatusSeen && message.key) {
+    // Do not let a slow/failing read receipt block status reactions or other messages.
+    try {
+      Promise.resolve(sock.readMessages([message.key])).catch(error =>
+        console.error("Auto status seen failed:", error.message));
+    } catch (error) {
+      console.error("Auto status seen failed:", error.message);
+    }
   }
   const mode = String(config.statusReact || "off").toLowerCase();
   const owner = message.key?.participant;
