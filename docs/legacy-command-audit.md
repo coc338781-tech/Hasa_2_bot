@@ -36,11 +36,11 @@ The old `.list` menu advertised roughly 190 command names, but the old source do
 The old menu advertised these groups, but code inspection did not find working command handlers for these names in the old `index.js` or its eight plugins. They are not considered ported merely because they appeared in `.list`.
 
 - **Convert:** `mp3tourl`, `dark`, `blur`, `toptt`, `remini`, `img2qr`, `removebg`, `toqr`, `subtr`, `splitmedia`, `surl`, `tts`, `img2url`, `toimg`, `pdf`, `emomix`, `removesticker`, `resetsticker`, `getsticker`, `addsticker`, `addbad`, `resetbad`, `getbad`, `resetvoice`, `removevoice`, `getvoice`, `addvoice`.
-- **Owner / administration:** `update`, `getpp`, `enc`, `dec`, `boom`, `vv`, `tovv`, `send`, `deljid`, `dp`, `sendtag`, `sendmsg`, `remove`, `backup`, `restore`, `reset`, `note`, `myenv`, `dsn`, `report`, `alljid`, `restart`, `join`, `about`, `theme`, `addseedr`, `addcmd`, `getcmd`, `delcmd`, `resetcmd`, `setup`, `tgauth`, `tgconfig`.
-- **Main / utility:** `logo`, `edit`, `tempmail`, `rename`, `bingen`, `device`, `newgroup`, `delgroup`, `save`, `block`, `unblock`, `help`, `defaultimg`, `defaultfooter`.
+- **Owner / administration:** `update`, `getpp`, `enc`, `dec`, `boom`, `vv`, `tovv`, `send`, `deljid`, `dp`, `sendtag`, `sendmsg`, `remove`, `backup`, `restore`, `reset`, `note`, `myenv`, `dsn`, `report`, `quote`, `alljid`, `restart`, `join`, `about`, `theme`, `addseedr`, `addcmd`, `getcmd`, `delcmd`, `resetcmd`, `setup`, `tgauth`, `tgconfig`.
+- **Main / utility:** `logo`, `edit`, `tempmail`, `rename`, `bingen`, `dictionary`, `readmore`, `device`, `newgroup`, `delgroup`, `save`, `block`, `unblock`, `help`, `id`, `jid`, `defaultimg`, `defaultfooter`.
 - **Downloads:** `tgvideo`, `downurl`, `threads`, `twitter`, `pinterest`, `pastpaper`, `teradl`, `gitclone`, `tiktok`, `ig`, `apk`, `gdrive`, `mediafire`, `ss`, `seedr`, `anime`, `sisub`, `mega`, `movie`, `xvdl`, `tgup`.
 - **Search / information:** `tiktoksearch`, `findtiktok`, `findapk`, `pixabay`, `unsplash`, `ip`, `cric`, `find`, `yts`, `npm`, `wabeta`, `movieinfo`, `weather`, `lyrics`, `git`.
-- **AI:** `imagine` (the old menu label; new bot has the separate `ai` command).
+- **Math / AI:** `mathstep`, `math`, `cal`, `imagine` (the old menu labels; new bot has the separate `ai` command).
 - **Group / channel:** `gdp`, `automute`, `timer`, `gsetting`, `safemode`, `ingsettings`, `ban`, `unban`, `invite`, `mute`, `unmute`, `gdesc`, `gname`, `left`, `antispam`, `del`, `delopt`, `cinfo`, `cupd`, `creact`, `csong`, `ctiktok`.
 - **Games:** `xo`, `delxo`, `guess`, `trivia`, `chess`, `hangman`, `scramble`, `slot`.
 - **Sticker:** `attp`, `ttp`, `searchsticker`, `steal`.
