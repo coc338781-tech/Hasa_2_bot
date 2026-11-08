@@ -50,40 +50,47 @@ export default async function testReport({ sock, message, config }) {
     return;
   }
 
-  const privacyCheck = await fetch(API + "/repos/" + reportRepo, {
-    headers: { "Accept": "application/vnd.github+json", "Authorization": "Bearer " + token, "X-GitHub-Api-Version": "2022-11-28" },
-    signal: AbortSignal.timeout(10000)
-  });
-  if (!privacyCheck.ok || !(await privacyCheck.json()).private) {
-    console.error("[BOTCHECK] Refusing to upload: report repository is not confirmed private.");
-    await sock.sendMessage(jid, { text: "🔒 Report එක upload කළේ නැහැ. Private report repository එක තහවුරු කළ නොහැකි නිසා ආරක්ෂාවට නතර කළා." }, { quoted: message });
-    return;
-  }
-
-  const report = [
-    "Automated owner-triggered bot check.",
-    "",
-    "- WhatsApp command received: PASS",
-    "- WhatsApp reply: " + checks.whatsappReply,
-    "- Plugin loader: " + (checks.pluginLoader ? "PASS" : "FAIL"),
-    "- Loaded plugin count: " + checks.loadedPluginCount,
-    "- Plugins: " + checks.loadedPlugins.join(", "),
-    "- Node: " + checks.nodeVersion,
-    "- Uptime seconds: " + checks.uptimeSeconds,
-    "- Timestamp: " + checks.timestamp,
-    "",
-    "Privacy: no chat text, message contents, contacts, media, or chat history are collected or included."
-  ].join("\n");
-
   try {
+    const headers = {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer " + token,
+      "X-GitHub-Api-Version": "2022-11-28"
+    };
+    const privacyCheck = await fetch(API + "/repos/" + reportRepo, {
+      headers,
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!privacyCheck.ok) {
+      const status = privacyCheck.status;
+      throw new Error("Repository access check failed (HTTP " + status + "). Check token access to the private report repo.");
+    }
+    const repository = await privacyCheck.json();
+    if (!repository.private) {
+      console.error("[BOTCHECK] Refusing to upload: report repository is not private.");
+      await sock.sendMessage(jid, {
+        text: "🔒 Report එක upload කළේ නැහැ. Report repo එක private නොවන නිසා ආරක්ෂාවට නතර කළා."
+      }, { quoted: message });
+      return;
+    }
+
+    const report = [
+      "Automated owner-triggered bot check.",
+      "",
+      "- WhatsApp command received: PASS",
+      "- WhatsApp reply: " + checks.whatsappReply,
+      "- Plugin loader: " + (checks.pluginLoader ? "PASS" : "FAIL"),
+      "- Loaded plugin count: " + checks.loadedPluginCount,
+      "- Plugins: " + checks.loadedPlugins.join(", "),
+      "- Node: " + checks.nodeVersion,
+      "- Uptime seconds: " + checks.uptimeSeconds,
+      "- Timestamp: " + checks.timestamp,
+      "",
+      "Privacy: no chat text, message contents, contacts, media, or chat history are collected or included."
+    ].join("\n");
+
     const response = await fetch(API + "/repos/" + reportRepo + "/issues", {
       method: "POST",
-      headers: {
-        "Accept": "application/vnd.github+json",
-        "Authorization": "Bearer " + token,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json"
-      },
+      headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
         title: "[BOTCHECK] " + checks.timestamp,
         body: report
@@ -91,8 +98,7 @@ export default async function testReport({ sock, message, config }) {
       signal: AbortSignal.timeout(12000)
     });
     if (!response.ok) {
-      const detail = await response.text();
-      throw new Error("GitHub API " + response.status + ": " + detail.slice(0, 180));
+      throw new Error("GitHub issue creation failed (HTTP " + response.status + "). Check that the token has Issues read/write access to the private report repo.");
     }
     const issue = await response.json();
     console.log("[BOTCHECK] Report uploaded:", issue.html_url);
@@ -100,9 +106,15 @@ export default async function testReport({ sock, message, config }) {
       text: "📡 Test report එක private GitHub repository එකට යැව්වා.\n" + issue.html_url
     }, { quoted: message });
   } catch (error) {
-    console.error("[BOTCHECK] Report upload failed:", error.message);
+    const detail = String(error?.message || error).slice(0, 220);
+    console.error("[BOTCHECK] Report upload failed:", detail);
+    let advice = "Server network එක හෝ GitHub token/repo access එක පරීක්ෂා කළ යුතුයි.";
+    if (/HTTP 401/.test(detail)) advice = "GitHub token එක invalid හෝ expired. Token එක අලුත් කර secret එක update කරන්න.";
+    else if (/HTTP 403/.test(detail)) advice = "Token එකට private repo එකේ Issues read/write permission නැහැ, නැත්නම් rate limit එකක්.";
+    else if (/HTTP 404/.test(detail)) advice = "Repo නම වැරදි හෝ token එකට private repo එක පෙනෙන්නේ නැහැ.";
+    else if (/timed out|fetch failed|ENOTFOUND|ECONN/.test(detail)) advice = "Oracle server එකෙන් GitHub වෙත network connection එක අසාර්ථකයි.";
     await sock.sendMessage(jid, {
-      text: "⚠️ WhatsApp test එක වැඩ කළා. නමුත් GitHub report එක යවන්න බැරි වුණා. Server log එකේ දෝෂය සටහන් කළා."
+      text: "⚠️ GitHub report upload අසාර්ථකයි.\n හේතුව: " + detail + "\n" + advice + "\n\n🔐 Chat messages කිසිවක් report එකට ඇතුළත් කරන්නේ නැහැ."
     }, { quoted: message });
   }
 }
