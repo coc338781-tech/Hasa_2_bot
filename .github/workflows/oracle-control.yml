@@ -128,10 +128,10 @@ jobs:
           s = s.replace(old, '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then', 1)
           needle = '  OLD_SHA="$(git rev-parse HEAD)"'
           block = """  UNTRACKED=\"$(git ls-files --others --exclude-standard)\"
-            UNEXPECTED=\"$(printf '%s\\\\n' \"$UNTRACKED\" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)\"
+            UNEXPECTED=\"$(printf '%s\\n' \"$UNTRACKED\" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)\"
             if [ -n \"$UNEXPECTED\" ]; then
               echo \"STOP: Unexpected untracked files exist; preserving them.\"
-              printf '%s\\\\n' \"$UNEXPECTED\"
+              printf '%s\\n' \"$UNEXPECTED\"
               exit 1
             fi
 
