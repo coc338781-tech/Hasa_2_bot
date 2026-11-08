@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|restart|rollback|remove-old) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -98,6 +98,18 @@ jobs:
               [ "$FOUND" -eq 1 ] || echo "No matching diagnostic lines found."
               print_status
               ;;
+            inspect-changes)
+              echo "Tracked and untracked file names only; file contents are not shown."
+              echo "--- git status --short ---"
+              git status --short
+              echo "--- tracked diff summary ---"
+              git diff --stat
+              echo "--- staged diff summary ---"
+              git diff --cached --stat
+              echo "--- untracked non-ignored files ---"
+              git ls-files --others --exclude-standard
+              print_status
+              ;; 
             restart)
               pm2 restart hasa2 --update-env
               sleep 6
