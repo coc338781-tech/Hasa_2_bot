@@ -1,4 +1,3 @@
-const REPO = "coc338781-tech/Hasa_2_bot";
 const API = "https://api.github.com";
 
 function isOwner(sender, message, config) {
@@ -45,8 +44,19 @@ export default async function testReport({ sock, message, config }) {
   }
 
   const token = process.env.BOT_TEST_REPORT_TOKEN;
-  if (!token) {
-    console.log("[BOTCHECK]", JSON.stringify(checks));
+  const reportRepo = String(process.env.BOT_TEST_REPORT_REPO || "").trim();
+  if (!token || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(reportRepo)) {
+    console.log("[BOTCHECK] Local-only report; private report repository is not configured.", JSON.stringify(checks));
+    return;
+  }
+
+  const privacyCheck = await fetch(API + "/repos/" + reportRepo, {
+    headers: { "Accept": "application/vnd.github+json", "Authorization": "Bearer " + token, "X-GitHub-Api-Version": "2022-11-28" },
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!privacyCheck.ok || !(await privacyCheck.json()).private) {
+    console.error("[BOTCHECK] Refusing to upload: report repository is not confirmed private.");
+    await sock.sendMessage(jid, { text: "🔒 Report එක upload කළේ නැහැ. Private report repository එක තහවුරු කළ නොහැකි නිසා ආරක්ෂාවට නතර කළා." }, { quoted: message });
     return;
   }
 
@@ -66,7 +76,7 @@ export default async function testReport({ sock, message, config }) {
   ].join("\n");
 
   try {
-    const response = await fetch(API + "/repos/" + REPO + "/issues", {
+    const response = await fetch(API + "/repos/" + reportRepo + "/issues", {
       method: "POST",
       headers: {
         "Accept": "application/vnd.github+json",
