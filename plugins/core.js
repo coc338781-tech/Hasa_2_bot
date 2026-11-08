@@ -25,29 +25,14 @@ const SETTINGS = [
 ];
 
 const CATEGORIES = {
-  "1": ["BASIC & MAIN", [
-    ".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram", ".fastmode", ".loadavg"
-  ]],
-  "2": ["GROUP", [
-    ".tagall [message]", ".hidetag [message]", ".promote @user",
-    ".demote @user", ".kick @user", ".groupinfo"
-  ]],
-  "3": ["DOWNLOAD", [".dl <url>", ".fb <url>"]],
-  "4": ["AI & PRANK", [".ai <question>", ".hack"]],
-  "5": ["AUTO REPLY", [
-    ".addreply word-reply", ".replacereply word-reply", ".getreply",
-    ".removereply word", ".resetreply"
-  ]],
-  "6": ["OWNER & SETTINGS", [
-    ".settings", ".apply", "set 1.1 Bot Name", "set 1.3 Footer",
-    "set 1.4 Alive Message", ".autoreply on/off", ".statusseen on/off",
-    ".statusreact green|random|off", ".antidelete on/off", ".viewonce on/off", ".aichat on/off",
-    ".groupcmd on/off", ".composing on/off", ".autovoice on/off"
-  ]],
-  "7": ["SUBBOT", [
-    ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
-    ".restartsubbot", ".delsubbot", ".helpsubbot"
-  ]]
+  "1": ["GENERAL", [".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram"]],
+  "2": ["AI ASSISTANT", [".ai <question>", ".ai (reply to image/audio)", ".aistatus"]],
+  "3": ["DOWNLOADERS", [".dl <url>", ".fb <url>"]],
+  "4": ["GROUP TOOLS", [".tagall [message]", ".hidetag [message]", ".promote @user", ".demote @user", ".kick @user", ".groupinfo"]],
+  "5": ["AUTOMATIONS", [".autoreply on/off", ".addreply word-reply", ".replacereply word-reply", ".getreply", ".removereply word", ".resetreply", ".statusseen on/off", ".statusreact green|random|off", ".antidelete on/off", ".viewonce on/off"]],
+  "6": ["STICKER & MEDIA", [".sticker (reply to image/video)", ".toaudio (reply to video)", ".toimage (reply to sticker)"]],
+  "7": ["OWNER PANEL", [".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", ".botcheck"]],
+  "8": ["BOT SETTINGS", [".settings", ".aichat on/off", ".groupcmd on/off", ".composing on/off", ".autovoice on/off", ".statusreact green|random|off", ".helpsubbot"]]
 };
 
 function isEnabled(value) {
@@ -117,57 +102,60 @@ function makeMainMenu(config) {
   const free = (os.freemem() / 1024 / 1024).toFixed(0);
   const used = total - free;
   const names = [
-    "1   BASIC & MAIN",
-    "2   GROUP",
-    "3   DOWNLOAD",
-    "4   AI & PRANK",
-    "5   AUTO REPLY",
-    "6   OWNER & SETTINGS",
-    "7   SUBBOT"
+    "01  ✦  GENERAL",
+    "02  ✦  AI ASSISTANT",
+    "03  ✦  DOWNLOADERS",
+    "04  ✦  GROUP TOOLS",
+    "05  ✦  AUTOMATIONS",
+    "06  ✦  STICKER & MEDIA",
+    "07  ✦  OWNER PANEL",
+    "08  ✦  BOT SETTINGS"
   ];
   return [
     "*HELLO! WELCOME TO HASA 2 BOT*",
-    "╭───「 *COMMANDS PANEL* 」",
-    "│ ◈ RAM USAGE - *" + used + "MB / " + total + "MB*",
-    "│ ◈ RUNTIME - *" + Math.floor(process.uptime() / 60) + " MINUTES*",
-    "╰────────────────────",
+    "╭━━━〔 🤖 *MAIN MENU* 〕━━━",
+    "┃",
+    "┃  ✦ *NEXT GENERATION WHATSAPP MD BOT*",
+    "┃  ◈ RAM  " + used + "MB / " + total + "MB",
+    "┃  ◈ UPTIME  " + Math.floor(process.uptime() / 60) + " MIN",
+    "┃",
+    ...names.map(line => "┃  " + line),
+    "┃",
+    "╰━━━━━━━━━━━━━━━━━━",
     "",
-    "⛵ *LIST MENU*",
-    ...names.map(line => "│ " + line),
-    "╰────────────────────",
+    "📌 *Select a category:* Reply to this message with its number.",
+    "📜 Full commands: " + (config.prefix || ".") + "list",
+    "⚙️ Owner settings: " + (config.prefix || ".") + "settings",
     "",
-    "*Reply to this message with the number you want to select.*",
-    "",
-    "📜 Full command list: .list",
-    "⚙️ Settings: .settings"
+    "⚡ *FAST • SMART • SECURE*",
+    "❤️ *POWERED BY HASA*"
   ].join("\n");
 }
 
 function makeCommandList(config, prefix) {
   const groups = [
-    ["BASIC & MAIN COMMANDS", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram", prefix+"fastmode", prefix+"loadavg"]],
-    ["GROUP COMMANDS", [prefix+"tagall", prefix+"hidetag", prefix+"promote", prefix+"demote", prefix+"kick", prefix+"groupinfo"]],
-    ["DOWNLOAD COMMANDS", [prefix+"dl <url>", prefix+"fb <url>"]],
-    ["AI & PRANK COMMANDS", [prefix+"ai <question>", prefix+"hack"]],
-    ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
-    ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
-    ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
+    ["GENERAL", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram"]],
+    ["AI ASSISTANT", [prefix+"ai <question>", prefix+"ai (reply to image/audio)"]],
+    ["DOWNLOADERS", [prefix+"dl <url>", prefix+"fb <url>"]],
+    ["GROUP TOOLS", [prefix+"tagall", prefix+"hidetag", prefix+"promote", prefix+"demote", prefix+"kick", prefix+"groupinfo"]],
+    ["AUTOMATIONS", [prefix+"autoreply on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off"]],
+    ["STICKER & MEDIA", [prefix+"sticker (reply to image/video)", prefix+"toaudio (reply to video)", prefix+"toimage (reply to sticker)"]],
+    ["OWNER PANEL", [prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"botcheck"]],
+    ["BOT SETTINGS & SUBBOT", [prefix+"settings", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
-    "╭───「 *COMMANDS PANEL* 」",
-    "│ ◈ RUNTIME - *" + Math.floor(process.uptime() / 60) + " MINUTES*",
-    "╰────────────────────",
+    "╭━━━〔 📜 *COMMAND CENTER* 〕━━━",
+    "┃ Runtime: *" + Math.floor(process.uptime() / 60) + " MINUTES*",
+    "╰━━━━━━━━━━━━━━━━━━",
     ...groups.flatMap(([title, commands]) => [
       "",
-      "╭──────────●●►",
-      "*│📜 " + title + "*",
-      "│   ───────",
-      ...commands.map(command => "*│►* " + command),
-      "╰───────────●●►"
+      "╭──〔 *" + title + "* 〕",
+      ...commands.map(command => "┃ ▸ " + command),
+      "╰━━━━━━━━━━━━━━━━━━"
     ]),
     "",
-    "✨ *Hasa_2_bot | Command Center*"
+    "⚡ *HASA 2 BOT • PREMIUM MD*"
   ].join("\n");
 }
 
