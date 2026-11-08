@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { lookupDictionary, parseTranslationInput, translateText } from "../plugins/language-tools.js";
 
 test("translation input defaults to Sinhala and accepts target language", () => {
-  assert.deepEqual(parseTranslationInput("Hello world"), { target: "si", text: "Hello world" });
+  assert.deepEqual(parseTranslationInput("Hello world"), { target: "si", text: "Hello world" });\n  assert.deepEqual(parseTranslationInput("hello"), { target: "si", text: "hello" });
   assert.deepEqual(parseTranslationInput("ta Good morning"), { target: "ta", text: "Good morning" });
   assert.throws(() => parseTranslationInput(""), /භාවිතය/);
 });
