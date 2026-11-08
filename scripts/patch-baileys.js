@@ -60,13 +60,12 @@ case 'msg': {
       ? stanza.attrs.participant_pn || stanza.attrs.sender_pn || stanza.attrs.peer_recipient_pn
       : stanza.attrs.participant_lid || stanza.attrs.sender_lid || stanza.attrs.peer_recipient_lid
     if (!retryJid || retryJid === decryptionJid) {
+      console.warn('[Hasa_2_bot] Decrypt failed; no alternate PN/LID identity was available.')
       throw err
     }
 
-    logger.debug(
-      { key: fullMessage.key, primary: decryptionJid, retryWith: retryJid },
-      'primary identity failed to decrypt; retrying with stanza-provided PN/LID pairing'
-    )
+    // Deliberately log no JIDs, message keys, message text, or chat metadata.
+    console.warn('[Hasa_2_bot] Decrypt retry started using alternate PN/LID identity.')
 
     try {
       msgBuffer = await repository.decryptMessage({
@@ -74,8 +73,10 @@ case 'msg': {
         type: e2eType,
         ciphertext: content
       })
+      console.warn('[Hasa_2_bot] Alternate PN/LID decrypt retry succeeded.')
     } catch {
       // Preserve the original failure (for example, Bad MAC).
+      console.warn('[Hasa_2_bot] Alternate PN/LID decrypt retry failed.')
       throw err
     }
   }
