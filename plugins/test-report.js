@@ -76,8 +76,7 @@ export default async function testReport({ sock, message, config }) {
       },
       body: JSON.stringify({
         title: "[BOTCHECK] " + checks.timestamp,
-        body: report,
-        labels: ["bot-health-check"]
+        body: report
       }),
       signal: AbortSignal.timeout(12000)
     });
