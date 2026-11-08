@@ -68,43 +68,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
           printf 'ORACLE_HOST=%s\nORACLE_USER=%s\n' "$ORACLE_HOST" "$ORACLE_USER" >> "$GITHUB_ENV"
 
-      - name: Deploy safely and roll back on failure
+      - name: Request restricted Oracle deployment
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$ORACLE_USER@$ORACLE_HOST" 'bash -s' <<'REMOTE'
-          set -Eeuo pipefail
-          APP_DIR=/home/opc/Hasa_2_bot
-          BRANCH=assistant-workflow
-          BACKUP_DIR=/home/opc/hasa-deploy-backups
-          cd "$APP_DIR"
-
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "Deployment stopped: production working tree is not clean."
-            exit 1
-          fi
-
-          OLD_SHA="$(git rev-parse HEAD)"
-          mkdir -p "$BACKUP_DIR"
-          git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" "$OLD_SHA"
-
-          rollback() {
-            echo "Deployment failed; restoring previous code revision."
-            git reset --hard "$OLD_SHA" || true
-            npm install --no-audit --no-fund || true
-            pm2 restart hasa2 || true
-          }
-          trap rollback ERR
-
-          git fetch origin "$BRANCH"
-          git reset --hard "origin/$BRANCH"
-          npm install --no-audit --no-fund
-          npm run check
-          npm run test:decrypt-retry
-          npm run test:system-info
-          pm2 restart hasa2
-          sleep 3
-          pm2 describe hasa2 >/dev/null
-          pm2 status hasa2
-          trap - ERR
-          echo "Deployment completed successfully."
-          REMOTE
+          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$ORACLE_USER@$ORACLE_HOST" deploy
