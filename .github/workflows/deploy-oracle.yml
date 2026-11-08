@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - assistant-workflow
+    paths-ignore:
+      - '.github/oracle-control/**'
+      - '.github/workflows/oracle-control.yml'
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +29,7 @@ jobs:
           test -n "$SSH_HOST"
           test -n "$SSH_USER"
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/oracle_key
+          printf '%s\\n' "$SSH_PRIVATE_KEY" > ~/.ssh/oracle_key
           chmod 600 ~/.ssh/oracle_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           chmod 600 ~/.ssh/known_hosts
@@ -39,7 +42,7 @@ jobs:
           BOT_TEST_REPORT_REPO: ${{ secrets.BOT_TEST_REPORT_REPO }}
         run: |
           set -euo pipefail
-          REPORT_ENV_B64="$(printf 'BOT_TEST_REPORT_TOKEN=%s\nBOT_TEST_REPORT_REPO=%s\n' "$BOT_TEST_REPORT_TOKEN" "$BOT_TEST_REPORT_REPO" | base64 -w0)"
+          REPORT_ENV_B64="$(printf 'BOT_TEST_REPORT_TOKEN=%s\\nBOT_TEST_REPORT_REPO=%s\\n' "$BOT_TEST_REPORT_TOKEN" "$BOT_TEST_REPORT_REPO" | base64 -w0)"
           ssh -i ~/.ssh/oracle_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" "REPORT_ENV_B64='$REPORT_ENV_B64' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           APP=/home/opc/Hasa_2_bot
@@ -58,7 +61,7 @@ jobs:
           BACKUP="$BACKUPS/predeploy-$(date +%Y%m%d-%H%M%S).tar.gz"
           tar -czf "$BACKUP" --exclude='./node_modules' --exclude='./auth_info' --exclude='./.git' --exclude='./downloads' .
           chmod 600 "$BACKUP"
-          printf '%s\n' "$PREVIOUS" > "$BACKUPS/last-good-commit"
+          printf '%s\\n' "$PREVIOUS" > "$BACKUPS/last-good-commit"
 
           rollback() {
             echo "Deployment failed; restoring previous code $PREVIOUS"
