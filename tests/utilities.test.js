@@ -11,7 +11,7 @@ test("calculator respects arithmetic precedence and parentheses", () => {
 
 test("calculator supports safe math functions and constants", () => {
   assert.equal(evaluateExpression("sqrt(81) + abs(-2)"), 11);
-  assert.equal(evaluateExpression("round(pi, 0)"), 3);
+  assert.equal(evaluateExpression("round(pi)"), 3);
   assert.equal(evaluateExpression("pow(2, 5)"), 32);
 });
 
