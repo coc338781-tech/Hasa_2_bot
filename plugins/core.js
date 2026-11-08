@@ -250,6 +250,16 @@ export default async function core({ sock, message, config }) {
       if (!owner) return send("⛔ Settings වෙනස් කළ හැක්කේ Ownerට පමණයි.");
       const setting = SETTINGS.find(item => item.id === body);
       if (!setting) return send("❌ ඒ Setting අංකය හමු වුණේ නැහැ. " + prefix + "settings යවන්න.");
+      const currentValue = config[setting.key];
+      const alreadySelected = typeof setting.value === "boolean"
+        ? isEnabled(currentValue) === setting.value
+        : String(currentValue || "off").toLowerCase() === String(setting.value).toLowerCase();
+
+      if (alreadySelected) {
+        const state = setting.value === false || setting.value === "off" ? "OFF 🔴" : "ON 🟢";
+        return send("ℹ️ *" + setting.label + "* දැනටමත් " + state + " කරලා තියෙන්නේ.");
+      }
+
       config[setting.key] = setting.value;
       try {
         saveConfig(config);
@@ -258,7 +268,7 @@ export default async function core({ sock, message, config }) {
         return send("❌ Setting Save කරන්න බැරි වුණා: " + error.message);
       }
       const enabled = setting.value !== false && setting.value !== "off";
-      return send("✅ *" + setting.label + "* " + (enabled ? "Enabled 🟢" : "Disabled 🔴") + "\n\n" + makeSettingsMenu(config, prefix));
+      return send("✅ *" + setting.label + "* " + (enabled ? "Enabled 🟢" : "Disabled 🔴"));
     }
   }
 
