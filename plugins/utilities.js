@@ -1,5 +1,3 @@
-import os from "node:os";
-
 const FUNCTIONS = {
   abs: { fn: Math.abs, min: 1, max: 1 },
   ceil: { fn: Math.ceil, min: 1, max: 1 },
@@ -154,27 +152,6 @@ export default async function utilities({ sock, message, config }) {
     } catch (error) {
       return send("❌ ගණනය කළ නොහැක: " + error.message);
     }
-  }
-
-  if (command === "uptime") {
-    return send("⏳ *BOT UPTIME*\n" + formatRuntime(process.uptime()));
-  }
-
-  if (command === "ram") {
-    const total = os.totalmem();
-    const free = os.freemem();
-    const used = total - free;
-    const mb = value => (value / 1024 / 1024).toFixed(1) + " MB";
-    return send("💾 *RAM USAGE*\n\nUsed: " + mb(used) + "\nFree: " + mb(free) + "\nTotal: " + mb(total));
-  }
-
-  if (command === "loadavg") {
-    const values = os.loadavg().map(value => value.toFixed(2));
-    return send("📊 *SERVER LOAD*\n1 min: " + values[0] + "\n5 min: " + values[1] + "\n15 min: " + values[2]);
-  }
-
-  if (command === "fastmode") {
-    return send("⚡ *FAST MODE:* " + (config.fastMode ? "ON 🟢" : "OFF 🔴"));
   }
 
   if (command === "fancy") {
