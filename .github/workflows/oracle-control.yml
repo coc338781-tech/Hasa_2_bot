@@ -119,29 +119,29 @@ jobs:
               BACKUP="${GUARD}.bak-$(date +%Y%m%d-%H%M%S)"
               cp -p "$GUARD" "$BACKUP"
               python3 - "$GUARD" <<'PY'
-import pathlib, sys
-p = pathlib.Path(sys.argv[1])
-s = p.read_text()
-old = """  if [ -n "$(git status --porcelain)" ]; then
-    echo "STOP: Production folder has local changes."
-    exit 1
-  fi"""
-new = """  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    echo "STOP: Production folder has tracked local changes."
-    exit 1
-  fi
-  UNTRACKED="$(git ls-files --others --exclude-standard)"
-  ALLOWED="$(printf 'bot_logo.jpg\\npackage-lock.json')"
-  ALLOWED_REVERSED="$(printf 'package-lock.json\\nbot_logo.jpg')"
-  if [ -n "$UNTRACKED" ] && [ "$UNTRACKED" != "$ALLOWED" ] && [ "$UNTRACKED" != "$ALLOWED_REVERSED" ]; then
-    echo "STOP: Unexpected untracked files exist; preserving them."
-    printf '%s\\n' "$UNTRACKED"
-    exit 1
-  fi"""
-if old not in s:
-    raise SystemExit("Expected original guard was not found; no changes made.")
-p.write_text(s.replace(old, new, 1))
-PY
+              import pathlib, sys
+              p = pathlib.Path(sys.argv[1])
+              s = p.read_text()
+              old = """  if [ -n "$(git status --porcelain)" ]; then
+                  echo "STOP: Production folder has local changes."
+                  exit 1
+                fi"""
+              new = """  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+                  echo "STOP: Production folder has tracked local changes."
+                  exit 1
+                fi
+                UNTRACKED="$(git ls-files --others --exclude-standard)"
+                ALLOWED="$(printf 'bot_logo.jpg\\npackage-lock.json')"
+                ALLOWED_REVERSED="$(printf 'package-lock.json\\nbot_logo.jpg')"
+                if [ -n "$UNTRACKED" ] && [ "$UNTRACKED" != "$ALLOWED" ] && [ "$UNTRACKED" != "$ALLOWED_REVERSED" ]; then
+                  echo "STOP: Unexpected untracked files exist; preserving them."
+                  printf '%s\\n' "$UNTRACKED"
+                  exit 1
+                fi"""
+              if old not in s:
+                  raise SystemExit("Expected original guard was not found; no changes made.")
+              p.write_text(s.replace(old, new, 1))
+              PY
               bash -n "$GUARD"
               echo "Deploy guard updated; original backup: $BACKUP"
               sed -n "14,48p" "$GUARD"
