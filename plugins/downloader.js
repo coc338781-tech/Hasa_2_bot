@@ -35,7 +35,7 @@ export default async function downloader({ sock, message, config, execCommand = 
   if (command === "fbtest") {
     const checks = await checkDownloaderTools(exec);
     const lines = checks.map(item => (item.ok ? "✅ " : "❌ ") + item.name + ": " + (item.ok ? item.version : item.reason));
-    return sock.sendMessage(jid, { text: "🧪 *DOWNLOADER DIAGNOSTIC*\\n" + lines.join("\\n") + "\\n\\nමෙය server tools පමණක් පරීක්ෂා කරයි; Facebook link එකක් download කරලා බලන්නේ නැහැ." }, { quoted: message });
+    return sock.sendMessage(jid, { text: "🧪 *DOWNLOADER DIAGNOSTIC*\n" + lines.join("\n") + "\n\nමෙය server tools පමණක් පරීක්ෂා කරයි; Facebook link එකක් download කරලා බලන්නේ නැහැ." }, { quoted: message });
   }
   if (!["dl", "fb", "video", "song"].includes(command)) return;
 
