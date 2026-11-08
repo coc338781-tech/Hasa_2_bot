@@ -2,7 +2,7 @@ import "dotenv/config";
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
-  makeCacheableSignalKeyStore,
+  fetchLatestWaWebVersion,
   Browsers,
   downloadContentFromMessage
 } from "@whiskeysockets/baileys";
@@ -54,9 +54,18 @@ async function requestPairingCode(sock, state, generation) {
   pairingRequestedFor = generation;
 
   try {
-    // The qr event is emitted only after the server sends pair-device;
-    // request the pairing code only after that readiness signal.
+    // Wait for the WebSocket handshake before requesting a pairing code.
+    let attempts = 0;
+    while (generation === socketGeneration && sock.ws?.isOpen !== true && attempts < 40) {
+      await sleep(250);
+      attempts++;
+    }
     if (generation !== socketGeneration || state.creds.registered) return;
+    if (sock.ws?.isOpen !== true) {
+      console.error("Pairing code not requested: WhatsApp WebSocket did not open.");
+      console.error("The saved auth_info folder was not deleted.");
+      return;
+    }
 
     const code = await sock.requestPairingCode(phoneNumber);
     pairingIssued = true;
@@ -71,12 +80,11 @@ async function requestPairingCode(sock, state, generation) {
 async function startBot(authState = null) {
   const generation = ++socketGeneration;
   const { state, saveCreds } = authState || await useMultiFileAuthState(authDir);
+  const { version } = await fetchLatestWaWebVersion({});
   const sock = makeWASocket({
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger)
-    },
-    browser: ["Mac OS", "Safari", "10.15.7"],
+    version,
+    auth: state,
+    browser: Browsers.ubuntu("Chrome"),
     logger,
     printQRInTerminal: false,
     markOnlineOnConnect: false,
@@ -117,6 +125,10 @@ async function startBot(authState = null) {
     }
   });
 
+  // Also request pairing when the socket is ready, even if no QR event arrives.
+  if (!state.creds.registered) {
+    void requestPairingCode(sock, state, generation);
+  }
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify" && type !== "append") return;
