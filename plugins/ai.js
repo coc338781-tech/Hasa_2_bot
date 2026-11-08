@@ -37,7 +37,7 @@ async function mediaToInlineData(media, type) {
   const fallback = type === "imageMessage" ? "image/jpeg" : "audio/ogg";
   return {
     inlineData: {
-      mimeType: media.mimetype || fallback,
+      mimeType: String(media.mimetype || fallback).split(";")[0].trim(),
       data: buffer.toString("base64")
     }
   };
