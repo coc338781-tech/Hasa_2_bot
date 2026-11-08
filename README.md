@@ -48,3 +48,8 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 - Legacy source files are kept under `legacy-plugins/` for reference and are not loaded directly.
 - Syntax/CI checks do not guarantee WhatsApp will accept a session or that external download/AI providers will always work. Real connection testing must be done after installation with your own WhatsApp account.
 - Atlas-MD code has not been copied wholesale; features are being ported selectively to avoid mixing incompatible Baileys APIs or QR login paths.
+
+## Oracle deployment
+- GitHub Actions runs the test suite before checking the restricted Oracle deployment connection.
+- Oracle deployment is enabled only when the repository variable `ORACLE_DEPLOY_ENABLED` is set to `true`.
+- The restricted deploy script validates the application and rolls back the release if deployment checks fail.
