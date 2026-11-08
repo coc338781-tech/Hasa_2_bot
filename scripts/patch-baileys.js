@@ -56,8 +56,9 @@ case 'msg': {
   } catch (err) {
     // Use the exact alternate identity WhatsApp paired with this stanza.
     // If PN was mapped to LID before decrypt, retry with the original author JID.
-    const { senderAlt } = extractAddressingContext(stanza)
-    const retryJid = decryptionJid !== author ? author : senderAlt
+    const retryJid = isLidUser(decryptionJid)
+      ? stanza.attrs.participant_pn || stanza.attrs.sender_pn
+      : stanza.attrs.participant_lid || stanza.attrs.sender_lid
     if (!retryJid || retryJid === decryptionJid) {
       throw err
     }
