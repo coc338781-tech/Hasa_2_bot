@@ -65,13 +65,13 @@ export default async function subbot({ sock, message, config }) {
 
   if (command === "delallsubbot") {
     if ((args[0] || "").toLowerCase() !== "confirm") {
-      const count = findSavedSubbotOwners().length;
+      const count = new Set([...findSavedSubbotOwners(), ...listSubbots().map(item => item.owner)]).size;
       return sock.sendMessage(chat, { text: "⚠️ මෙය සියලුම Subbot sessions මකා දමයි (" + count + " saved). තහවුරු කිරීමට: " + prefix + "delallsubbot confirm" }, { quoted: message });
     }
     const owners = [...new Set([...findSavedSubbotOwners(), ...listSubbots().map(item => item.owner)])];
     const results = await deleteAllSubbots(owners, owner => stopSubbot(owner, { removeSession: true }));
     const failed = results.filter(item => !item.ok);
-    return sock.sendMessage(chat, { text: "🗑️ *BULK SUBBOT DELETE*\\nDeleted: " + (results.length - failed.length) + " / " + results.length + (failed.length ? "\\nFailed: " + failed.map(item => item.owner + " (" + item.error + ")").join(", ") : "") }, { quoted: message });
+    return sock.sendMessage(chat, { text: "🗑️ *BULK SUBBOT DELETE*\nDeleted: " + (results.length - failed.length) + " / " + results.length + (failed.length ? "\nFailed: " + failed.map(item => item.owner + " (" + item.error + ")").join(", ") : "") }, { quoted: message });
   }
   if (command === "restartallsubbot") {
     const owners = [...new Set([...findSavedSubbotOwners(), ...listSubbots().map(item => item.owner)])];
@@ -81,7 +81,7 @@ export default async function subbot({ sock, message, config }) {
       start: owner => startSubbot({ ownerJid: owner + "@s.whatsapp.net", mainSock: sock, config, plugins: globalThis.__hasaPlugins })
     });
     const failed = results.filter(item => !item.ok);
-    return sock.sendMessage(chat, { text: "🔄 *BULK SUBBOT RESTART*\\nRestart requested: " + (results.length - failed.length) + " / " + results.length + (failed.length ? "\\nFailed: " + failed.map(item => item.owner + " (" + item.error + ")").join(", ") : "") }, { quoted: message });
+    return sock.sendMessage(chat, { text: "🔄 *BULK SUBBOT RESTART*\nRestart requested: " + (results.length - failed.length) + " / " + results.length + (failed.length ? "\nFailed: " + failed.map(item => item.owner + " (" + item.error + ")").join(", ") : "") }, { quoted: message });
   }
 
   if (command === "restartsubbot") {
