@@ -2,6 +2,7 @@ import "dotenv/config";
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
+  makeCacheableSignalKeyStore,
   fetchLatestWaWebVersion,
   Browsers,
   downloadContentFromMessage
@@ -24,6 +25,19 @@ let shuttingDown = false;
 let pairingRequestedFor = -1;
 let pairingIssued = false;
 let phoneNumber = process.env.BOT_PHONE_NUMBER || "";
+
+function scheduleReconnect() {
+  if (shuttingDown) return;
+  const delay = Math.min(60_000, (pairingIssued ? 10_000 : 3_000) * (2 ** Math.min(reconnectAttempts++, 4)));
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    startBot().catch(error => {
+      console.error("Reconnect attempt failed:", error.message);
+      scheduleReconnect();
+    });
+  }, delay);
+  console.log("Reconnecting in " + Math.round(delay / 1000) + " seconds...");
+}
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -83,7 +97,7 @@ async function startBot(authState = null) {
   const { version } = await fetchLatestWaWebVersion({});
   const sock = makeWASocket({
     version,
-    auth: state,
+    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
     browser: Browsers.ubuntu("Chrome"),
     logger,
     printQRInTerminal: false,
@@ -117,10 +131,7 @@ async function startBot(authState = null) {
       if (code === DisconnectReason.loggedOut || code === DisconnectReason.badSession) {
         console.error("Session is logged out or invalid. auth_info was NOT deleted.");
       } else if (!shuttingDown) {
-        const delay = Math.min(60_000, (pairingIssued ? 10_000 : 3_000) * (2 ** Math.min(reconnectAttempts++, 4)));
-        clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(() => startBot().catch(err => console.error("Reconnect failed:", err)), delay);
-        console.log("Reconnecting in " + Math.round(delay / 1000) + " seconds...");
+        scheduleReconnect();
       }
     }
   });
