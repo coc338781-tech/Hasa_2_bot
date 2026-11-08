@@ -27,7 +27,7 @@ function explainDownloadError(error) {
     return "මේ වීඩියෝ එක ඔබේ ප්‍රදේශයෙන් ලබාගත නොහැක.";
   }
   if (/max-filesize|file is larger|larger than/i.test(details)) {
-    return "වීඩියෝ එක 64 MB සීමාවට වඩා විශාලයි.";
+    return "Media එක 64 MB සීමාවට වඩා විශාලයි.";
   }
   if (/429|too many requests|rate.?limit/i.test(details)) {
     return "වෙබ් අඩවියෙන් තාවකාලික සීමාවක් දමා තිබෙනවා. ටික වේලාවකින් නැවත උත්සාහ කරන්න.";
