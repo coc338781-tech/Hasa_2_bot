@@ -347,13 +347,39 @@ export default async function core({ sock, message, config }) {
 
   if (command === "alive") {
     const botName = config.BOT_NAME || config.botName || "Hasa_2_bot";
-    const aliveText = config.ALIVE_MSG || "System Online. ⚡\n\n" + botName + " is active and ready.";
+    const aliveText = config.ALIVE_MSG || "Your WhatsApp assistant is active and ready to serve.";
+    const uptimeSeconds = Math.floor(process.uptime());
+    const days = Math.floor(uptimeSeconds / 86400);
+    const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+    const seconds = uptimeSeconds % 60;
+    const uptime = [
+      days ? days + "d" : "",
+      hours ? hours + "h" : "",
+      minutes ? minutes + "m" : "",
+      seconds + "s"
+    ].filter(Boolean).join(" ");
+    const connectionStatus = sock.user ? "Connected 🟢" : "Active 🟡";
     const caption = [
-      "✅ *" + aliveText + "*",
+      "╭━━〔 🤖 *HASA 2 BOT* 〕━━╮",
       "",
-      "🤖 *" + botName + "*",
-      "⏱️ *Uptime:* " + Math.floor(process.uptime() / 60) + " minutes",
-      config.FOOTER ? "\n_" + config.FOOTER + "_" : ""
+      "        ✅ *SYSTEM ONLINE*",
+      "     ⚡ ALL SYSTEMS OPERATIONAL",
+      "",
+      aliveText,
+      "",
+      "╭──〔 📡 *BOT STATUS* 〕",
+      "│ 🤖 *Bot:* " + botName,
+      "│ 🟢 *Status:* " + connectionStatus,
+      "│ ⏱️ *Uptime:* " + uptime,
+      "╰━━━━━━━━━━━━━━━━━━",
+      "",
+      "╭──〔 👑 *BOT OWNERS* 〕",
+      "│ Hasantha S Bandara",
+      "│ Amandi C Priyadarshani",
+      "╰━━━━━━━━━━━━━━━━━━",
+      "",
+      config.FOOTER ? "_" + config.FOOTER + "_" : "⚡ *POWERED BY HASA 2 BOT* ❤️"
     ].join("\n");
     return sendWithLogo(sock, jid, message, caption, config);
   }
