@@ -53,7 +53,7 @@ const CATEGORIES = {
   ]],
   "10": ["UTILITY TOOLS", [
     ".math <expression>", ".cal <expression>", ".mathstep <expression>",
-    ".id", ".jid", ".quote (reply to message)", ".fancy <text>"
+    ".id", ".jid", ".quote (reply to message)", ".wame <number> [message]", ".readmore <preview> | <text>", ".fancy <text>"
   ]]
 };
 
@@ -166,7 +166,7 @@ function makeCommandList(config, prefix) {
     ["PRANK & FUN", [prefix+"hack"]],
     ["OWNER CONTROL", [prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
     ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]],
-    ["UTILITY TOOLS", [prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"quote (reply to message)", prefix+"fancy <text>"]]
+    ["UTILITY TOOLS", [prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"quote (reply to message)", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
