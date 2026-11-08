@@ -9,7 +9,8 @@
     "check": "node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && for f in plugins/*.js; do node --input-type=module -e \"await import('./$f')\" || exit 1; done && node --input-type=module -e \"await import('./lib/subbot-manager.js')\" && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\"",
     "postinstall": "node scripts/patch-baileys.js",
     "test:decrypt-retry": "node --test tests/decrypt-retry-patch.test.js",
-    "test:system-info": "node --test tests/system-info.test.js"
+    "test:system-info": "node --test tests/system-info.test.js",
+    "test:media-tools": "node --test tests/media-tools.test.js tests/ai.test.js"
   },
   "engines": {
     "node": ">=20.0.0"
