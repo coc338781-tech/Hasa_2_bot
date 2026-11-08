@@ -28,6 +28,7 @@ The old `.list` menu advertised roughly 190 command names, but the old source do
 - `.math`, `.cal`, `.mathstep` — restricted arithmetic parser; no `eval`.
 - `.id`, `.jid`, `.quote`, `.fancy`, `.wame`, `.readmore`.
 - `.video`, `.song` search support and guarded downloads.
+- `.fbtest` checks whether `yt-dlp` and `ffmpeg` are installed; it does not perform a network download.
 - `.dictionary` / `.dict` — English dictionary lookup.
 - `.trt` — text translation; defaults to Sinhala, or accepts a target language code (for example `.trt ta Hello`).
 
