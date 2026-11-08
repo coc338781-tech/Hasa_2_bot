@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateExpression, formatFancy, formatRuntime } from "../plugins/utilities.js";
+import { evaluateExpression, formatFancy, formatRuntime, createWaMeLink, buildReadMore } from "../plugins/utilities.js";
 
 test("calculator respects arithmetic precedence and parentheses", () => {
   assert.equal(evaluateExpression("2 + 3 * 4"), 14);
@@ -29,4 +29,19 @@ test("fancy formatter transforms Latin letters and digits only", () => {
 test("runtime formatter keeps days and seconds", () => {
   assert.equal(formatRuntime(90061), "1d 1h 1m 1s");
   assert.equal(formatRuntime(0), "0s");
+});
+
+test("WhatsApp link helper validates international numbers and encodes messages", () => {
+  assert.equal(createWaMeLink("94771234567 Hello there"), "https://wa.me/94771234567?text=Hello%20there");
+  assert.throws(() => createWaMeLink("0771234567"), /රටේ code/);
+  assert.throws(() => createWaMeLink("abc1234567"), /රටේ code/);
+});
+
+test("read-more helper separates preview and hidden text safely", () => {
+  const result = buildReadMore("Short preview", "The remaining message");
+  assert.ok(result.startsWith("Short preview\\n"));
+  assert.ok(result.includes("\\u200e".repeat(4000)));
+  assert.ok(result.endsWith("\\nThe remaining message"));
+  assert.throws(() => buildReadMore("Only preview", ""), /භාවිතය/);
+  assert.throws(() => buildReadMore("x".repeat(501), "hidden"), /500/);
 });
