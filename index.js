@@ -12,10 +12,11 @@ import pino from "pino";
 import fs from "node:fs";
 import readline from "node:readline";
 import { loadPlugins } from "./lib/plugin-loader.js";
+import { PersistentMessageCache } from "./lib/message-cache.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
 const authDir = "./auth_info";
-const messageCache = new Map();
+const messageCache = new PersistentMessageCache({ file: "./data/message-cache.bin", maxEntries: 2000, ttlMs: 24 * 60 * 60 * 1000 });
 let config;
 let plugins;
 let socketGeneration = 0;
@@ -45,9 +46,21 @@ function remember(message) {
   const key = message?.key;
   if (!key?.remoteJid || !key?.id || !message.message) return;
   messageCache.set(key.remoteJid + ":" + key.id, message);
-  if (messageCache.size > 2000) {
-    messageCache.delete(messageCache.keys().next().value);
+}
+
+async function handleStatusMessage(sock, message) {
+  if (config.autoStatusSeen) {
+    try { await sock.readMessages([message.key]); }
+    catch (error) { console.error("Auto status seen failed:", error.message); }
   }
+  const mode = String(config.statusReact || "off").toLowerCase();
+  const owner = message.key?.participant;
+  if (!owner || !["green", "random"].includes(mode)) return;
+  const emojis = ["👍", "❤️", "🔥", "💯", "😊", "💚"];
+  const reaction = mode === "green" ? "💚" : emojis[Math.floor(Math.random() * emojis.length)];
+  try {
+    await sock.sendMessage("status@broadcast", { react: { text: reaction, key: message.key } }, { statusJidList: [owner] });
+  } catch (error) { console.error("Status reaction failed:", error.message); }
 }
 
 async function requestPairingCode(sock, state, generation) {
@@ -141,27 +154,7 @@ async function startBot(authState = null) {
       if (type !== "notify") continue;
       const jid = msg.key.remoteJid;
       if (jid === "status@broadcast") {
-        if (config.autoStatusSeen) {
-          await sock.readMessages([msg.key]).catch(error =>
-            console.error("Auto status seen failed:", error.message)
-          );
-        }
-
-        const statusReactMode = String(config.statusReact || "off").toLowerCase();
-        const statusOwner = msg.key.participant;
-        if (statusOwner && ["green", "random"].includes(statusReactMode)) {
-          const emojis = ["👍", "❤️", "🔥", "💯", "😊", "💚"];
-          const reaction = statusReactMode === "green"
-            ? "💚"
-            : emojis[Math.floor(Math.random() * emojis.length)];
-          await sock.sendMessage(
-            jid,
-            { react: { text: reaction, key: msg.key } },
-            { statusJidList: [statusOwner] }
-          ).catch(error =>
-            console.error("Status reaction failed:", error.message)
-          );
-        }
+        await handleStatusMessage(sock, msg);
         continue;
       }
 
@@ -223,6 +216,7 @@ function shutdown() {
   shuttingDown = true;
   clearTimeout(reconnectTimer);
   console.log("\nStopping Hasa_2_bot...");
+  messageCache.flush();
   process.exit(0);
 }
 process.once("SIGINT", shutdown);
