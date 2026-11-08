@@ -32,7 +32,8 @@ const CATEGORIES = {
   "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>"]],
   "4": ["GROUP MANAGEMENT", [
     ".tagall [message]", ".hidetag [message]", ".promote @user",
-    ".demote @user", ".kick @user", ".groupinfo"
+    ".demote @user", ".kick @user", ".groupinfo", ".antilink on|off",
+    ".warn @user [reason]", ".warnings @user", ".resetwarn @user"
   ]],
   "5": ["AUTOMATIONS", [
     ".settings", ".autoreply on|off", ".statusseen on|off",
@@ -154,7 +155,7 @@ function makeCommandList(config, prefix) {
     ["GENERAL & SYSTEM", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram", prefix+"fastmode", prefix+"loadavg"]],
     ["AI ASSISTANT", [prefix+"ai <question>", prefix+"transcribe (reply to voice)"]],
     ["MEDIA DOWNLOADS", [prefix+"dl <public video url>", prefix+"fb <public video url>"]],
-    ["GROUP MANAGEMENT", [prefix+"tagall [message]", prefix+"hidetag [message]", prefix+"promote @user", prefix+"demote @user", prefix+"kick @user", prefix+"groupinfo"]],
+    ["GROUP MANAGEMENT", [prefix+"tagall [message]", prefix+"hidetag [message]", prefix+"promote @user", prefix+"demote @user", prefix+"kick @user", prefix+"groupinfo", prefix+"antilink on/off", prefix+"warn @user [reason]", prefix+"warnings @user", prefix+"resetwarn @user"]],
     ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
