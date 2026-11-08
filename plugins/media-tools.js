@@ -51,8 +51,8 @@ export default async function mediaTools({ sock, message, config }) {
     }, { quoted: message });
   }
   const [, media, kind] = found;
-  if (command === "toaudio" && kind !== "video") {
-    return sock.sendMessage(jid, { text: "🎵 Audio කරන්න Video එකකට Reply කරන්න." }, { quoted: message });
+  if ((command === "toaudio" || command === "compress") && kind !== "video") {
+    return sock.sendMessage(jid, { text: command === "toaudio" ? "🎵 Audio කරන්න Video එකකට Reply කරන්න." : "📦 Compress කරන්න Video එකකට Reply කරන්න." }, { quoted: message });
   }
 
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-media-"));
