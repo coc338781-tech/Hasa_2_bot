@@ -5,8 +5,7 @@ on:
     branches:
       - assistant-workflow
     paths-ignore:
-      - '.github/oracle-control/**'
-      - '.github/workflows/oracle-control.yml'
+      - '.github/**'
   workflow_dispatch:
 
 concurrency:
