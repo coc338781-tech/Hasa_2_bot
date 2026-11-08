@@ -137,11 +137,12 @@ jobs:
 
           """
           if needle not in s:
+              raise SystemExit("Deploy guard insertion point not found; no changes made.")
           s = s.replace(needle, block + needle, 1)
           old_bundle = '  git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" "$OLD_SHA"'
           if old_bundle not in s:
               raise SystemExit("Expected bundle command not found; no changes made.")
-          new_bundle = "\\n".join([
+          new_bundle = chr(10).join([
               '  if ! git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all; then',
               '    rm -f "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle"',
               '    git archive --format=tar "$OLD_SHA" | gzip -c > "$BACKUP_DIR/pre-deploy-$OLD_SHA.tar.gz"',
