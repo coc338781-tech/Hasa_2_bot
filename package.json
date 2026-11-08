@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && for f in plugins/*.js; do node --input-type=module -e \"await import('./$f')\" || exit 1; done && node --input-type=module -e \"await import('./lib/subbot-manager.js')\" && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\"",
+    "check": "node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && for f in plugins/*.js; do node --input-type=module -e \"await import('./$f')\" || exit 1; done && node --input-type=module -e \"await import('./lib/subbot-manager.js')\" && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\" && npm run test:anti-delete",
     "postinstall": "node scripts/patch-baileys.js",
     "test:decrypt-retry": "node --test tests/decrypt-retry-patch.test.js",
     "test:system-info": "node --test tests/system-info.test.js",
