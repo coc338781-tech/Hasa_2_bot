@@ -40,13 +40,13 @@ export default async function downloader({ sock, message, config }) {
   const body = message.message?.conversation || message.message?.extendedTextMessage?.text || "";
   const prefix = config.prefix || ".";
   const command = body.startsWith(prefix)
-    ? body.slice(prefix.length).trim().split(/\\s+/)[0].toLowerCase()
+    ? body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase()
     : "";
 
   if (!["dl", "fb"].includes(command)) return;
 
   const url = body.trim().slice((prefix + command).length).trim();
-  if (!/^https?:\\/\\//i.test(url)) {
+  if (!/^https?:\/\//i.test(url)) {
     return sock.sendMessage(
       jid,
       { text: "⚠️ *INVALID LINK*\n\nකරුණාකර නිවැරදි වීඩියෝ Link එකක් යවන්න.\nඋදා: " + prefix + command + " https://..." },
