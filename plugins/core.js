@@ -128,7 +128,8 @@ function makeMainMenu(config) {
     "06  STICKER & MEDIA TOOLS",
     "07  PRANK & FUN",
     "08  OWNER CONTROL",
-    "09  SUBBOT MANAGER"
+    "09  SUBBOT MANAGER",
+    "10  UTILITY TOOLS"
   ];
   return [
     "*『 HASA 2 BOT 』*",
@@ -160,7 +161,8 @@ function makeCommandList(config, prefix) {
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
     ["OWNER CONTROL", [prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
-    ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
+    ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]],
+    ["UTILITY TOOLS", [prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"quote (reply to message)", prefix+"fancy <text>"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
