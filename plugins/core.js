@@ -188,7 +188,7 @@ function makeSettingsMenu(config, prefix) {
     "├─ *[9] STATUS REACTION*",
     "│  9.1 | Green Heart 💚  " + (config.statusReact === "green" ? "🟢" : ""),
     "│  9.2 | Random Emoji 🎲  " + (config.statusReact === "random" ? "🟢" : ""),
-    "│  9.3 | Disable Status React",
+    "│  9.3 | Disable Status React  " + (config.statusReact === "off" ? "🟢" : ""),
     "│",
     "├─ *[3] ANTI-DELETE*",
     "│  3.1 | Enable  " + (current("antiDelete") === "🟢 ON" ? "🟢" : ""),
@@ -257,7 +257,8 @@ export default async function core({ sock, message, config }) {
         console.error("Numeric setting save failed:", error);
         return send("❌ Setting Save කරන්න බැරි වුණා: " + error.message);
       }
-      return send("✅ *" + setting.label + "* " + (setting.value ? "Enabled 🟢" : "Disabled 🔴") + "\n\n" + makeSettingsMenu(config, prefix));
+      const enabled = typeof setting.value === "string" ? setting.value !== "off" : Boolean(setting.value);
+      return send("✅ *" + setting.label + "* " + (enabled ? "Enabled 🟢" : "Disabled 🔴") + "\n\n" + makeSettingsMenu(config, prefix));
     }
   }
 
