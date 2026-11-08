@@ -28,7 +28,7 @@ const CATEGORIES = {
   "1": ["GENERAL & SYSTEM", [
     ".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram", ".fastmode", ".loadavg"
   ]],
-  "2": ["AI ASSISTANT", [".ai <question>"]],
+  "2": ["AI ASSISTANT", [".ai <question>", ".transcribe (reply to voice)"]],
   "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>"]],
   "4": ["GROUP MANAGEMENT", [
     ".tagall [message]", ".hidetag [message]", ".promote @user",
@@ -142,7 +142,7 @@ function makeMainMenu(config) {
     ...names.map(line => "┃ " + line),
     "╰━━━━━━━━━━━━━━━━━━",
     "",
-    "↪ Reply with a category number (1-8)",
+    "↪ Reply with a category number (1-9)",
     "📜 Full commands: .list",
     "⚙️ Owner settings: .settings",
     "",
