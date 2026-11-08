@@ -9,8 +9,9 @@ A separate WhatsApp MD bot project. It does not overwrite or share the existing 
 - Auto status seen, anti-delete (text and media forwarding where supported), and view-once media handling.
 - Configurable auto replies with add/replace/list/remove/reset commands.
 - Group commands: tagall, hidetag, promote, demote, kick, groupinfo (admin checks included).
-- AI chat using Gemini when an API key is configured.
+- AI chat using Gemini when an API key is configured, including image questions and voice transcription.
 - Video downloader for supported public URLs via yt-dlp (.dl and .fb).
+- Media tools: create static/animated stickers (.sticker / .s), extract audio from video (.toaudio), and compress video (.compress).
 - Optional auto voice reply and composing presence.
 - Pairing-code Subbot with separate per-owner session storage.
 
@@ -30,14 +31,15 @@ npm start
 
 Set the `owner` number in config.json to your WhatsApp number with country code, digits only. The main bot asks for the WhatsApp number on first pairing; you can alternatively set `BOT_PHONE_NUMBER` in a private `.env` file. The pairing code is shown in the terminal. On WhatsApp: Linked devices -> Link a device -> Link with phone number instead.
 
-For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in config.json.
+For AI text, image questions, and voice transcription, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in config.json. AI media input is limited to 15 MB. Sticker, audio extraction, and compression tools require FFmpeg on the server.
 
 ## Commands
 - `.menu`, `.ping`, `.alive`, `.uptime`
 - `.autoreply on|off`
 - `.addreply word-reply`, `.replaceeply word-reply`, `.getreply`, `.removereply word`, `.resetreply`
 - `.tagall`, `.hidetag`, `.promote @user`, `.demote @user`, `.kick @user`, `.groupinfo`
-- `.ai question`, `.hack` (owner-only harmless prank simulation)
+- `.ai question`, reply to an image with `.ai describe this`, `.transcribe` (reply to voice/audio), `.hack` (owner-only harmless prank simulation)
+- `.sticker` / `.s` (reply to image/video), `.toaudio` (reply to video), `.compress` (reply to video)
 - `.dl url`, `.fb url`
 - `.subbot phone-number`, `.subcheck`, `.stopsubbot`, `.restartsubbot`, `.delsubbot`, `.helpsubbot`
 
