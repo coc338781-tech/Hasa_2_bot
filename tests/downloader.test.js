@@ -74,3 +74,48 @@ test("download errors provide useful size and timeout explanations", () => {
   timeout.killed = true;
   assert.match(explainDownloadError(timeout), /වැඩි වෙලාවක්/);
 });
+
+test("song command searches one result, extracts mp3, and sends audio", async () => {
+  const state = fixture();
+  state.message.message.conversation = ".song coldplay yellow";
+  let downloadArgs;
+  const execCommand = async (command, args) => {
+    if (args.includes("--version") || args[0] === "-version") return { stdout: "ok" };
+    downloadArgs = args;
+    const template = args[args.indexOf("-o") + 1];
+    fs.writeFileSync(template.replace("%(ext)s", "mp3"), Buffer.from("audio-data"));
+    return { stdout: "" };
+  };
+  try {
+    await downloader({ ...state, execCommand });
+    assert.equal(downloadArgs.at(-1), "ytsearch1:coldplay yellow");
+    assert.ok(downloadArgs.includes("-x"));
+    assert.ok(downloadArgs.includes("16M"));
+    assert.equal(state.sent[1].payload.audio.toString(), "audio-data");
+    assert.equal(state.sent[1].payload.mimetype, "audio/mpeg");
+    assert.equal(fs.readdirSync(state.dir).length, 0);
+  } finally {
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
+test("video command searches one result and sends video", async () => {
+  const state = fixture();
+  state.message.message.conversation = ".video nature documentary";
+  let downloadArgs;
+  const execCommand = async (command, args) => {
+    if (args.includes("--version") || args[0] === "-version") return { stdout: "ok" };
+    downloadArgs = args;
+    const template = args[args.indexOf("-o") + 1];
+    fs.writeFileSync(template.replace("%(ext)s", "mp4"), Buffer.from("video-data"));
+    return { stdout: "" };
+  };
+  try {
+    await downloader({ ...state, execCommand });
+    assert.equal(downloadArgs.at(-1), "ytsearch1:nature documentary");
+    assert.ok(downloadArgs.includes("64M"));
+    assert.equal(state.sent[1].payload.video.toString(), "video-data");
+  } finally {
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
