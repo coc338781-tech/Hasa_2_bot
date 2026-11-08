@@ -36,9 +36,14 @@ export default async function downloader({ sock, message, config, execCommand = 
   const input = body.trim().slice((prefix + command).length).trim();
   const isAudio = command === "song";
   const supportsSearch = command === "video" || isAudio;
-  if (!input || (!supportsSearch && !/^https?:\/\//i.test(input))) {
+  if (!input) {
     return sock.sendMessage(jid, {
       text: "⚠️ *භාවිතය:* " + prefix + command + (supportsSearch ? " song name / public URL" : " https://...")
+    }, { quoted: message });
+  }
+  if (!supportsSearch && !/^https?:\/\//i.test(input)) {
+    return sock.sendMessage(jid, {
+      text: "⚠️ *INVALID LINK*\\n\\nනිවැරදි Public URL එකක් යවන්න.\\nඋදා: " + prefix + command + " https://..."
     }, { quoted: message });
   }
   const target = supportsSearch && !/^https?:\/\//i.test(input) ? "ytsearch1:" + input : input;
