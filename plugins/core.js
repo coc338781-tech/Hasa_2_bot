@@ -344,40 +344,21 @@ export default async function core({ sock, message, config }) {
   }
 
   if (command === "ping") {
-    const uptimeSeconds = Math.floor(process.uptime());
-    const days = Math.floor(uptimeSeconds / 86400);
-    const hours = Math.floor((uptimeSeconds % 86400) / 3600);
-    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-    const seconds = uptimeSeconds % 60;
-    const uptime = [
-      days ? days + "d" : "",
-      hours ? hours + "h" : "",
-      minutes ? minutes + "m" : "",
-      seconds + "s"
-    ].filter(Boolean).join(" ");
-    const now = new Date().toLocaleString("en-GB", {
-      timeZone: "Asia/Colombo",
-      hour12: true,
-      dateStyle: "medium",
-      timeStyle: "short"
-    });
-    const botName = config.BOT_NAME || config.botName || "Hasa_2_bot";
+    const startedAt = process.hrtime.bigint();
+    const responseMs = Math.max(
+      1,
+      Number((process.hrtime.bigint() - startedAt) / 1000000n)
+    );
     const caption = [
-      "╭━━〔 🏓 *HASA 2 BOT* 〕━━╮",
+      "🏓 *PONG RESPONSE*",
       "",
-      "       ✅ *PONG! SYSTEM ACTIVE*",
-      "╰━━━━━━━━━━━━━━━━━━━━",
+      "🟢 *ONLINE*  |  *HASA 2 BOT*",
       "",
-      "╭──〔 📡 *LIVE STATUS* 〕",
-      "│ 🟢 *Status:* Online",
-      "│ 🤖 *Bot:* " + botName,
-      "│ ⏱️ *Uptime:* " + uptime,
-      "│ ⚙️ *Runtime:* Node.js " + process.version,
-      "╰━━━━━━━━━━━━━━━━━━━━",
+      "⚡ *" + responseMs + "ms*",
+      "_RESPONSE SPEED_",
       "",
-      "🕒 *Server Time:* " + now,
-      "",
-      "⚡ _HASA 2 BOT • POWERED & READY_"
+      "────────────────",
+      "❤️ *POWERED BY HASA*"
     ].join("\n");
     return send(caption);
   }
