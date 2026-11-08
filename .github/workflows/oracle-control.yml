@@ -123,32 +123,36 @@ jobs:
           p = pathlib.Path(sys.argv[1])
           s = p.read_text()
           old = '  if [ -n "$(git status --porcelain)" ]; then'
-          if old not in s:
-              raise SystemExit("Expected deploy guard line not found; no changes made.")
-          s = s.replace(old, '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then', 1)
+          new = '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit("Deploy guard status check not found; no changes made.")
           needle = '  OLD_SHA="$(git rev-parse HEAD)"'
-          block = """  UNTRACKED=\"$(git ls-files --others --exclude-standard)\"
+          if 'UNTRACKED="$(git ls-files --others --exclude-standard)"' not in s:
+              block = """  UNTRACKED=\"$(git ls-files --others --exclude-standard)\"
             UNEXPECTED=\"$(printf '%s\\n' \"$UNTRACKED\" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)\"
             if [ -n \"$UNEXPECTED\" ]; then
               echo \"STOP: Unexpected untracked files exist; preserving them.\"
               printf '%s\\n' \"$UNEXPECTED\"
               exit 1
             fi
-
+          
           """
-          if needle not in s:
-              raise SystemExit("Deploy guard insertion point not found; no changes made.")
-          s = s.replace(needle, block + needle, 1)
+              if needle not in s:
+                  raise SystemExit("Deploy guard insertion point not found; no changes made.")
+              s = s.replace(needle, block + needle, 1)
           old_bundle = '  git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" "$OLD_SHA"'
-          if old_bundle not in s:
-              raise SystemExit("Expected bundle command not found; no changes made.")
-          new_bundle = chr(10).join([
-              '  if ! git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all; then',
-              '    rm -f "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle"',
-              '    git archive --format=tar "$OLD_SHA" | gzip -c > "$BACKUP_DIR/pre-deploy-$OLD_SHA.tar.gz"',
-              '  fi'
-          ])
-          s = s.replace(old_bundle, new_bundle, 1)
+          if old_bundle in s:
+              new_bundle = chr(10).join([
+                  '  if ! git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all; then',
+                  '    rm -f "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle"',
+                  '    git archive --format=tar "$OLD_SHA" | gzip -c > "$BACKUP_DIR/pre-deploy-$OLD_SHA.tar.gz"',
+                  '  fi'
+              ])
+              s = s.replace(old_bundle, new_bundle, 1)
+          elif 'git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all' not in s:
+              raise SystemExit("Deploy backup command not found; no changes made.")
           p.write_text(s)
           PY
               bash -n "$GUARD"
