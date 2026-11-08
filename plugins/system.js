@@ -36,6 +36,25 @@ async function readPackageVersion(path, fallback = "Unknown") {
   }
 }
 
+async function getCpuUsage() {
+  try {
+    const before = os.cpus().map(cpu => cpu.times);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const after = os.cpus().map(cpu => cpu.times);
+    let totalDelta = 0;
+    let idleDelta = 0;
+    for (let i = 0; i < Math.min(before.length, after.length); i++) {
+      const beforeTotal = Object.values(before[i]).reduce((sum, value) => sum + value, 0);
+      const afterTotal = Object.values(after[i]).reduce((sum, value) => sum + value, 0);
+      totalDelta += afterTotal - beforeTotal;
+      idleDelta += after[i].idle - before[i].idle;
+    }
+    return totalDelta > 0 ? Math.max(0, Math.min(100, (1 - idleDelta / totalDelta) * 100)) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getDiskInfo() {
   try {
     const disk = await statfs(process.cwd());
@@ -55,7 +74,7 @@ export async function buildSystemInfo({ sock, config }) {
   const totalRam = os.totalmem();
   const freeRam = os.freemem();
   const usedRam = Math.max(0, totalRam - freeRam);
-  const disk = await getDiskInfo();
+  const [disk, cpuUsage] = await Promise.all([getDiskInfo(), getCpuUsage()]);
   const [botVersion, baileysVersion] = await Promise.all([
     readPackageVersion(new URL("../package.json", import.meta.url), process.env.npm_package_version || "1.0.0"),
     readPackageVersion(new URL("../node_modules/@whiskeysockets/baileys/package.json", import.meta.url))
@@ -75,6 +94,7 @@ export async function buildSystemInfo({ sock, config }) {
     "┃ 🧩 Platform: " + os.platform() + " / " + os.arch(),
     "┃ 🧠 CPU: " + (cpus[0]?.model?.trim() || "Unknown"),
     "┃ 🔢 CPU Cores: " + (cpus.length || "Unknown"),
+    "┃ 📈 CPU Usage: " + (cpuUsage === null ? "Unavailable" : cpuUsage.toFixed(1) + "%"),
     "┃ 📊 Load Average: " + load.join(" / ") + " (1m / 5m / 15m)",
     "┃ ⏳ Server Uptime: " + formatUptime(os.uptime()),
     "┗━━━━━━━━━━━━━━━━",
