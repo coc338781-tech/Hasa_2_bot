@@ -50,11 +50,12 @@ test("message cache enforces the configured entry limit", () => {
   }
 });
 
-test("expired messages are not returned", () => {
+test("expired messages are not returned", async () => {
   const temp = temporaryFile();
   try {
-    const cache = new PersistentMessageCache({ file: temp.file, ttlMs: 0, flushDelayMs: 60_000 });
+    const cache = new PersistentMessageCache({ file: temp.file, ttlMs: 5, flushDelayMs: 60_000 });
     cache.set("old", { message: { conversation: "expired" } });
+    await new Promise(resolve => setTimeout(resolve, 10));
     assert.equal(cache.get("old"), undefined);
     assert.equal(cache.has("old"), false);
     cache.flush();
