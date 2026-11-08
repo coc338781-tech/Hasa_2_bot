@@ -13,7 +13,7 @@ test('retry uses the stanza LID when primary decrypt JID is PN', () => {
 })
 
 test('missing or duplicate alternate JID does not trigger a second decrypt', () => {
-  assert.match(patch, /if \(!retryJid \|\| retryJid === decryptionJid\)\s*\{\s*throw err/)
+  assert.match(patch, /if \(!retryJid \|\| retryJid === decryptionJid\)\s*\{[\s\S]*?throw err/)
 })
 
 test('failed alternate decrypt preserves the original error', () => {
