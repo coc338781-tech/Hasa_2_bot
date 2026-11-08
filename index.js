@@ -5,7 +5,8 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   fetchLatestWaWebVersion,
   Browsers,
-  downloadContentFromMessage
+  downloadContentFromMessage,
+  normalizeMessageContent
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import pino from "pino";
@@ -145,6 +146,8 @@ async function startBot(authState = null) {
     if (type !== "notify" && type !== "append") return;
     for (const msg of messages || []) {
       if (!msg?.key?.remoteJid || !msg.message) continue;
+      // Unwrap ephemeral/view-once containers before plugins inspect command text.
+      msg.message = normalizeMessageContent(msg.message) || msg.message;
       remember(msg);
       // Append events can populate the cache, but only live notifications run plugins.
       if (type !== "notify") continue;
