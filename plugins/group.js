@@ -4,7 +4,8 @@ export default async function group({ sock, message, config }) {
   const text = message.message?.conversation || message.message?.extendedTextMessage?.text || "";
   const prefix = config.prefix || ".";
   if (!text.startsWith(prefix)) return;
-  const [cmd] = text.slice(prefix.length).trim().split(/\s+/);
+  const [rawCommand] = text.slice(prefix.length).trim().split(/\s+/);
+  const cmd = (rawCommand || "").toLowerCase();
   if (!["tagall", "hidetag", "promote", "demote", "kick", "groupinfo"].includes(cmd)) return;
   const meta = await sock.groupMetadata(jid).catch(() => null);
   if (!meta) return sock.sendMessage(jid, { text: "Could not read group information." }, { quoted: message });
