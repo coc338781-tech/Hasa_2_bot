@@ -37,11 +37,11 @@ export default async function autoReply({ sock, message, config }) {
   const command = lower.split(/\s+/)[0];
   const send = text => sock.sendMessage(jid, { text }, { quoted: message });
 
-  if ([prefix+"addreply", prefix+"replaceeply", prefix+"removereply", prefix+"getreply", prefix+"resetreply"].includes(command)) {
+  if ([prefix+"addreply", prefix+"replaceeply", prefix+"replacereply", prefix+"removereply", prefix+"getreply", prefix+"resetreply"].includes(command)) {
     if (!owner) return send("⛔ මේ command එක owner ට විතරයි.");
     const args = body.slice(command.length).trim();
     const replies = readReplies();
-    if (command === prefix+"addreply" || command === prefix+"replaceeply") {
+    if (command === prefix+"addreply" || command === prefix+"replaceeply" || command === prefix+"replacereply") {
       const splitAt = args.indexOf("-");
       if (splitAt < 1 || !args.slice(splitAt + 1).trim()) {
         return send("භාවිතය: " + command + " වචනය-උත්තරය");
