@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - assistant-workflow
+      - feature/oracle-service-check
     paths:
       - '.github/oracle-control/request.json'
 
@@ -31,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|service-check) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -113,6 +114,75 @@ jobs:
             inspect-guard-script)
               echo "Read-only inspection of deploy guard script."
               sed -n "1,240p" /home/opc/bin/hasa2-deploy
+              ;;
+            service-check)
+              echo "Read-only external service diagnostics; no bot messages are sent and no media is downloaded."
+              node --input-type=module <<'NODE'
+          import "dotenv/config";
+          import fs from "node:fs";
+          import { spawnSync } from "node:child_process";
+
+          let failures = 0;
+          const result = (name, state, detail = "") => {
+            console.log((state === "PASS" ? "PASS" : state === "SKIP" ? "SKIP" : "FAIL") + " | " + name + (detail ? " | " + String(detail).replace(/[\\r\\n]+/g, " ").slice(0, 180) : ""));
+            if (state === "FAIL") failures++;
+          };
+          let config = {};
+          try { config = JSON.parse(fs.readFileSync("config.json", "utf8")); }
+          catch (e) { result("Bot config", "FAIL", "config.json unavailable or invalid"); }
+
+          if (!process.env.GEMINI_API_KEY) {
+            result("Gemini AI API", "SKIP", "GEMINI_API_KEY is not configured");
+          } else {
+            try {
+              const model = config.aiModel || "gemini-2.0-flash";
+              const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(process.env.GEMINI_API_KEY), {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Reply with exactly: HASA_ORACLE_TEST_OK" }] }] }),
+                signal: AbortSignal.timeout(20000)
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok) throw new Error("HTTP " + response.status + (data.error?.message ? ": " + data.error.message : ""));
+              if (!data.candidates?.[0]?.content?.parts?.length) throw new Error("No generated response");
+              result("Gemini AI API", "PASS", "model " + model + (config.aiChat ? "; feature enabled" : "; API works but bot AI feature is OFF"));
+            } catch (e) { result("Gemini AI API", "FAIL", e.message); }
+          }
+
+          try {
+            const r = await fetch("https://api.dictionaryapi.dev/api/v2/entries/en/hello", { signal: AbortSignal.timeout(12000) });
+            const d = await r.json().catch(() => null);
+            if (!r.ok || !Array.isArray(d) || !d[0]?.meanings?.length) throw new Error("HTTP " + r.status + "; valid definition missing");
+            result("Dictionary API", "PASS", "sample word returned definitions");
+          } catch (e) { result("Dictionary API", "FAIL", e.message); }
+
+          try {
+            const u = new URL("https://api.mymemory.translated.net/get");
+            u.searchParams.set("q", "Hello world");
+            u.searchParams.set("langpair", "en|si");
+            const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || d.responseStatus >= 400 || !d.responseData?.translatedText) throw new Error("HTTP " + r.status + "; translation missing");
+            result("Translation API", "PASS", "English-to-Sinhala sample returned");
+          } catch (e) { result("Translation API", "FAIL", e.message); }
+
+          for (const bin of ["yt-dlp", "ffmpeg"]) {
+            const r = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 15000 });
+            if (r.status === 0) result(bin, "PASS", (r.stdout || "").trim().split("\\n")[0]);
+            else result(bin, "FAIL", r.error?.message || (r.stderr || "command failed").trim());
+          }
+
+          try {
+            const r = spawnSync("yt-dlp", ["--dump-single-json", "--skip-download", "--no-playlist", "--no-warnings", "ytsearch1:instrumental music"], { encoding: "utf8", timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
+            if (r.status !== 0) throw new Error((r.stderr || r.error?.message || "YouTube metadata lookup failed").trim().slice(0, 160));
+            const d = JSON.parse(r.stdout);
+            if (!d.id || !d.title) throw new Error("No usable video metadata returned");
+            result("YouTube search/extractor", "PASS", "metadata lookup succeeded; download intentionally skipped");
+          } catch (e) { result("YouTube search/extractor", "FAIL", e.message); }
+
+          console.log("Service check finished. Failures: " + failures);
+          if (failures) process.exitCode = 1;
+          NODE
               ;;
             patch-deploy-guard)
               GUARD=/home/opc/bin/hasa2-deploy

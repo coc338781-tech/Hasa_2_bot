@@ -1,4 +1,4 @@
 {
-  "action": "patch-deploy-guard",
-  "request_id": "patch-guard-20261109-09"
+  "action": "service-check",
+  "request_id": "oracle-services-20261109-02"
 }
