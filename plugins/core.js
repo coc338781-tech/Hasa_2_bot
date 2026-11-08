@@ -26,7 +26,7 @@ const SETTINGS = [
 
 const CATEGORIES = {
   "1": ["BASIC & MAIN", [
-    ".menu", ".list", ".ping", ".alive", ".uptime", ".fastmode", ".loadavg"
+    ".menu", ".list", ".ping", ".alive", ".system", ".ram", ".uptime", ".fastmode", ".loadavg"
   ]],
   "2": ["GROUP", [
     ".tagall [message]", ".hidetag [message]", ".promote @user",
@@ -145,11 +145,11 @@ function makeMainMenu(config) {
 
 function makeCommandList(config, prefix) {
   const groups = [
-    ["BASIC & MAIN COMMANDS", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"fastmode", prefix+"loadavg"]],
+    ["BASIC & MAIN COMMANDS", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"system", prefix+"ram", prefix+"uptime", prefix+"fastmode", prefix+"loadavg"]],
     ["GROUP COMMANDS", [prefix+"tagall", prefix+"hidetag", prefix+"promote", prefix+"demote", prefix+"kick", prefix+"groupinfo"]],
     ["DOWNLOAD COMMANDS", [prefix+"dl <url>", prefix+"fb <url>"]],
     ["AI & PRANK COMMANDS", [prefix+"ai <question>", prefix+"hack"]],
-    ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replaceeply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
+    ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
     ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
   ];
