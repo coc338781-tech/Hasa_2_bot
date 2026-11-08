@@ -49,7 +49,7 @@ export default async function downloader({ sock, message, config }) {
   if (!/^https?:\/\//i.test(url)) {
     return sock.sendMessage(
       jid,
-      { text: "⚠️ *INVALID LINK*\n\nකරුණාකර නිවැරදි වීඩියෝ Link එකක් යවන්න.\nඋදා: " + prefix + command + " https://..." },
+      { text: "⚠️ *INVALID LINK*\n\nකරුණාකර නිවැරදි Public Link එකක් යවන්න.\nඋදා: " + prefix + command + " https://..." },
       { quoted: message }
     );
   }
@@ -63,8 +63,8 @@ export default async function downloader({ sock, message, config }) {
     jid,
     {
       text: audioMode
-        ? "╭─「 ⏳ *AUDIO DOWNLOADING* 」\\n│\\n│ 🎵 Audio එක සූදානම් කරමින්\\n│ පවතී...\\n│\\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\\n╰──────────────"
-        : "╭─「 ⏳ *VIDEO DOWNLOADING* 」\\n│\\n│ 🎬 වීඩියෝ එක සූදානම් කරමින්\\n│ පවතී...\\n│\\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\\n╰──────────────"
+        ? "╭─「 ⏳ *AUDIO DOWNLOADING* 」\n│\n│ 🎵 Audio එක සූදානම් කරමින්\n│ පවතී...\n│\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\n╰──────────────"
+        : "╭─「 ⏳ *VIDEO DOWNLOADING* 」\n│\n│ 🎬 වීඩියෝ එක සූදානම් කරමින්\n│ පවතී...\n│\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\n╰──────────────"
     },
     { quoted: message }
   );
@@ -93,7 +93,7 @@ export default async function downloader({ sock, message, config }) {
 
     const file = files[0];
     const data = fs.readFileSync(file);
-    if (data.length > 64 * 1024 * 1024) throw new Error("Video is larger than 64 MB.");
+    if (data.length > 64 * 1024 * 1024) throw new Error("Media is larger than 64 MB.");
 
     if (audioMode) {
       await sock.sendMessage(
@@ -104,7 +104,7 @@ export default async function downloader({ sock, message, config }) {
     } else {
       await sock.sendMessage(
         jid,
-        { video: data, caption: "✅ *DOWNLOAD COMPLETED*\\n\\n🎬 " + path.basename(file) + "\\n❤️ *POWERED BY HASA*" },
+        { video: data, caption: "✅ *DOWNLOAD COMPLETED*\n\n🎬 " + path.basename(file) + "\n❤️ *POWERED BY HASA*" },
         { quoted: message }
       );
     }
@@ -112,7 +112,7 @@ export default async function downloader({ sock, message, config }) {
     const reason = explainDownloadError(error);
     await sock.sendMessage(
       jid,
-      { text: "╭─「 ❌ *DOWNLOAD FAILED* 」\n│\n│ වීඩියෝ එක ලබාගන්න බැරි වුණා.\n│\n│ 🔎 *හේතුව:*\n│ " + reason + "\n│\n│ 🔄 වෙනත් Public Link එකක් උත්සාහ කරන්න.\n╰──────────────" },
+      { text: "╭─「 ❌ *DOWNLOAD FAILED* 」\n│\n│ " + (audioMode ? "Audio" : "වීඩියෝ") + " එක ලබාගන්න බැරි වුණා.\n│\n│ 🔎 *හේතුව:*\n│ " + reason + "\n│\n│ 🔄 වෙනත් Public Link එකක් උත්සාහ කරන්න.\n╰──────────────" },
       { quoted: message }
     );
   } finally {
