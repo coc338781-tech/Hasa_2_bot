@@ -13,6 +13,7 @@ import fs from "node:fs";
 import readline from "node:readline";
 import { loadPlugins } from "./lib/plugin-loader.js";
 import { PersistentMessageCache } from "./lib/message-cache.js";
+import { restoreSubbots } from "./lib/subbot-manager.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
 const authDir = "./auth_info";
@@ -26,6 +27,7 @@ let shuttingDown = false;
 let pairingRequestedFor = -1;
 let pairingIssued = false;
 let phoneNumber = process.env.BOT_PHONE_NUMBER || "";
+let restoredSubbotsGeneration = -1;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -114,6 +116,14 @@ async function startBot(authState = null) {
     if (connection === "open") {
       reconnectAttempts = 0;
       console.log("✅ Hasa_2_bot connected. Pairing-code login only.");
+      if (restoredSubbotsGeneration !== generation) {
+        restoredSubbotsGeneration = generation;
+        void restoreSubbots({ mainSock: sock, config, plugins })
+          .then(owners => {
+            if (owners.length) console.log("Restoring " + owners.length + " saved Subbot session(s).");
+          })
+          .catch(error => console.error("Subbot session restore failed:", error.message));
+      }
     }
     if (connection === "close") {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
