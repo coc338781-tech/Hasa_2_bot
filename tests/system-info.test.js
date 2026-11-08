@@ -19,7 +19,7 @@ test("system card contains server, memory, storage and bot details", async () =>
     sock: { user: { id: "947000000000:1@s.whatsapp.net" } },
     config: { botName: "Hasa_2_bot", publicMode: true, fastMode: true }
   });
-  for (const label of ["SERVER DETAILS", "CPU:", "CPU Cores:", "Server Uptime:", "MEMORY & STORAGE", "RAM Used:", "RAM Free:", "Bot Memory:", "Disk Used:", "BOT DETAILS", "Status: Connected", "Bot Uptime:", "Node.js:", "Baileys:", "Plugins: 10 Active", "Mode: Public", "Fast Mode: ON"]) {
+  for (const label of ["SERVER DETAILS", "CPU:", "CPU Cores:", "CPU Usage:", "Server Uptime:", "MEMORY & STORAGE", "RAM Used:", "RAM Free:", "Bot Memory:", "Disk Used:", "BOT DETAILS", "Status: Connected", "Bot Uptime:", "Node.js:", "Baileys:", "Plugins: 10 Active", "Mode: Public", "Fast Mode: ON"]) {
     assert.ok(output.includes(label), "missing " + label);
   }
   delete globalThis.__hasaPlugins;
