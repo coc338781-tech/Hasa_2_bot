@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
+import { checkDownloaderTools } from "../lib/downloader-check.js";
 
 const exec = promisify(execFile);
 const MAX_BYTES = 64 * 1024 * 1024;
@@ -31,6 +32,11 @@ export default async function downloader({ sock, message, config, execCommand = 
   const body = message.message?.conversation || message.message?.extendedTextMessage?.text || "";
   const prefix = config.prefix || ".";
   const command = body.startsWith(prefix) ? body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase() : "";
+  if (command === "fbtest") {
+    const checks = await checkDownloaderTools(exec);
+    const lines = checks.map(item => (item.ok ? "✅ " : "❌ ") + item.name + ": " + (item.ok ? item.version : item.reason));
+    return sock.sendMessage(jid, { text: "🧪 *DOWNLOADER DIAGNOSTIC*\\n" + lines.join("\\n") + "\\n\\nමෙය server tools පමණක් පරීක්ෂා කරයි; Facebook link එකක් download කරලා බලන්නේ නැහැ." }, { quoted: message });
+  }
   if (!["dl", "fb", "video", "song"].includes(command)) return;
 
   const input = body.trim().slice((prefix + command).length).trim();
