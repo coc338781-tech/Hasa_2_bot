@@ -110,9 +110,9 @@ export function formatFancy(value) {
 }
 
 export function createWaMeLink(input) {
-  const [rawNumber, ...messageParts] = String(input || "").trim().split(/\\s+/);
-  const number = String(rawNumber || "").replace(/[+()\\-]/g, "");
-  if (!/^\\d{7,15}$/.test(number) || number.startsWith("0")) {
+  const [rawNumber, ...messageParts] = String(input || "").trim().split(/\s+/);
+  const number = String(rawNumber || "").replace(/[+()\-]/g, "");
+  if (!/^\d{7,15}$/.test(number) || number.startsWith("0")) {
     throw new Error("රටේ code එක සමඟ අංකය දෙන්න. උදා: .wame 94771234567");
   }
   const message = messageParts.join(" ").trim();
@@ -124,7 +124,7 @@ export function buildReadMore(preview, hidden) {
   const rest = String(hidden || "").trim();
   if (!first || !rest) throw new Error("භාවිතය: .readmore කෙටි පෙරදසුන | සම්පූර්ණ පණිවිඩය");
   if (first.length > 500 || rest.length > 4000) throw new Error("පෙරදසුන 500 සහ ඉතිරි පණිවිඩය 4000 අකුරු ඉක්මවිය නොහැක.");
-  return first + "\\n" + "\\u200e".repeat(4000) + "\\n" + rest;
+  return first + "\n" + "\u200e".repeat(4000) + "\n" + rest;
 }
 
 export function formatRuntime(seconds) {
