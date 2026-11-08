@@ -13,7 +13,7 @@ A WhatsApp MD bot with pairing-code login, modular plugins, owner controls, AI a
 - View-once image/video handling where supported by the WhatsApp message payload.
 - Gemini AI text chat plus image analysis and voice-message transcription/analysis when an API key is configured.
 - Group commands: tagall, hidetag, promote, demote, kick and groupinfo (admin checks included).
-- Video downloader for supported public URLs via yt-dlp (.dl and .fb).
+- Video and MP3 downloader for supported public URLs via yt-dlp (.dl, .fb, .song and .mp3).
 - Sticker maker for images and short videos; video-to-audio and sticker-to-image conversion via FFmpeg.
 - Configurable auto replies with add/replace/list/remove/reset commands.
 - Optional auto voice reply and composing presence.
@@ -24,7 +24,7 @@ A WhatsApp MD bot with pairing-code login, modular plugins, owner controls, AI a
 ## Commands
 - General: `.menu`, `.list`, `.ping`, `.alive`, `.uptime`, `.system`, `.ram`
 - AI: `.ai <question>`; reply to an image or voice note with `.ai <question>` (or `.ai` for a default description/transcription).
-- Downloads: `.dl <public-url>`, `.fb <public-url>`
+- Downloads: `.dl <video-url>`, `.fb <facebook-url>`, `.song <url>`, `.mp3 <url>`
 - Media: reply to an image/video with `.sticker`; reply to a video/audio with `.toaudio`; reply to a sticker with `.toimage`.
 - Group: `.tagall`, `.hidetag`, `.promote @user`, `.demote @user`, `.kick @user`, `.groupinfo`
 - Auto reply: `.addreply word-reply`, `.replacereply word-reply`, `.getreply`, `.removereply word`, `.resetreply`
