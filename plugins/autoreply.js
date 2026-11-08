@@ -37,17 +37,18 @@ export default async function autoReply({ sock, message, config }) {
   const command = lower.split(/\s+/)[0];
   const send = text => sock.sendMessage(jid, { text }, { quoted: message });
 
-  if ([prefix+"addreply", prefix+"replaceeply", prefix+"removereply", prefix+"getreply", prefix+"resetreply"].includes(command)) {
+  if ([prefix+"addreply", prefix+"replaceeply", prefix+"replacereply", prefix+"removereply", prefix+"getreply", prefix+"resetreply"].includes(command)) {
     if (!owner) return send("⛔ මේ command එක owner ට විතරයි.");
     const args = body.slice(command.length).trim();
     const replies = readReplies();
-    if (command === prefix+"addreply" || command === prefix+"replaceeply") {
+    if (command === prefix+"addreply" || command === prefix+"replaceeply" || command === prefix+"replacereply") {
       const splitAt = args.indexOf("-");
       if (splitAt < 1 || !args.slice(splitAt + 1).trim()) {
         return send("භාවිතය: " + command + " වචනය-උත්තරය");
       }
       const trigger = args.slice(0, splitAt).trim().toLowerCase();
-      if (command === prefix+"addreply" && replies[trigger]) return send("මේ වචනයට reply එකක් දැනටමත් තියෙනවා. replaceeply භාවිතා කරන්න.");
+      if (command === prefix+"addreply" && replies[trigger]) return send("මේ වචනයට reply එකක් දැනටමත් තියෙනවා. replacereply භාවිතා කරන්න.");
+      if (command !== prefix+"addreply" && !Object.hasOwn(replies, trigger)) return send("ඒ වචනයට කලින් reply එකක් නැහැ. addreply භාවිතා කරන්න.");
       replies[trigger] = args.slice(splitAt + 1).trim();
       writeReplies(replies);
       return send("✅ Auto reply save කළා: " + trigger);
