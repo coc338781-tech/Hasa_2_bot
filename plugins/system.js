@@ -1,16 +1,106 @@
 import os from "node:os";
+import { readFile, statfs } from "node:fs/promises";
 
-function formatBytes(bytes) {
-  const mb = bytes / 1024 / 1024;
-  return mb >= 100 ? mb.toFixed(0) : mb.toFixed(1);
+export function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return "N/A";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return value.toFixed(unit >= 3 ? 2 : 1) + " " + units[unit];
 }
 
-function formatUptime(totalSeconds) {
-  const seconds = Math.floor(totalSeconds);
-  const hours = Math.floor(seconds / 3600);
+export function formatUptime(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainder = seconds % 60;
-  return `${String(hours).padStart(2, "0")} Hours, ${String(minutes).padStart(2, "0")} Mins, ${String(remainder).padStart(2, "0")} Secs`;
+  const parts = [];
+  if (days) parts.push(days + "d");
+  parts.push(String(hours).padStart(2, "0") + "h");
+  parts.push(String(minutes).padStart(2, "0") + "m");
+  parts.push(String(remainder).padStart(2, "0") + "s");
+  return parts.join(" ");
+}
+
+async function readPackageVersion(path, fallback = "Unknown") {
+  try {
+    const data = JSON.parse(await readFile(path, "utf8"));
+    return data.version || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function getDiskInfo() {
+  try {
+    const disk = await statfs(process.cwd());
+    const total = disk.blocks * disk.bsize;
+    const free = disk.bavail * disk.bsize;
+    const used = Math.max(0, total - free);
+    const percent = total > 0 ? Math.round((used / total) * 100) : 0;
+    return { total, free, used, percent };
+  } catch {
+    return null;
+  }
+}
+
+export async function buildSystemInfo({ sock, config }) {
+  const cpus = os.cpus() || [];
+  const memory = process.memoryUsage();
+  const totalRam = os.totalmem();
+  const freeRam = os.freemem();
+  const usedRam = Math.max(0, totalRam - freeRam);
+  const disk = await getDiskInfo();
+  const [botVersion, baileysVersion] = await Promise.all([
+    readPackageVersion(new URL("../package.json", import.meta.url), process.env.npm_package_version || "1.0.0"),
+    readPackageVersion(new URL("../node_modules/@whiskeysockets/baileys/package.json", import.meta.url))
+  ]);
+  const pluginCount = Number.isInteger(globalThis.__hasaPlugins?.count)
+    ? globalThis.__hasaPlugins.count
+    : null;
+  const connection = sock?.user?.id ? "Connected" : "Connection status unavailable";
+  const mode = config?.publicMode === false ? "Private" : "Public";
+  const load = os.loadavg().map(value => value.toFixed(2));
+
+  const lines = [
+    "╭━━〔 🖥️ *" + (config?.botName || "HASA 2 BOT").toUpperCase() + " SYSTEM* 〕━━╮",
+    "",
+    "┏━━〔 ⚙️ *SERVER DETAILS* 〕",
+    "┃ 🐧 OS: " + os.type() + " " + os.release(),
+    "┃ 🧩 Platform: " + os.platform() + " / " + os.arch(),
+    "┃ 🧠 CPU: " + (cpus[0]?.model?.trim() || "Unknown"),
+    "┃ 🔢 CPU Cores: " + (cpus.length || "Unknown"),
+    "┃ 📊 Load Average: " + load.join(" / ") + " (1m / 5m / 15m)",
+    "┃ ⏳ Server Uptime: " + formatUptime(os.uptime()),
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 💾 *MEMORY & STORAGE* 〕",
+    "┃ RAM Used: " + formatBytes(usedRam) + " / " + formatBytes(totalRam),
+    "┃ RAM Free: " + formatBytes(freeRam),
+    "┃ Bot Memory: " + formatBytes(memory.rss) + " (process RSS)",
+    "┃ Disk Used: " + (disk ? formatBytes(disk.used) + " / " + formatBytes(disk.total) + " (" + disk.percent + "%)" : "Unavailable"),
+    "┃ Disk Free: " + (disk ? formatBytes(disk.free) : "Unavailable"),
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 🤖 *BOT DETAILS* 〕",
+    "┃ Status: " + connection,
+    "┃ Bot Uptime: " + formatUptime(process.uptime()),
+    "┃ Version: " + botVersion,
+    "┃ Node.js: " + process.version,
+    "┃ Baileys: " + baileysVersion,
+    "┃ Plugins: " + (pluginCount === null ? "Unknown" : pluginCount + " Active"),
+    "┃ Mode: " + mode,
+    "┃ Fast Mode: " + (config?.fastMode ? "ON ⚡" : "OFF"),
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "╰━━〔 *HASA 2 BOT • SYSTEM MONITOR* 〕━━╯"
+  ];
+  return lines.join("\n");
 }
 
 export default async function system({ sock, message, config }) {
@@ -21,28 +111,14 @@ export default async function system({ sock, message, config }) {
   if (!jid || !body.startsWith(prefix)) return;
 
   if (cmd === prefix + "system" || cmd === prefix + "ram") {
-    const memory = process.memoryUsage();
-    const totalRam = os.totalmem();
-    const cpuCores = os.cpus()?.length || 1;
-    const version = process.env.npm_package_version || "1.0.0";
-    const uptime = formatUptime(process.uptime());
-
-    const sysTxt =
-      "⚙️ *HASA_2_BOT SYSTEM INFO* ⚙️\n\n" +
-      `⏱️ *Uptime:* ${uptime}\n` +
-      `💻 *OS:* ${os.platform()} (${os.arch()})\n` +
-      `🧠 *CPU Cores:* ${cpuCores}\n` +
-      `💾 *Bot RAM Usage:* ${formatBytes(memory.rss)} MB / ${formatBytes(totalRam)} MB\n` +
-      `🔖 *Bot Version:* ${version}\n` +
-      `🟢 *Node.js:* ${process.version}`;
-
+    const sysTxt = await buildSystemInfo({ sock, config });
     return sock.sendMessage(jid, { text: sysTxt }, { quoted: message });
   }
 
   if (cmd === prefix + "uptime") {
     return sock.sendMessage(
       jid,
-      { text: "⏳ Uptime: " + formatUptime(process.uptime()) },
+      { text: "⏳ Bot Uptime: " + formatUptime(process.uptime()) },
       { quoted: message }
     );
   }
@@ -56,10 +132,10 @@ export default async function system({ sock, message, config }) {
   }
 
   if (cmd === prefix + "loadavg") {
-    const load = os.loadavg().map((value) => value.toFixed(2));
+    const load = os.loadavg().map(value => value.toFixed(2));
     return sock.sendMessage(
       jid,
-      { text: "📊 Load average\n1m: " + load[0] + "\n5m: " + load[1] + "\n15m: " + load[2] },
+      { text: "📊 Server Load Average\n1m: " + load[0] + "\n5m: " + load[1] + "\n15m: " + load[2] },
       { quoted: message }
     );
   }
