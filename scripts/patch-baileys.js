@@ -64,6 +64,7 @@ case 'msg': {
       throw err
     }
 
+    // primary identity failed to decrypt; retrying with stanza-provided PN/LID pairing
     // Deliberately log no JIDs, message keys, message text, or chat metadata.
     console.warn('[Hasa_2_bot] Decrypt retry started using alternate PN/LID identity.')
 
