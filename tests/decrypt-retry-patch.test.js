@@ -13,7 +13,7 @@ test('retry uses the stanza LID when primary decrypt JID is PN', () => {
 })
 
 test('missing or duplicate alternate JID does not trigger a second decrypt', () => {
-  assert.match(patch, /if \(!retryJid \|\| retryJid === decryptionJid\)\s*\{\s*throw err/)
+  assert.match(patch, /if \(!retryJid \|\| retryJid === decryptionJid\)\s*\{[\s\S]*?throw err/)
 })
 
 test('failed alternate decrypt preserves the original error', () => {
@@ -22,4 +22,11 @@ test('failed alternate decrypt preserves the original error', () => {
 
 test('patch refuses unexpected Baileys versions', () => {
   assert.match(patch, /packageJson\.version !== '7\.0\.0-rc14'/)
+})
+
+test('retry diagnostics are visible without logging private identifiers', () => {
+  assert.match(patch, /console\.warn\('\[Hasa_2_bot\] Decrypt retry started using alternate PN\/LID identity\.'/)
+  assert.match(patch, /console\.warn\('\[Hasa_2_bot\] Alternate PN\/LID decrypt retry succeeded\.'/)
+  assert.match(patch, /console\.warn\('\[Hasa_2_bot\] Alternate PN\/LID decrypt retry failed\.'/)
+  assert.doesNotMatch(patch, /logger\.debug\(\s*\{\s*key:\s*fullMessage\.key/)
 })
