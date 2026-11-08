@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 export default async function ai({ sock, message, config }) {
   const jid = message.key.remoteJid;
-  const text = message.message?.conversation || message.message?.extendedTextMessage?.text || "";
+  const text = (message.message?.conversation || message.message?.extendedTextMessage?.text || "").trim();
   const prefix = config.prefix || ".";
-  if (!text.startsWith(prefix+"ai ")) return;
-  const prompt = text.slice((prefix+"ai ").length).trim();
+  const commandPrefix = prefix + "ai ";
+  if (text.slice(0, commandPrefix.length).toLowerCase() !== commandPrefix.toLowerCase()) return;
+  const prompt = text.slice(commandPrefix.length).trim();
   const key = process.env.GEMINI_API_KEY;
   if (!key || !config.aiChat) return sock.sendMessage(jid,{text:"AI chat is disabled. Set GEMINI_API_KEY and aiChat=true."},{quoted:message});
   try {
