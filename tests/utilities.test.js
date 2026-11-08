@@ -39,9 +39,9 @@ test("WhatsApp link helper validates international numbers and encodes messages"
 
 test("read-more helper separates preview and hidden text safely", () => {
   const result = buildReadMore("Short preview", "The remaining message");
-  assert.ok(result.startsWith("Short preview\\n"));
-  assert.ok(result.includes("\\u200e".repeat(4000)));
-  assert.ok(result.endsWith("\\nThe remaining message"));
+  assert.ok(result.startsWith("Short preview\n"));
+  assert.ok(result.includes("\u200e".repeat(4000)));
+  assert.ok(result.endsWith("\nThe remaining message"));
   assert.throws(() => buildReadMore("Only preview", ""), /භාවිතය/);
   assert.throws(() => buildReadMore("x".repeat(501), "hidden"), /500/);
 });
