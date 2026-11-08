@@ -35,7 +35,7 @@ const CATEGORIES = {
   "3": ["DOWNLOAD", [".dl <url>", ".fb <url>"]],
   "4": ["AI & PRANK", [".ai <question>", ".hack"]],
   "5": ["AUTO REPLY", [
-    ".addreply word-reply", ".replaceeply word-reply", ".getreply",
+    ".addreply word-reply", ".replacereply word-reply", ".getreply",
     ".removereply word", ".resetreply"
   ]],
   "6": ["OWNER & SETTINGS", [
@@ -257,7 +257,8 @@ export default async function core({ sock, message, config }) {
         console.error("Numeric setting save failed:", error);
         return send("❌ Setting Save කරන්න බැරි වුණා: " + error.message);
       }
-      return send("✅ *" + setting.label + "* " + (setting.value ? "Enabled 🟢" : "Disabled 🔴") + "\n\n" + makeSettingsMenu(config, prefix));
+      const enabled = setting.value !== false && setting.value !== "off";
+      return send("✅ *" + setting.label + "* " + (enabled ? "Enabled 🟢" : "Disabled 🔴") + "\n\n" + makeSettingsMenu(config, prefix));
     }
   }
 
