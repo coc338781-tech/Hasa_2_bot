@@ -220,6 +220,7 @@ function makeSettingsMenu(config, prefix) {
 }
 
 export default async function core({ sock, message, config }) {
+  const commandReceivedAt = process.hrtime.bigint();
   const jid = message.key?.remoteJid;
   if (!jid || jid === "status@broadcast") return;
   const sender = message.key.participant || jid;
@@ -344,11 +345,9 @@ export default async function core({ sock, message, config }) {
   }
 
   if (command === "ping") {
-    const startedAt = process.hrtime.bigint();
-    const responseMs = Math.max(
-      1,
-      Number((process.hrtime.bigint() - startedAt) / 1000000n)
-    );
+    // Measure real bot-side command processing time up to response dispatch.
+    const elapsedNs = process.hrtime.bigint() - commandReceivedAt;
+    const responseMs = Math.max(0.01, Number(elapsedNs) / 1e6).toFixed(2);
     const caption = [
       "🏓 *PONG RESPONSE*",
       "",
