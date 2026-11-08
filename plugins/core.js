@@ -29,7 +29,7 @@ const CATEGORIES = {
     ".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram", ".fastmode", ".loadavg"
   ]],
   "2": ["AI ASSISTANT", [".ai <question>", ".transcribe (reply to voice)"]],
-  "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>"]],
+  "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>", ".video <name or url>", ".song <name or url>"]],
   "4": ["GROUP MANAGEMENT", [
     ".tagall [message]", ".hidetag [message]", ".promote @user",
     ".demote @user", ".kick @user", ".groupinfo", ".antilink on|off",
@@ -159,7 +159,7 @@ function makeCommandList(config, prefix) {
   const groups = [
     ["GENERAL & SYSTEM", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram", prefix+"fastmode", prefix+"loadavg"]],
     ["AI ASSISTANT", [prefix+"ai <question>", prefix+"transcribe (reply to voice)"]],
-    ["MEDIA DOWNLOADS", [prefix+"dl <public video url>", prefix+"fb <public video url>"]],
+    ["MEDIA DOWNLOADS", [prefix+"dl <public video url>", prefix+"fb <public video url>", prefix+"video <name or url>", prefix+"song <name or url>"]],
     ["GROUP MANAGEMENT", [prefix+"tagall [message]", prefix+"hidetag [message]", prefix+"promote @user", prefix+"demote @user", prefix+"kick @user", prefix+"groupinfo", prefix+"antilink on/off", prefix+"warn @user [reason]", prefix+"warnings @user", prefix+"resetwarn @user"]],
     ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
