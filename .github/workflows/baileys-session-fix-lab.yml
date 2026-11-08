@@ -1,0 +1,51 @@
+name: Baileys Session Fix Lab (no production deploy)
+
+on:
+  push:
+    branches:
+      - baileys-session-fix-lab
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/baileys-session-fix-lab.yml'
+      - 'index.js'
+      - 'lib/**'
+      - 'plugins/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hasa2-baileys-session-lab
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated test branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install candidate Baileys and bot dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify installed Baileys version and import
+        run: |
+          node --input-type=module -e "import('\\@whiskeysockets/baileys').then(m => console.log('Baileys import OK; makeWASocket:', typeof m.default))"
+          npm ls @whiskeysockets/baileys --depth=0
+
+      - name: Run bot static and plugin checks
+        run: npm run check
+
+      - name: Confirm production branch is untouched
+        run: |
+          echo "Lab branch only: $GITHUB_REF_NAME"
+          test "$GITHUB_REF_NAME" = "refs/heads/baileys-session-fix-lab" || test "$GITHUB_REF_NAME" = "baileys-session-fix-lab"
+          echo "No Oracle SSH credentials are used by this workflow."
