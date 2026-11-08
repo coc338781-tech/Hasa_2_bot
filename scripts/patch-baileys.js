@@ -57,8 +57,8 @@ case 'msg': {
     // Use the exact alternate identity WhatsApp paired with this stanza.
     // If PN was mapped to LID before decrypt, retry with the original author JID.
     const retryJid = isLidUser(decryptionJid)
-      ? stanza.attrs.participant_pn || stanza.attrs.sender_pn
-      : stanza.attrs.participant_lid || stanza.attrs.sender_lid
+      ? stanza.attrs.participant_pn || stanza.attrs.sender_pn || stanza.attrs.peer_recipient_pn
+      : stanza.attrs.participant_lid || stanza.attrs.sender_lid || stanza.attrs.peer_recipient_lid
     if (!retryJid || retryJid === decryptionJid) {
       throw err
     }
