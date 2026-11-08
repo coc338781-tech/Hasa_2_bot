@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import { downloadContentFromMessage } from "@whiskeysockets/baileys";
-import { setLanguagePreference } from "../lib/language-preference.js";
 
 const SETTINGS = [
   { id: "1.1", key: "autoReply", label: "Auto Reply", value: true },
@@ -55,7 +54,7 @@ const CATEGORIES = {
   "10": ["UTILITY TOOLS", [
     ".math <expression>", ".cal <expression>", ".mathstep <expression>",
     ".id", ".jid", ".quote (reply to message)", ".wame <number> [message]", ".readmore <preview> | <text>", ".fancy <text>",
-    ".dictionary <English word>", ".trt [language] <text>", ".8.1 (Sinhala)", ".8.2 (English)"
+    ".dictionary <English word>", ".trt [language] <text>"
   ]]
 };
 
@@ -297,18 +296,6 @@ export default async function core({ sock, message, config }) {
   const command = (rawCommand || "").toLowerCase();
   const arg = args.join(" ").trim();
 
-
-  if (command === "8.1" || command === "8.2") {
-    if (!owner) return send("⛔ Bot භාෂාව වෙනස් කළ හැක්කේ Ownerට පමණයි.");
-    const language = command === "8.1" ? "SI" : "EN";
-    try {
-      setLanguagePreference(config, language);
-      saveConfig(config);
-      return send(language === "SI" ? "✅ *Bot භාෂාව සිංහල ලෙස සුරැකුවා.*" : "✅ *Bot language preference saved as English.*");
-    } catch (error) {
-      return send("❌ Language setting save කරන්න බැරි වුණා: " + error.message);
-    }
-  }
 
   if (command === "apply" || command === "applyy") {
     const imageMessage = getQuotedImage(message);
