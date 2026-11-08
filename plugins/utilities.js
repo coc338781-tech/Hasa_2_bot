@@ -109,6 +109,24 @@ export function formatFancy(value) {
   }).join("");
 }
 
+export function createWaMeLink(input) {
+  const [rawNumber, ...messageParts] = String(input || "").trim().split(/\\s+/);
+  const number = String(rawNumber || "").replace(/[+()\\-]/g, "");
+  if (!/^\\d{7,15}$/.test(number) || number.startsWith("0")) {
+    throw new Error("රටේ code එක සමඟ අංකය දෙන්න. උදා: .wame 94771234567");
+  }
+  const message = messageParts.join(" ").trim();
+  return "https://wa.me/" + number + (message ? "?text=" + encodeURIComponent(message) : "");
+}
+
+export function buildReadMore(preview, hidden) {
+  const first = String(preview || "").trim();
+  const rest = String(hidden || "").trim();
+  if (!first || !rest) throw new Error("භාවිතය: .readmore කෙටි පෙරදසුන | සම්පූර්ණ පණිවිඩය");
+  if (first.length > 500 || rest.length > 4000) throw new Error("පෙරදසුන 500 සහ ඉතිරි පණිවිඩය 4000 අකුරු ඉක්මවිය නොහැක.");
+  return first + "\\n" + "\\u200e".repeat(4000) + "\\n" + rest;
+}
+
 export function formatRuntime(seconds) {
   let remaining = Math.max(0, Math.floor(seconds));
   const days = Math.floor(remaining / 86400);
@@ -151,6 +169,24 @@ export default async function utilities({ sock, message, config }) {
       return send(heading + "\n\nExpression: " + query + "\nResult: *" + formatted + "*\n\n⚡ HASA 2 BOT");
     } catch (error) {
       return send("❌ ගණනය කළ නොහැක: " + error.message);
+    }
+  }
+
+  if (command === "wame") {
+    if (!query) return send("📱 *භාවිතය:* " + prefix + "wame 94771234567 [message]\\nරටේ code එක සමඟ අංකය යොදන්න.");
+    try {
+      return send("🔗 *WHATSAPP CHAT LINK*\\n\\n" + createWaMeLink(query));
+    } catch (error) {
+      return send("❌ " + error.message);
+    }
+  }
+
+  if (command === "readmore") {
+    const [preview, ...hiddenParts] = query.split("|");
+    try {
+      return send(buildReadMore(preview, hiddenParts.join("|")));
+    } catch (error) {
+      return send("❌ " + error.message);
     }
   }
 
