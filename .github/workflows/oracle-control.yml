@@ -122,30 +122,28 @@ jobs:
           import pathlib, sys
           p = pathlib.Path(sys.argv[1])
           s = p.read_text()
-          old = """  if [ -n "$(git status --porcelain)" ]; then
-          echo "STOP: Production folder has local changes."
-          exit 1
-          fi"""
-          new = """  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-          echo "STOP: Production folder has tracked local changes."
-          exit 1
-          fi
-          UNTRACKED="$(git ls-files --others --exclude-standard)"
-          ALLOWED="$(printf 'bot_logo.jpg\\npackage-lock.json')"
-          ALLOWED_REVERSED="$(printf 'package-lock.json\\nbot_logo.jpg')"
-          if [ -n "$UNTRACKED" ] && [ "$UNTRACKED" != "$ALLOWED" ] && [ "$UNTRACKED" != "$ALLOWED_REVERSED" ]; then
-          echo "STOP: Unexpected untracked files exist; preserving them."
-          printf '%s\\n' "$UNTRACKED"
-          exit 1
-          fi"""
+          old = '  if [ -n "$(git status --porcelain)" ]; then'
           if old not in s:
-          raise SystemExit("Expected original guard was not found; no changes made.")
-          p.write_text(s.replace(old, new, 1))
+              raise SystemExit("Expected deploy guard line not found; no changes made.")
+          s = s.replace(old, '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then', 1)
+          needle = '  OLD_SHA="$(git rev-parse HEAD)"'
+          block = """  UNTRACKED=\"$(git ls-files --others --exclude-standard)\"
+            UNEXPECTED=\"$(printf '%s\\\\n' \"$UNTRACKED\" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)\"
+            if [ -n \"$UNEXPECTED\" ]; then
+              echo \"STOP: Unexpected untracked files exist; preserving them.\"
+              printf '%s\\\\n' \"$UNEXPECTED\"
+              exit 1
+            fi
+
+          """
+          if needle not in s:
+              raise SystemExit("Deploy guard insertion point not found; no changes made.")
+          p.write_text(s.replace(needle, block + needle, 1))
           PY
               bash -n "$GUARD"
               echo "Deploy guard updated; original backup: $BACKUP"
-              sed -n "14,48p" "$GUARD"
-              ;; 
+              sed -n "14,52p" "$GUARD"
+              ;;
             restart)
               pm2 restart hasa2 --update-env
               sleep 6
