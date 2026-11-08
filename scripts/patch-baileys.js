@@ -43,7 +43,7 @@ if (source.includes(marker)) {
   process.exit(0)
 }
 
-const original = /case ['"]pkmsg['"]:\\s*case ['"]msg['"]:\\s*msgBuffer\\s*=\\s*await repository\\.decryptMessage\\(\\{\\s*jid:\\s*decryptionJid,\\s*type:\\s*e2eType,\\s*ciphertext:\\s*content\\s*\\}\\)\\s*;?\\s*break\\s*;?/
+const original = /case ['"]pkmsg['"]:\s*case ['"]msg['"]:\s*msgBuffer\s*=\s*await repository\.decryptMessage\(\{\s*jid:\s*decryptionJid,\s*type:\s*e2eType,\s*ciphertext:\s*content\s*\}\)\s*;?\s*break\s*;?/
 
 const replacement = `case 'pkmsg':
 case 'msg': {
