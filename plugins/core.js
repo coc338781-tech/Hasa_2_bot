@@ -32,7 +32,7 @@ const CATEGORIES = {
   "5": ["AUTOMATIONS", [".autoreply on/off", ".addreply word-reply", ".replacereply word-reply", ".getreply", ".removereply word", ".resetreply", ".statusseen on/off", ".statusreact green|random|off", ".antidelete on/off", ".viewonce on/off"]],
   "6": ["STICKER & MEDIA", [".sticker (reply to image/video)", ".toaudio (reply to video)", ".toimage (reply to sticker)"]],
   "7": ["OWNER PANEL", [".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", ".botcheck"]],
-  "8": ["BOT SETTINGS", [".settings", ".aichat on/off", ".groupcmd on/off", ".composing on/off", ".autovoice on/off", ".statusreact green|random|off", ".helpsubbot"]]
+  "8": ["BOT SETTINGS & SUBBOT", [".settings", ".aichat on/off", ".groupcmd on/off", ".composing on/off", ".autovoice on/off", ".statusreact green|random|off", ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot", ".restartsubbot", ".delsubbot", ".helpsubbot"]]
 };
 
 function isEnabled(value) {
