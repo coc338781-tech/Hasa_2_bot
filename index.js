@@ -123,8 +123,19 @@ async function startBot(authState = null) {
     if (type !== "notify" && type !== "append") return;
     for (const msg of messages || []) {
       if (!msg?.key?.remoteJid || !msg.message) continue;
-      // Unwrap ephemeral/view-once containers before plugins inspect command text.
-      msg.message = normalizeMessageContent(msg.message) || msg.message;
+      // Preserve the original wrapper before Baileys normalization for view-once extraction.
+      const originalMessage = msg.message;
+      const normalizedMessage = normalizeMessageContent(originalMessage) || originalMessage;
+      const wrappedViewOnce = originalMessage.viewOnceMessageV2?.message ||
+        originalMessage.viewOnceMessage?.message ||
+        originalMessage.viewOnceMessageV2Extension?.message ||
+        originalMessage.ephemeralMessage?.message?.viewOnceMessageV2?.message ||
+        originalMessage.ephemeralMessage?.message?.viewOnceMessage?.message ||
+        originalMessage.ephemeralMessage?.message?.viewOnceMessageV2Extension?.message ||
+        normalizedMessage.viewOnceMessageV2?.message ||
+        normalizedMessage.viewOnceMessage?.message ||
+        normalizedMessage.viewOnceMessageV2Extension?.message;
+      msg.message = normalizedMessage;
       remember(msg);
       // Append events can populate the cache, but only live notifications run plugins.
       if (type !== "notify") continue;
@@ -154,9 +165,7 @@ async function startBot(authState = null) {
         continue;
       }
 
-      const viewOnceContent = msg.message.viewOnceMessageV2?.message ||
-        msg.message.viewOnceMessage?.message ||
-        msg.message.viewOnceMessageV2Extension?.message;
+      const viewOnceContent = wrappedViewOnce;
       if (config.viewOnce && viewOnceContent) {
         const typeName = Object.keys(viewOnceContent)[0];
         const media = viewOnceContent[typeName];
