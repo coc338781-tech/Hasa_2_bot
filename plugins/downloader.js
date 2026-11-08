@@ -43,7 +43,7 @@ export default async function downloader({ sock, message, config }) {
     ? body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase()
     : "";
 
-  if (!["dl", "fb"].includes(command)) return;
+  if (!["dl", "fb", "song", "mp3"].includes(command)) return;
 
   const url = body.trim().slice((prefix + command).length).trim();
   if (!/^https?:\/\//i.test(url)) {
@@ -58,21 +58,31 @@ export default async function downloader({ sock, message, config }) {
   fs.mkdirSync(dir, { recursive: true });
   const prefixName = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
+  const audioMode = command === "song" || command === "mp3";
   await sock.sendMessage(
     jid,
     {
-      text: "╭─「 ⏳ *VIDEO DOWNLOADING* 」\n│\n│ 🎬 වීඩියෝ එක සූදානම් කරමින්\n│ පවතී...\n│\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\n╰──────────────"
+      text: audioMode
+        ? "╭─「 ⏳ *AUDIO DOWNLOADING* 」\\n│\\n│ 🎵 Audio එක සූදානම් කරමින්\\n│ පවතී...\\n│\\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\\n╰──────────────"
+        : "╭─「 ⏳ *VIDEO DOWNLOADING* 」\\n│\\n│ 🎬 වීඩියෝ එක සූදානම් කරමින්\\n│ පවතී...\\n│\\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\\n╰──────────────"
     },
     { quoted: message }
   );
 
   try {
-    await exec("yt-dlp", [
-      "--no-playlist", "--no-warnings", "--max-filesize", "64M",
-      "-f", "best[ext=mp4][filesize<64M]/best[filesize<64M]/best",
-      "--merge-output-format", "mp4",
-      "-o", path.join(dir, prefixName + ".%(ext)s"), url
-    ], { timeout: 240000, maxBuffer: 8 * 1024 * 1024 });
+    const downloadArgs = audioMode
+      ? [
+          "--no-playlist", "--no-warnings", "--max-filesize", "64M",
+          "--extract-audio", "--audio-format", "mp3", "--audio-quality", "5",
+          "-o", path.join(dir, prefixName + ".%(ext)s"), url
+        ]
+      : [
+          "--no-playlist", "--no-warnings", "--max-filesize", "64M",
+          "-f", "best[ext=mp4][filesize<64M]/best[filesize<64M]/best",
+          "--merge-output-format", "mp4",
+          "-o", path.join(dir, prefixName + ".%(ext)s"), url
+        ];
+    await exec("yt-dlp", downloadArgs, { timeout: 240000, maxBuffer: 8 * 1024 * 1024 });
 
     const files = fs.readdirSync(dir)
       .filter(name => name.startsWith(prefixName))
@@ -85,11 +95,19 @@ export default async function downloader({ sock, message, config }) {
     const data = fs.readFileSync(file);
     if (data.length > 64 * 1024 * 1024) throw new Error("Video is larger than 64 MB.");
 
-    await sock.sendMessage(
-      jid,
-      { video: data, caption: "✅ *DOWNLOAD COMPLETED*\n\n🎬 " + path.basename(file) + "\n❤️ *POWERED BY HASA*" },
-      { quoted: message }
-    );
+    if (audioMode) {
+      await sock.sendMessage(
+        jid,
+        { audio: data, mimetype: "audio/mpeg", fileName: "Hasa-audio.mp3", ptt: false },
+        { quoted: message }
+      );
+    } else {
+      await sock.sendMessage(
+        jid,
+        { video: data, caption: "✅ *DOWNLOAD COMPLETED*\\n\\n🎬 " + path.basename(file) + "\\n❤️ *POWERED BY HASA*" },
+        { quoted: message }
+      );
+    }
   } catch (error) {
     const reason = explainDownloadError(error);
     await sock.sendMessage(
