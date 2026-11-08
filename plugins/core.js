@@ -27,7 +27,7 @@ const SETTINGS = [
 const CATEGORIES = {
   "1": ["GENERAL", [".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram"]],
   "2": ["AI ASSISTANT", [".ai <question>", ".ai (reply to image/audio)", ".aistatus"]],
-  "3": ["DOWNLOADERS", [".dl <url>", ".fb <url>"]],
+  "3": ["DOWNLOADERS", [".dl <video-url>", ".fb <facebook-url>", ".song <url>", ".mp3 <url>"]],
   "4": ["GROUP TOOLS", [".tagall [message]", ".hidetag [message]", ".promote @user", ".demote @user", ".kick @user", ".groupinfo"]],
   "5": ["AUTOMATIONS", [".autoreply on/off", ".addreply word-reply", ".replacereply word-reply", ".getreply", ".removereply word", ".resetreply", ".statusseen on/off", ".statusreact green|random|off", ".antidelete on/off", ".viewonce on/off"]],
   "6": ["STICKER & MEDIA", [".sticker (reply to image/video)", ".toaudio (reply to video)", ".toimage (reply to sticker)"]],
@@ -136,7 +136,7 @@ function makeCommandList(config, prefix) {
   const groups = [
     ["GENERAL", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram"]],
     ["AI ASSISTANT", [prefix+"ai <question>", prefix+"ai (reply to image/audio)"]],
-    ["DOWNLOADERS", [prefix+"dl <url>", prefix+"fb <url>"]],
+    ["DOWNLOADERS", [prefix+"dl <video-url>", prefix+"fb <facebook-url>", prefix+"song <url>", prefix+"mp3 <url>"]],
     ["GROUP TOOLS", [prefix+"tagall", prefix+"hidetag", prefix+"promote", prefix+"demote", prefix+"kick", prefix+"groupinfo"]],
     ["AUTOMATIONS", [prefix+"autoreply on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off"]],
     ["STICKER & MEDIA", [prefix+"sticker (reply to image/video)", prefix+"toaudio (reply to video)", prefix+"toimage (reply to sticker)"]],
