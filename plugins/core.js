@@ -41,11 +41,12 @@ const CATEGORIES = {
     ".addreply word-reply", ".replacereply word-reply", ".getreply",
     ".removereply word", ".resetreply"
   ]],
-  "6": ["PRANK & FUN", [".hack"]],
-  "7": ["OWNER CONTROL", [
+  "6": ["STICKER & MEDIA TOOLS", [".sticker (reply to photo/video)", ".toaudio (reply to video)", ".compress (reply to video)"]],
+  "7": ["PRANK & FUN", [".hack"]],
+  "8": ["OWNER CONTROL", [
     ".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"
   ]],
-  "8": ["SUBBOT MANAGER", [
+  "9": ["SUBBOT MANAGER", [
     ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
     ".restartsubbot", ".delsubbot", ".helpsubbot"
   ]]
@@ -123,9 +124,10 @@ function makeMainMenu(config) {
     "03  MEDIA DOWNLOADS",
     "04  GROUP MANAGEMENT",
     "05  AUTOMATIONS",
-    "06  PRANK & FUN",
-    "07  OWNER CONTROL",
-    "08  SUBBOT MANAGER"
+    "06  STICKER & MEDIA TOOLS",
+    "07  PRANK & FUN",
+    "08  OWNER CONTROL",
+    "09  SUBBOT MANAGER"
   ];
   return [
     "*『 HASA 2 BOT 』*",
@@ -150,10 +152,11 @@ function makeMainMenu(config) {
 function makeCommandList(config, prefix) {
   const groups = [
     ["GENERAL & SYSTEM", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram", prefix+"fastmode", prefix+"loadavg"]],
-    ["AI ASSISTANT", [prefix+"ai <question>"]],
+    ["AI ASSISTANT", [prefix+"ai <question>", prefix+"transcribe (reply to voice)"]],
     ["MEDIA DOWNLOADS", [prefix+"dl <public video url>", prefix+"fb <public video url>"]],
     ["GROUP MANAGEMENT", [prefix+"tagall [message]", prefix+"hidetag [message]", prefix+"promote @user", prefix+"demote @user", prefix+"kick @user", prefix+"groupinfo"]],
     ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
+    ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
     ["OWNER CONTROL", [prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
     ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
