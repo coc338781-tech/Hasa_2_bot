@@ -380,7 +380,7 @@ export default async function core({ sock, message, config }) {
       "╰━━━━━━━━━━━━━━━━━━",
       "",
       config.FOOTER ? "_" + config.FOOTER + "_" : "⚡ *POWERED BY HASA 2 BOT* ❤️"
-    ].join("\\n");
+    ].join("\n");
     return sendWithLogo(sock, jid, message, caption, config);
   }
 
