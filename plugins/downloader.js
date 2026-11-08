@@ -30,26 +30,24 @@ export default async function downloader({ sock, message, config, execCommand = 
   if (!jid) return;
   const body = message.message?.conversation || message.message?.extendedTextMessage?.text || "";
   const prefix = config.prefix || ".";
-  const command = body.startsWith(prefix) ? body.slice(prefix.length).trim().split(/\\s+/)[0].toLowerCase() : "";
+  const command = body.startsWith(prefix) ? body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase() : "";
   if (!["dl", "fb"].includes(command)) return;
 
   const url = body.trim().slice((prefix + command).length).trim();
-  if (!/^https?:\\/\\//i.test(url)) {
+  if (!/^https?:\/\//i.test(url)) {
     return sock.sendMessage(jid, {
-      text: "⚠️ *INVALID LINK*\\n\\nකරුණාකර නිවැරදි වීඩියෝ Link එකක් යවන්න.\\nඋදා: " + prefix + command + " https://..."
+      text: "⚠️ *INVALID LINK*\n\nකරුණාකර නිවැරදි වීඩියෝ Link එකක් යවන්න.\nඋදා: " + prefix + command + " https://..."
     }, { quoted: message });
   }
 
   const dir = path.resolve(config.downloadDir || "downloads");
   fileSystem.mkdirSync(dir, { recursive: true });
   const prefixName = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-  let noticeSent = false;
 
   try {
     await sock.sendMessage(jid, {
-      text: "╭─「 ⏳ *VIDEO DOWNLOADING* 」\\n│\\n│ 🔎 Link එක පරීක්ෂා කරමින්...\\n│ 🎬 වීඩියෝ එක සූදානම් කරමින්\\n│\\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\\n╰──────────────"
+      text: "╭─「 ⏳ *VIDEO DOWNLOADING* 」\n│\n│ 🔎 Link එක පරීක්ෂා කරමින්...\n│ 🎬 වීඩියෝ එක සූදානම් කරමින්\n│\n│ ❤️ පොඩ්ඩක් රැඳී සිටින්න.\n╰──────────────"
     }, { quoted: message });
-    noticeSent = true;
 
     // Check both required server tools before starting a potentially long download.
     await execCommand("yt-dlp", ["--version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
@@ -74,12 +72,12 @@ export default async function downloader({ sock, message, config, execCommand = 
     const data = fileSystem.readFileSync(file);
     await sock.sendMessage(jid, {
       video: data,
-      caption: "✅ *DOWNLOAD COMPLETED*\\n\\n🎬 " + path.basename(file) + "\\n📦 " + (size / (1024 * 1024)).toFixed(1) + " MB\\n❤️ *POWERED BY HASA*"
+      caption: "✅ *DOWNLOAD COMPLETED*\n\n🎬 " + path.basename(file) + "\n📦 " + (size / (1024 * 1024)).toFixed(1) + " MB\n❤️ *POWERED BY HASA*"
     }, { quoted: message });
   } catch (error) {
     const reason = explainDownloadError(error);
     await sock.sendMessage(jid, {
-      text: "╭─「 ❌ *DOWNLOAD FAILED* 」\\n│\\n│ වීඩියෝ එක ලබාගන්න බැරි වුණා.\\n│\\n│ 🔎 *හේතුව:*\\n│ " + reason + "\\n│\\n│ 🔄 වෙනත් Public Link එකක් උත්සාහ කරන්න.\\n╰──────────────"
+      text: "╭─「 ❌ *DOWNLOAD FAILED* 」\n│\n│ වීඩියෝ එක ලබාගන්න බැරි වුණා.\n│\n│ 🔎 *හේතුව:*\n│ " + reason + "\n│\n│ 🔄 වෙනත් Public Link එකක් උත්සාහ කරන්න.\n╰──────────────"
     }, { quoted: message }).catch(() => {});
   } finally {
     for (const name of fileSystem.readdirSync(dir).filter(name => name.startsWith(prefixName))) {
