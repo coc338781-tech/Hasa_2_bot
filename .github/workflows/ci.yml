@@ -1,4 +1,4 @@
-name: Hasa 2 Bot - Safe CI
+name: Hasa 2 Bot - Safe CI and Deploy
 
 on:
   push:
@@ -41,3 +41,70 @@ jobs:
 
       - name: Test system information
         run: npm run test:system-info
+
+  deploy:
+    name: Deploy to Oracle with rollback
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/assistant-workflow'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Configure SSH
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          test -n "$ORACLE_HOST" || { echo "Missing ORACLE_HOST secret"; exit 1; }
+          test -n "$ORACLE_USER" || { echo "Missing ORACLE_USER secret"; exit 1; }
+          test -n "$ORACLE_SSH_KEY" || { echo "Missing ORACLE_SSH_KEY secret"; exit 1; }
+          test -n "$ORACLE_KNOWN_HOSTS" || { echo "Missing ORACLE_KNOWN_HOSTS secret"; exit 1; }
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          printf 'ORACLE_HOST=%s\nORACLE_USER=%s\n' "$ORACLE_HOST" "$ORACLE_USER" >> "$GITHUB_ENV"
+
+      - name: Deploy safely and roll back on failure
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$ORACLE_USER@$ORACLE_HOST" 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          APP_DIR=/home/opc/Hasa_2_bot
+          BRANCH=assistant-workflow
+          BACKUP_DIR=/home/opc/hasa-deploy-backups
+          cd "$APP_DIR"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Deployment stopped: production working tree is not clean."
+            exit 1
+          fi
+
+          OLD_SHA="$(git rev-parse HEAD)"
+          mkdir -p "$BACKUP_DIR"
+          git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" "$OLD_SHA"
+
+          rollback() {
+            echo "Deployment failed; restoring previous code revision."
+            git reset --hard "$OLD_SHA" || true
+            npm install --no-audit --no-fund || true
+            pm2 restart hasa2 || true
+          }
+          trap rollback ERR
+
+          git fetch origin "$BRANCH"
+          git reset --hard "origin/$BRANCH"
+          npm install --no-audit --no-fund
+          npm run check
+          npm run test:decrypt-retry
+          npm run test:system-info
+          pm2 restart hasa2
+          sleep 3
+          pm2 describe hasa2 >/dev/null
+          pm2 status hasa2
+          trap - ERR
+          echo "Deployment completed successfully."
+          REMOTE
