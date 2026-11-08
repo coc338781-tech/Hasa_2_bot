@@ -222,7 +222,7 @@ export default async function core({ sock, message, config }) {
 
   // Number replies are accepted only when replying to this bot's menu/settings panel.
   if (/^\d+(?:\.\d+)?$/.test(body)) {
-    if (quotedBody.includes("COMMANDS PANEL") || quotedBody.includes("LIST MENU")) {
+    if (quotedBody.includes("COMMANDS PANEL") || quotedBody.includes("LIST MENU") || quotedBody.includes("MAIN MENU")) {
       const category = CATEGORIES[body];
       if (!category) return send("❌ ඒ Menu අංකය හමු වුණේ නැහැ. .menu යවලා නැවත තෝරන්න.");
       const caption = [
