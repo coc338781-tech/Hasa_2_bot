@@ -50,6 +50,10 @@ const CATEGORIES = {
   "9": ["SUBBOT MANAGER", [
     ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
     ".restartsubbot", ".delsubbot", ".helpsubbot"
+  ]],
+  "10": ["UTILITY TOOLS", [
+    ".math <expression>", ".cal <expression>", ".mathstep <expression>",
+    ".id", ".jid", ".quote (reply to message)", ".fancy <text>"
   ]]
 };
 
@@ -143,7 +147,7 @@ function makeMainMenu(config) {
     ...names.map(line => "┃ " + line),
     "╰━━━━━━━━━━━━━━━━━━",
     "",
-    "↪ Reply with a category number (1-9)",
+    "↪ Reply with a category number (1-10)",
     "📜 Full commands: .list",
     "⚙️ Owner settings: .settings",
     "",
