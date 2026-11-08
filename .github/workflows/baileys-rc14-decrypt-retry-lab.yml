@@ -1,0 +1,64 @@
+name: Baileys rc14 decrypt retry lab
+
+on:
+  push:
+    branches:
+      - baileys-rc14-decrypt-retry-lab
+    paths:
+      - 'package.json'
+      - 'scripts/patch-baileys.js'
+      - 'tests/**'
+      - '.github/workflows/baileys-rc14-decrypt-retry-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baileys-rc14-decrypt-retry-lab
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated test branch
+        uses: actions/checkout@v4
+        with:
+          ref: baileys-rc14-decrypt-retry-lab
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install official Baileys rc14 and run guarded patch
+        run: npm install --no-audit --no-fund
+
+      - name: Verify the rc14 retry patch was applied
+        run: |
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            import { createRequire } from 'node:module';
+            import { dirname, join } from 'node:path';
+            const require = createRequire(import.meta.url);
+            const entry = require.resolve('@whiskeysockets/baileys');
+            const file = join(dirname(entry), 'Utils', 'decode-wa-message.js');
+            const source = fs.readFileSync(file, 'utf8');
+            if (!source.includes('primary identity failed to decrypt; retrying with stanza-provided PN/LID pairing')) {
+              throw new Error('rc14 retry patch marker missing');
+            }
+            console.log('PASS: official rc14 package contains the guarded alternate-JID retry');
+          "
+
+      - name: Run focused decrypt retry safeguard tests
+        run: npm run test:decrypt-retry
+
+      - name: Run bot static and plugin checks
+        run: npm run check
+
+      - name: Confirm production branch was not targeted
+        run: |
+          test "$GITHUB_REF_NAME" = "baileys-rc14-decrypt-retry-lab"
+          echo "PASS: isolated lab only; no Oracle SSH secrets or deployment steps"
