@@ -8,7 +8,7 @@ A separate WhatsApp MD bot project. It does not overwrite or share the existing 
 - Modular plugin loader that isolates plugin load/runtime errors.
 - Auto status seen, anti-delete (text and media forwarding where supported), and view-once media handling.
 - Configurable auto replies with add/replace/list/remove/reset commands.
-- Group commands: tagall, hidetag, promote, demote, kick, groupinfo (admin checks included).
+- Group commands: tagall, hidetag, promote, demote, kick, groupinfo, anti-link moderation, and member warnings (admin checks included).
 - AI chat using Gemini when an API key is configured, including image questions and voice transcription.
 - Video downloader for supported public URLs via yt-dlp (.dl and .fb).
 - Media tools: create static/animated stickers (.sticker / .s), extract audio from video (.toaudio), and compress video (.compress).
@@ -37,7 +37,7 @@ For AI text, image questions, and voice transcription, add `GEMINI_API_KEY=your_
 - `.menu`, `.ping`, `.alive`, `.uptime`
 - `.autoreply on|off`
 - `.addreply word-reply`, `.replaceeply word-reply`, `.getreply`, `.removereply word`, `.resetreply`
-- `.tagall`, `.hidetag`, `.promote @user`, `.demote @user`, `.kick @user`, `.groupinfo`
+- `.tagall`, `.hidetag`, `.promote @user`, `.demote @user`, `.kick @user`, `.groupinfo`, `.antilink on/off`, `.warn @user [reason]`, `.warnings @user`, `.resetwarn @user`
 - `.ai question`, reply to an image with `.ai describe this`, `.transcribe` (reply to voice/audio), `.hack` (owner-only harmless prank simulation)
 - `.sticker` / `.s` (reply to image/video), `.toaudio` (reply to video), `.compress` (reply to video)
 - `.dl url`, `.fb url`
