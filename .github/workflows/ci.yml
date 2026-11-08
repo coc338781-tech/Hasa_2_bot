@@ -41,7 +41,10 @@ jobs:
 
       - name: Test system information
         run: npm run test:system-info
-\n      - name: Test persistent anti-delete cache\n        run: npm run test:message-cache\n
+
+      - name: Test persistent anti-delete cache
+        run: npm run test:message-cache
+
   oracle-health:
     name: Verify restricted Oracle access (read-only)
     needs: check
