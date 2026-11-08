@@ -1,0 +1,21 @@
+name: Oracle Control Workflow Smoke Test
+
+on:
+  push:
+    branches:
+      - assistant-workflow
+    paths:
+      - '.github/oracle-control/smoke.json'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm workflow runner
+        run: |
+          set -euo pipefail
+          echo "GitHub Actions runner started successfully."
+          echo "No Oracle connection or server operation is performed by this test."
