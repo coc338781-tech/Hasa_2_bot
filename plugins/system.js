@@ -1,5 +1,9 @@
 import os from "node:os";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { readFile, statfs } from "node:fs/promises";
+
+const exec = promisify(execFile);
 
 export function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return "N/A";
@@ -68,13 +72,23 @@ async function getDiskInfo() {
   }
 }
 
+async function getToolVersion(command, args) {
+  try {
+    const result = await exec(command, args, { timeout: 4000, maxBuffer: 64 * 1024 });
+    const output = String(result.stdout || result.stderr || "").split("\\n")[0].trim();
+    return output.slice(0, 90) || "Available";
+  } catch {
+    return "Unavailable";
+  }
+}
+
 export async function buildSystemInfo({ sock, config }) {
   const cpus = os.cpus() || [];
   const memory = process.memoryUsage();
   const totalRam = os.totalmem();
   const freeRam = os.freemem();
   const usedRam = Math.max(0, totalRam - freeRam);
-  const [disk, cpuUsage] = await Promise.all([getDiskInfo(), getCpuUsage()]);
+  const [disk, cpuUsage, ytDlpVersion, ffmpegVersion] = await Promise.all([\n    getDiskInfo(), getCpuUsage(), getToolVersion("yt-dlp", ["--version"]), getToolVersion("ffmpeg", ["-version"])\n  ]);
   const [botVersion, baileysVersion] = await Promise.all([
     readPackageVersion(new URL("../package.json", import.meta.url), process.env.npm_package_version || "1.0.0"),
     readPackageVersion(new URL("../node_modules/@whiskeysockets/baileys/package.json", import.meta.url))
