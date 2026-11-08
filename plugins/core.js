@@ -35,7 +35,7 @@ const CATEGORIES = {
   "3": ["DOWNLOAD", [".dl <url>", ".fb <url>"]],
   "4": ["AI & PRANK", [".ai <question>", ".hack"]],
   "5": ["AUTO REPLY", [
-    ".addreply word-reply", ".replaceeply word-reply", ".getreply",
+    ".addreply word-reply", ".replacereply word-reply", ".getreply",
     ".removereply word", ".resetreply"
   ]],
   "6": ["OWNER & SETTINGS", [
