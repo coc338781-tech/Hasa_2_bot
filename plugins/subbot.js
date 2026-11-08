@@ -1,4 +1,5 @@
-import { startSubbot, stopSubbot, listSubbots } from "../lib/subbot-manager.js";
+import { startSubbot, stopSubbot, listSubbots, findSavedSubbotOwners } from "../lib/subbot-manager.js";
+import { restartAllSubbots, deleteAllSubbots } from "../lib/subbot-bulk.js";
 
 function ownerAllowed(sender, message, config) {
   if (message.key.fromMe) return true;
@@ -14,7 +15,7 @@ export default async function subbot({ sock, message, config }) {
   if (!body.startsWith(prefix)) return;
   const [rawCommand, ...args] = body.slice(prefix.length).trim().split(/\s+/);
   const command = rawCommand.toLowerCase();
-  const valid = ["subbot", "subcheck", "getsubbot", "stopsubbot", "delsubbot", "restartsubbot", "helpsubbot"];
+  const valid = ["subbot", "subcheck", "getsubbot", "stopsubbot", "delsubbot", "restartsubbot", "delallsubbot", "restartallsubbot", "helpsubbot"];
   if (!valid.includes(command)) return;
   const sender = message.key.participant || chat;
   if (!ownerAllowed(sender, message, config)) {
@@ -30,7 +31,9 @@ export default async function subbot({ sock, message, config }) {
       prefix + "getsubbot - List active subbots\n" +
       prefix + "stopsubbot - Stop but keep session\n" +
       prefix + "restartsubbot - Restart saved session\n" +
-      prefix + "delsubbot - Stop and delete this subbot session"
+      prefix + "delsubbot - Stop and delete this subbot session\n" +
+      prefix + "delallsubbot confirm - Stop and delete all saved subbot sessions\n" +
+      prefix + "restartallsubbot - Restart all saved subbots"
     }, { quoted: message });
   }
   if (command === "subbot") {
@@ -59,6 +62,28 @@ export default async function subbot({ sock, message, config }) {
     await stopSubbot(ownerNumber, { removeSession: true });
     return sock.sendMessage(chat, { text: "🗑️ Subbot stopped and its separate session folder deleted." }, { quoted: message });
   }
+
+  if (command === "delallsubbot") {
+    if ((args[0] || "").toLowerCase() !== "confirm") {
+      const count = findSavedSubbotOwners().length;
+      return sock.sendMessage(chat, { text: "⚠️ මෙය සියලුම Subbot sessions මකා දමයි (" + count + " saved). තහවුරු කිරීමට: " + prefix + "delallsubbot confirm" }, { quoted: message });
+    }
+    const owners = [...new Set([...findSavedSubbotOwners(), ...listSubbots().map(item => item.owner)])];
+    const results = await deleteAllSubbots(owners, owner => stopSubbot(owner, { removeSession: true }));
+    const failed = results.filter(item => !item.ok);
+    return sock.sendMessage(chat, { text: "🗑️ *BULK SUBBOT DELETE*\\nDeleted: " + (results.length - failed.length) + " / " + results.length + (failed.length ? "\\nFailed: " + failed.map(item => item.owner + " (" + item.error + ")").join(", ") : "") }, { quoted: message });
+  }
+  if (command === "restartallsubbot") {
+    const owners = [...new Set([...findSavedSubbotOwners(), ...listSubbots().map(item => item.owner)])];
+    if (!owners.length) return sock.sendMessage(chat, { text: "Restart කරන්න saved Subbot session එකක් නැහැ." }, { quoted: message });
+    const results = await restartAllSubbots(owners, {
+      stop: owner => stopSubbot(owner),
+      start: owner => startSubbot({ ownerJid: owner + "@s.whatsapp.net", mainSock: sock, config, plugins: globalThis.__hasaPlugins })
+    });
+    const failed = results.filter(item => !item.ok);
+    return sock.sendMessage(chat, { text: "🔄 *BULK SUBBOT RESTART*\\nRestart requested: " + (results.length - failed.length) + " / " + results.length + (failed.length ? "\\nFailed: " + failed.map(item => item.owner + " (" + item.error + ")").join(", ") : "") }, { quoted: message });
+  }
+
   if (command === "restartsubbot") {
     try {
       await stopSubbot(ownerNumber);
