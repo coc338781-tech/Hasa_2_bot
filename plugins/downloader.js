@@ -43,7 +43,7 @@ export default async function downloader({ sock, message, config, execCommand = 
   }
   if (!supportsSearch && !/^https?:\/\//i.test(input)) {
     return sock.sendMessage(jid, {
-      text: "⚠️ *INVALID LINK*\\n\\nනිවැරදි Public URL එකක් යවන්න.\\nඋදා: " + prefix + command + " https://..."
+      text: "⚠️ *INVALID LINK*\n\nනිවැරදි Public URL එකක් යවන්න.\nඋදා: " + prefix + command + " https://..."
     }, { quoted: message });
   }
   const target = supportsSearch && !/^https?:\/\//i.test(input) ? "ytsearch1:" + input : input;
