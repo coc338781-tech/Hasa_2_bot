@@ -7,3 +7,6 @@ downloads/
 tmp/
 replies.json
 *.log
+
+group-settings.json
+group-warnings.json
