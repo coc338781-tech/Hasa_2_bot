@@ -10,7 +10,8 @@
     "postinstall": "node scripts/patch-baileys.js",
     "test:decrypt-retry": "node --test tests/decrypt-retry-patch.test.js",
     "test:system-info": "node --test tests/system-info.test.js",
-    "test:message-cache": "node --test tests/message-cache.test.js"
+    "test:message-cache": "node --test tests/message-cache.test.js",
+    "test:anti-delete": "node --test tests/anti-delete.test.js"
   },
   "engines": {
     "node": ">=20.0.0"
