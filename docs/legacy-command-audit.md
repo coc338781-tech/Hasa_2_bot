@@ -48,7 +48,7 @@ The old menu advertised these groups, but code inspection did not find working c
 ## Intentionally excluded pending separate safety/design review
 
 - Arbitrary code execution or environment/secret exposure: `eval`, `myenv`.
-- Destructive or sensitive account/server/session actions: legacy reset/restore/backup, JID deletion, bulk messaging, and session-ID generation/transfer commands.
+- Destructive or sensitive account/server/session actions: legacy reset/restore/backup, JID deletion, bulk messaging, and session-ID generation/transfer commands (including the legacy `.pair` flow), and in-chat package self-update commands (`.updatefb` / `.fbupdate`).
 - Third-party API-dependent menu labels with no verified old implementation are not added as nonfunctional placeholders.
 
 ## Validation status
