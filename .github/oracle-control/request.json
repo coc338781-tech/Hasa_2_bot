@@ -1,4 +1,4 @@
 {
-  "action": "access-audit",
-  "request_id": "oracle-failed-units-diagnostics-20261110-2"
+  "action": "disable-unsupported-diagnostics",
+  "request_id": "oracle-disable-unsupported-diagnostics-20261110-1"
 }
