@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -81,6 +81,48 @@ jobs:
           echo "Operation: $ACTION"
           echo "Current commit: $(git rev-parse --short HEAD)"
           case "$ACTION" in
+            restore-start)
+              echo "Checking saved PM2 state and WhatsApp session registration."
+              DUMP="$HOME/.pm2/dump.pm2"
+              if [ -s "$DUMP" ]; then
+                echo "PM2 dump: present"
+                node -e 'const a=require(process.argv[1]); for(const x of a){const e=x.pm2_env||{}; console.log("Saved app: "+(e.name||x.name||"unknown")+" | script: "+(e.pm_exec_path||"unknown"))}' "$DUMP"
+                if node -e 'const a=require(process.argv[1]); process.exit(a.some(x=>(x.pm2_env||{}).name==="hasa2")?0:1)' "$DUMP"; then
+                  echo "Restoring saved PM2 processes."
+                  pm2 resurrect
+                else
+                  echo "No hasa2 entry in dump; checking auth before start."
+                  REGISTERED="$(node -e 'try{process.stdout.write(require("./auth_info/creds.json").registered?"yes":"no")}catch{process.stdout.write("no")}')"
+                  echo "WhatsApp session registered: $REGISTERED"
+                  if [ "$REGISTERED" = "yes" ]; then
+                    pm2 describe hasa2 >/dev/null 2>&1 || pm2 start npm --name hasa2 -- start
+                  else
+                    echo "STOP: No registered session. Auth files left untouched."
+                    exit 2
+                  fi
+                fi
+              else
+                echo "PM2 dump: missing"
+                REGISTERED="$(node -e 'try{process.stdout.write(require("./auth_info/creds.json").registered?"yes":"no")}catch{process.stdout.write("no")}')"
+                echo "WhatsApp session registered: $REGISTERED"
+                if [ "$REGISTERED" = "yes" ]; then
+                  pm2 describe hasa2 >/dev/null 2>&1 || pm2 start npm --name hasa2 -- start
+                else
+                  echo "STOP: No registered session. Auth files left untouched."
+                  exit 2
+                fi
+              fi
+              sleep 10
+              pm2 save
+              pm2 status
+              print_status
+              echo "--- Recent safe diagnostics ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  tail -n 40 "$f" | grep -Ei 'connected|connection open|error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|online' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 20 || true
+                fi
+              done
+              ;;
             status)
               print_status
               ;;
