@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - "**"
+    paths-ignore:
+      - ".github/oracle-control/request.json"
+      - "README.md"
+      - "docs/**"
   pull_request:
     branches:
       - "**"
