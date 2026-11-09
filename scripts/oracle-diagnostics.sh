@@ -18,12 +18,14 @@ printf 'OS: '; grep '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2- |
 printf 'Node: '; node --version 2>/dev/null || true
 printf 'npm: '; npm --version 2>/dev/null || true
 section "PM2 PROCESS"
-pm2 jlist 2>/dev/null | node --input-type=commonjs -e '
+PM2_OK=0
+if pm2 jlist 2>/dev/null | node --input-type=commonjs -e '
 let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{
  try { const p=JSON.parse(s).find(x=>x.name==="hasa2");
  if(!p){console.log("hasa2: NOT FOUND");process.exitCode=2;return;}
  const e=p.pm2_env||{},m=p.monit||{};
  console.log("name: "+p.name); console.log("status: "+(e.status||"unknown"));
+ if(e.status!=="online"){console.log("ALERT: hasa2 is not online");process.exitCode=2;}
  console.log("restart_count: "+(e.restart_time??"unknown"));
  console.log("uptime_seconds: "+(e.pm_uptime?Math.floor((Date.now()-e.pm_uptime)/1000):"unknown"));
  console.log("memory_mb: "+(m.memory==null?"unknown":(m.memory/1048576).toFixed(1)));
@@ -31,7 +33,7 @@ let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{
  console.log("exit_code: "+(e.exit_code??"unknown"));
  console.log("unstable_restarts: "+(e.unstable_restarts??"unknown"));
  } catch(e){console.log("Could not parse PM2 state: "+e.message);process.exitCode=1}
-});' || true
+});' ; then PM2_OK=1; else echo "ALERT: PM2 process check failed or hasa2 is offline."; fi
 section "PM2 ERROR LOGS"
 if [ -f "$HOME/.pm2/logs/hasa2-error.log" ]; then
  tail -n 300 "$HOME/.pm2/logs/hasa2-error.log" | grep -Ei 'error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|uncaught|rejection|killed|heap|memory|restart|closed|logout' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | tail -n 80 | redact || true
@@ -57,3 +59,4 @@ section "DISK PRESSURE"
 du -sh "$APP/downloads" "$APP/tmp" 2>/dev/null || true
 section "END"
 echo "Read-only completed. No PM2 restart, config edit, or auth/session access."
+if [ "$PM2_OK" -ne 1 ]; then exit 2; fi
