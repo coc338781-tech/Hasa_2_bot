@@ -21,7 +21,24 @@ test("configured aliases are normalized and deduplicated", () => {
 test("finds a status from a quoted status reply", () => {
   const status = { key: { remoteJid: "status@broadcast", id: "status-1", participant: "94770000000@s.whatsapp.net" }, message: { imageMessage: { caption: "original" } } };
   const cache = new Map([["status@broadcast:status-1", status]]);
-  const command = { message: { extendedTextMessage: { text: ".save", contextInfo: { quotedMessage: { extendedTextMessage: { text: "reply", contextInfo: { stanzaId: "status-1", participant: "94770000000@s.whatsapp.net" } } } } } };
+  const command = {
+    message: {
+      extendedTextMessage: {
+        text: ".save",
+        contextInfo: {
+          quotedMessage: {
+            extendedTextMessage: {
+              text: "reply",
+              contextInfo: {
+                stanzaId: "status-1",
+                participant: "94770000000@s.whatsapp.net"
+              }
+            }
+          }
+        }
+      }
+    }
+  };
   assert.equal(findStatusForCommand(command, cache, "94770000000@s.whatsapp.net"), status);
 });
 
