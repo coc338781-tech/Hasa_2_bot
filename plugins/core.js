@@ -28,7 +28,7 @@ const CATEGORIES = {
   "1": ["GENERAL & SYSTEM", [
     ".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram", ".fastmode", ".loadavg"
   ]],
-  "2": ["AI ASSISTANT", [".ai <question>", ".transcribe (reply to voice)"]],
+  "2": ["AI ASSISTANT", [".ai <question>", ".ask <question>", ".summarize (reply to text)", ".imagine <prompt>", ".translate [language] <text>", ".transcribe (reply to voice)"]],
   "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>", ".video <name or url>", ".song <name or url>", ".fbtest"]],
   "4": ["GROUP MANAGEMENT", [
     ".tagall [message]", ".hidetag [message]", ".promote @user",
@@ -37,7 +37,7 @@ const CATEGORIES = {
   ]],
   "5": ["AUTOMATIONS", [
     ".settings", ".autoreply on|off", ".statusseen on|off",
-    ".statusreact green|random|off", ".antidelete on|off", ".viewonce on|off",
+    ".statusreact green|random|off", ".antidelete on|off", ".viewonce on|off", ".autoreact on|off",
     ".aichat on|off", ".groupcmd on|off", ".composing on|off", ".autovoice on|off",
     ".addreply word-reply", ".replacereply word-reply", ".getreply",
     ".removereply word", ".resetreply"
@@ -45,14 +45,14 @@ const CATEGORIES = {
   "6": ["STICKER & MEDIA TOOLS", [".sticker (reply to photo/video)", ".toaudio (reply to video)", ".compress (reply to video)"]],
   "7": ["PRANK & FUN", [".hack"]],
   "8": ["OWNER CONTROL", [
-    ".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"
+    ".status", ".system", ".logs", ".backup", ".owner", ".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"
   ]],
   "9": ["SUBBOT MANAGER", [
     ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
     ".restartsubbot", ".delsubbot", ".delallsubbot confirm", ".restartallsubbot", ".helpsubbot"
   ]],
   "10": ["UTILITY TOOLS", [
-    ".math <expression>", ".cal <expression>", ".mathstep <expression>",
+    ".weather <city>", ".movie <title>", ".quote (reply to message)", ".math <expression>", ".cal <expression>", ".mathstep <expression>",
     ".id", ".jid", ".quote (reply to message)", ".wame <number> [message]", ".readmore <preview> | <text>", ".fancy <text>",
     ".dictionary <English word>", ".trt [language] <text>"
   ]]
@@ -159,15 +159,15 @@ function makeMainMenu(config) {
 function makeCommandList(config, prefix) {
   const groups = [
     ["GENERAL & SYSTEM", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram", prefix+"fastmode", prefix+"loadavg"]],
-    ["AI ASSISTANT", [prefix+"ai <question>", prefix+"transcribe (reply to voice)"]],
+    ["AI ASSISTANT", [prefix+"ai <question>", prefix+"ask <question>", prefix+"summarize (reply to text)", prefix+"imagine <prompt>", prefix+"translate [language] <text>", prefix+"transcribe (reply to voice)"]],
     ["MEDIA DOWNLOADS", [prefix+"dl <public video url>", prefix+"fb <public video url>", prefix+"video <name or url>", prefix+"song <name or url>", prefix+"fbtest"]],
     ["GROUP MANAGEMENT", [prefix+"tagall [message]", prefix+"hidetag [message]", prefix+"promote @user", prefix+"demote @user", prefix+"kick @user", prefix+"groupinfo", prefix+"antilink on/off", prefix+"warn @user [reason]", prefix+"warnings @user", prefix+"resetwarn @user"]],
-    ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
+    ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"autoreact on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
-    ["OWNER CONTROL", [prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
+    ["OWNER CONTROL", [prefix+"status", prefix+"system", prefix+"logs", prefix+"backup", prefix+"owner", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
     ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"delallsubbot confirm", prefix+"restartallsubbot", prefix+"helpsubbot"]],
-    ["UTILITY TOOLS", [prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"quote (reply to message)", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>"]]
+    ["UTILITY TOOLS", [prefix+"weather <city>", prefix+"movie <title>", prefix+"quote (reply to message)", prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"quote (reply to message)", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
