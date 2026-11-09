@@ -5,6 +5,7 @@
   "autoReply": false,
   "autoStatusSeen": true,
   "statusReact": "off",
+  "statusSaveAliases": ["save", "dpn", "dapan", "one", "evapan", "දාපන්", "ඔනේ", "ඕනේ", "සේව්", "එවපන්"],
   "autoReact": false,
   "antiDelete": true,
   "antiDeleteToInbox": false,
