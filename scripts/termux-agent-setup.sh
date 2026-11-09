@@ -45,6 +45,8 @@ echo "Checking agent syntax..."
 node --check "$AGENT_DIR/agent.mjs"
 echo "Starting agent..."
 if command -v termux-wake-lock >/dev/null 2>&1; then termux-wake-lock || true; fi
+# Stop every stale copy of this exact agent, not only a possibly outdated PID file.
+pkill -f '[n]ode .*/hasa-termux-agent/agent.mjs' 2>/dev/null || true
 OLD_PID=""
 [ -f "$AGENT_DIR/agent.pid" ] && OLD_PID="$(cat "$AGENT_DIR/agent.pid" 2>/dev/null || true)"
 if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
