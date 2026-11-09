@@ -29,7 +29,7 @@ const CATEGORIES = {
     ".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram", ".fastmode", ".loadavg"
   ]],
   "2": ["AI ASSISTANT", [".ai <question>", ".ask <question>", ".summarize (reply to text)", ".imagine <prompt>", ".translate [language] <text>", ".transcribe (reply to voice)"]],
-  "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>", ".video <name or url>", ".song <name or url>", ".fbtest"]],
+  "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>", ".video <name or url>", ".song <name or url>", ".fbtest", ".save / .dpn / .dapan / .one / .evapan"]],
   "4": ["GROUP MANAGEMENT", [
     ".tagall [message]", ".hidetag [message]", ".promote @user",
     ".demote @user", ".kick @user", ".groupinfo", ".antilink on|off",
@@ -160,12 +160,12 @@ function makeCommandList(config, prefix) {
   const groups = [
     ["GENERAL & SYSTEM", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram", prefix+"fastmode", prefix+"loadavg"]],
     ["AI ASSISTANT", [prefix+"ai <question>", prefix+"ask <question>", prefix+"summarize (reply to text)", prefix+"imagine <prompt>", prefix+"translate [language] <text>", prefix+"transcribe (reply to voice)"]],
-    ["MEDIA DOWNLOADS", [prefix+"dl <public video url>", prefix+"fb <public video url>", prefix+"video <name or url>", prefix+"song <name or url>", prefix+"fbtest"]],
+    ["MEDIA DOWNLOADS & STATUS SAVER", [prefix+"dl <public video url>", prefix+"fb <public video url>", prefix+"video <name or url>", prefix+"song <name or url>", prefix+"fbtest", prefix+"save / "+prefix+"dpn / "+prefix+"dapan / "+prefix+"one / "+prefix+"evapan"]],
     ["GROUP MANAGEMENT", [prefix+"tagall [message]", prefix+"hidetag [message]", prefix+"promote @user", prefix+"demote @user", prefix+"kick @user", prefix+"groupinfo", prefix+"antilink on/off", prefix+"warn @user [reason]", prefix+"warnings @user", prefix+"resetwarn @user"]],
     ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"autoreact on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
-    ["OWNER CONTROL", [prefix+"status", prefix+"system", prefix+"logs", prefix+"backup", prefix+"owner", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
+    ["OWNER CONTROL", [prefix+"status", prefix+"system", prefix+"logs", prefix+"backup", prefix+"owner", prefix+"statusalias list/add/remove", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
     ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"delallsubbot confirm", prefix+"restartallsubbot", prefix+"helpsubbot"]],
     ["UTILITY TOOLS", [prefix+"weather <city>", prefix+"movie <title>", prefix+"quote (reply to message)", prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>", prefix+"translate [language] <text>"]]
   ];
@@ -233,6 +233,9 @@ function makeHelpGuide(prefix) {
     "┃ " + prefix + "video <නම හෝ URL> — Video සෙවීම/ලබාගැනීම.",
     "┃ " + prefix + "song <නම හෝ URL> — Song සෙවීම/ලබාගැනීම.",
     "┃ " + prefix + "fbtest — Facebook Downloader පරීක්ෂාව.",
+    "┃ " + prefix + "save / " + prefix + "dpn / " + prefix + "dapan / " + prefix + "one / " + prefix + "evapan — Status එකට Reply එකක් යවා, ඒ Reply ගිය Chat එකේ මේ Command එක යවන්න; Photo/Video එක එම Chat එකට ලැබේ.",
+    "┃ Sinhala aliases: " + prefix + "දාපන් / " + prefix + "ඔනේ / " + prefix + "ඕනේ / " + prefix + "සේව් / " + prefix + "එවපන්.",
+    "┃ Owner: " + prefix + "statusalias list | add <නම> | remove <නම> — අලුත් Alias එකක් පසුව එක්කරන්න.",
     "┃ සටහන: Public සහ Downloader එකෙන් සහාය දක්වන Links පමණක් භාවිතා කරන්න.",
     "┗━━━━━━━━━━━━━━━━",
     "",
@@ -277,6 +280,7 @@ function makeHelpGuide(prefix) {
     "",
     "┏━━〔 🎨 8. STICKER & FUN 〕",
     "┃ " + prefix + "sticker / " + prefix + "s — Photo/Video එකකට Reply කර යවන්න.",
+    "┃ Status Saver: Status එකට Reply එකක් යවා, ඒ Chat එකේ " + prefix + "save (හෝ වෙනත් Alias එකක්) යවන්න.",
     "┃ " + prefix + "toaudio — Video එකකට Reply කර Audio ලබාගන්න.",
     "┃ " + prefix + "compress — Video එකකට Reply කර Compress කරන්න.",
     "┃ " + prefix + "hack — Fun prank message එක.",
