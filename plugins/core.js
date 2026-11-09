@@ -500,7 +500,11 @@ export default async function core({ sock, message, config }) {
     }
   }
 
-  if (command === "menu" || command === "help") {
+  if (command === "help") {
+    return send(makeHelpGuide(prefix));
+  }
+
+  if (command === "menu") {
     return sendWithLogo(sock, jid, message, makeMainMenu(config), config);
   }
 
