@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 const EMOJIS = ["❤️", "🔥", "👍", "😂", "💯", "😍"];
 function bodyOf(message) {
   return message.message?.conversation || message.message?.extendedTextMessage?.text ||
