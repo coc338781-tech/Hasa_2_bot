@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit|pm2-event-audit|access-audit) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -122,6 +122,829 @@ jobs:
                   tail -n 40 "$f" | grep -Ei 'connected|connection open|error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|online' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 20 || true
                 fi
               done
+              ;;
+            repair-pm2-startup)
+              echo "Repairing only the PM2 systemd startup unit; the running bot will NOT be restarted."
+              UNIT="/etc/systemd/system/pm2-$(id -un).service"
+              DUMP="$HOME/.pm2/dump.pm2"
+              test -s "$UNIT"
+              test -s "$DUMP"
+              pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2");if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
+              node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const a=Array.isArray(d)?d:(d.apps||d.pm2||[]);if(!a.some(x=>(x.pm2_env||{}).name==="hasa2"))process.exit(2)' "$DUMP"
+              grep -q '^Type=forking
+              echo "===== IDENTITY AND PRIVILEGES ====="
+              id
+              echo "groups: $(id -nG)"
+              if command -v sudo >/dev/null 2>&1; then
+                echo "sudo_noninteractive_permissions:"
+                sudo -n -l 2>&1 | sed -E 's/.*NOPASSWD:.*/NOPASSWD: [COMMANDS REDACTED]/' | head -n 25 || true
+                PM2_UNIT="/etc/systemd/system/pm2-$(id -un).service"
+                if sudo -n test -w "$PM2_UNIT" 2>/dev/null; then
+                  echo "sudo_can_write_pm2_unit=yes"
+                else
+                  echo "sudo_can_write_pm2_unit=no"
+                fi
+              else echo "sudo: unavailable"; fi
+              echo "===== HOST AND RUNTIME ====="
+              printf 'hostname: '; hostname
+              printf 'kernel: '; uname -sr
+              printf 'os: '; . /etc/os-release 2>/dev/null && printf '%s\\n' "${PRETTY_NAME:-unknown}" || true
+              printf 'node: '; node --version 2>/dev/null || echo unavailable
+              printf 'npm: '; npm --version 2>/dev/null || echo unavailable
+              printf 'git: '; git --version 2>/dev/null || echo unavailable
+              printf 'pm2: '; pm2 --version 2>/dev/null || echo unavailable
+              echo "===== PATH PERMISSIONS ====="
+              for p in "$HOME" "$APP" "$APP/plugins" "$APP/auth_info" "$APP/subbot_sessions" "$HOME/.pm2" /home/opc/bin /etc/systemd/system /usr/local/bin /var/log; do
+                if [ -e "$p" ]; then
+                  printf '%s | read=%s | write=%s | execute=%s\\n' "$p" "$([ -r "$p" ] && echo yes || echo no)" "$([ -w "$p" ] && echo yes || echo no)" "$([ -x "$p" ] && echo yes || echo no)"
+                else printf '%s | missing\\n' "$p"; fi
+              done
+              echo "===== PM2 PROCESS ====="
+              pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{for(const p of JSON.parse(s)){const e=p.pm2_env||{},m=p.monit||{};console.log("app="+p.name+" status="+(e.status||"?")+" restarts="+(e.restart_time??"?")+" memory_mb="+(m.memory==null?"?":Math.round(m.memory/1048576)));}}catch{console.log("PM2 state unavailable")}});' || true
+              echo "===== SYSTEM TOOLS ====="
+              for c in systemctl journalctl crontab ss lsof curl wget ssh; do printf '%s: ' "$c"; command -v "$c" || echo unavailable; done
+              if command -v systemctl >/dev/null 2>&1; then
+                printf 'systemd_user: '; systemctl --user is-system-running 2>&1 | head -n 1 || true
+                printf 'systemd_system: '; systemctl is-system-running 2>&1 | head -n 1 || true
+              fi
+              echo "===== GIT WORKTREE ====="
+              if [ -d "$APP/.git" ]; then
+                git -C "$APP" rev-parse --short HEAD
+                git -C "$APP" status --short
+              else echo "Application Git checkout missing"; fi
+              echo "===== RESOURCE SNAPSHOT ====="
+              uptime
+              free -h
+              df -h / /home 2>/dev/null | tail -n +1
+              echo "===== FAILED SYSTEM UNITS ====="
+              systemctl --failed --no-legend --no-pager 2>&1 | head -n 25 || true
+              while read -r unit _; do
+                [ -n "$unit" ] || continue
+                echo "--- $unit ---"
+                systemctl show "$unit" -p ActiveState -p SubState -p Result -p ExecMainStatus -p ActiveEnterTimestamp -p UnitFileState --no-pager 2>/dev/null || true
+                if [[ "$unit" == pm2-* ]]; then
+                  echo "--- Safe unit definition (environment lines hidden) ---"
+                  systemctl cat "$unit" --no-pager 2>/dev/null | sed -E '/^[[:space:]]*Environment(File)?=/d' | head -n 60 || true
+                  echo "--- Recent PM2 service journal ---"
+                  journalctl -u "$unit" -n 30 --no-pager 2>/dev/null | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 30 || true
+                fi
+              done < <(systemctl --failed --plain --no-legend --no-pager 2>/dev/null)
+              echo "===== LISTENING PORTS ====="
+              ss -lnt 2>/dev/null | head -n 25 || true
+              echo "===== CRON CONFIGURATION METADATA ====="
+              if crontab -l >/dev/null 2>&1; then
+                echo "User crontab: present"
+                printf 'entries: '
+                crontab -l 2>/dev/null | grep -Ev '^[[:space:]]*(#|$)' | wc -l
+              else echo "User crontab: none or not readable"; fi
+              echo "===== END ====="
+              echo "Read-only audit complete. No credentials, environment values, or WhatsApp session contents were read."
+              ;;
+            pm2-event-audit)
+              echo "Read-only PM2 exit/restart timeline."
+              echo "--- PM2 daemon event log ---"
+              if [ -f "$HOME/.pm2/pm2.log" ]; then
+                stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
+                grep -n -Ei 'hasa2|exited|exit code|errored|restart|online|stopped|SIG(INT|TERM|KILL)|unstable|launching' "$HOME/.pm2/pm2.log" | tail -n 180 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              else
+                echo "PM2 daemon log missing"
+              fi
+              echo "--- Bot error log: last 180 lines ---"
+              if [ -f "$HOME/.pm2/logs/hasa2-error.log" ]; then
+                tail -n 180 "$HOME/.pm2/logs/hasa2-error.log" | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              fi
+              echo "--- PM2 process describe ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- System reboot / OOM evidence ---"
+              (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
+              (last -x 2>/dev/null | head -n 12 || true)
+              ;;
+            crash-audit)
+              echo "Read-only crash diagnosis; no process/session changes."
+              echo "--- PM2 process metadata ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- PM2 log file metadata ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  stat -c '%n | bytes=%s | modified=%y' "$f"
+                  printf 'lines='; wc -l < "$f"
+                else
+                  echo "$f: MISSING"
+                fi
+              done
+              echo "--- Historical disconnect / crypto errors with stack context ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  echo "FILE: $(basename "$f")"
+                  grep -n -A 12 -E 'Bad MAC|Session error|Disconnect details|uncaughtException|UnhandledPromiseRejection|heap out of memory|ENOMEM|SIGKILL|Killed' "$f" | tail -n 100 | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' || true
+                fi
+              done
+              echo "--- Kernel OOM evidence ---"
+              (dmesg 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 20 || true)
+              echo "--- PM2 current state ---"
+              print_status || true
+              ;;
+            status)
+              print_status
+              ;;
+            auth-audit)
+              echo "Read-only auth directory metadata; no session contents or credentials are displayed."
+              for DIR in "$APP/auth_info" "$APP/subbot_sessions"; do
+                echo "--- $(basename "$DIR") ---"
+                if [ -d "$DIR" ]; then
+                  printf 'files: '; find "$DIR" -type f 2>/dev/null | wc -l
+                  printf 'total_bytes: '; du -sb "$DIR" 2>/dev/null | awk '{print $1}'
+                else
+                  echo "directory: MISSING"
+                fi
+              done
+              printf 'creds_json_present: '; [ -s "$APP/auth_info/creds.json" ] && echo yes || echo no
+              for pattern in 'session-*.json' 'pre-key-*.json' 'sender-key-*.json' 'app-state-sync-key-*.json' 'app-state-sync-version-*.json'; do
+                count="$(find "$APP/auth_info" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | wc -l)"
+                printf '%s: %s\n' "$pattern" "$count"
+              done
+              print_status
+              ;;
+            logs)
+              echo "Filtered diagnostics only; chat/message-like lines are excluded."
+              FOUND=0
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  MATCHES="$(tail -n 200 "$f" | grep -Ei 'error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|uncaught|rejection' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 30 || true)"
+                  if [ -n "$MATCHES" ]; then
+                    echo "--- $(basename "$f") ---"
+                    printf '%s\n' "$MATCHES"
+                    FOUND=1
+                  fi
+                fi
+              done
+              [ "$FOUND" -eq 1 ] || echo "No matching diagnostic lines found."
+              print_status
+              ;;
+            inspect-changes)
+              echo "Tracked and untracked file names only; file contents are not shown."
+              echo "--- git status --short ---"
+              git status --short
+              echo "--- tracked diff summary ---"
+              git diff --stat
+              echo "--- staged diff summary ---"
+              git diff --cached --stat
+              echo "--- untracked non-ignored files ---"
+              git ls-files --others --exclude-standard
+              print_status
+              ;;
+            inspect-guard-script)
+              echo "Read-only inspection of deploy guard script."
+              sed -n "1,240p" /home/opc/bin/hasa2-deploy
+              ;;
+            patch-deploy-guard)
+              GUARD=/home/opc/bin/hasa2-deploy
+              BACKUP="${GUARD}.bak-$(date +%Y%m%d-%H%M%S)"
+              cp -p "$GUARD" "$BACKUP"
+              python3 - "$GUARD" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+          old = '  if [ -n "$(git status --porcelain)" ]; then'
+          new = '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s and 'LOCAL_AI_BACKUP=""' not in s:
+              raise SystemExit("Deploy guard status check not found; no changes made.")
+          needle = '  OLD_SHA="$(git rev-parse HEAD)"'
+          if 'UNTRACKED="$(git ls-files --others --exclude-standard)"' not in s:
+              block = """  UNTRACKED=\"$(git ls-files --others --exclude-standard)\"
+            UNEXPECTED=\"$(printf '%s\\n' \"$UNTRACKED\" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)\"
+            if [ -n \"$UNEXPECTED\" ]; then
+              echo \"STOP: Unexpected untracked files exist; preserving them.\"
+              printf '%s\\n' \"$UNEXPECTED\"
+              exit 1
+            fi
+          
+          """
+              if needle not in s:
+                  raise SystemExit("Deploy guard insertion point not found; no changes made.")
+              s = s.replace(needle, block + needle, 1)
+          old_bundle = '  git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" "$OLD_SHA"'
+          if old_bundle in s:
+              new_bundle = chr(10).join([
+                  '  if ! git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all; then',
+                  '    rm -f "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle"',
+                  '    git archive --format=tar "$OLD_SHA" | gzip -c > "$BACKUP_DIR/pre-deploy-$OLD_SHA.tar.gz"',
+                  '  fi'
+              ])
+              s = s.replace(old_bundle, new_bundle, 1)
+          elif 'git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all' not in s:
+              raise SystemExit("Deploy backup command not found; no changes made.")
+          p.write_text(s)
+          PY
+              python3 - "$GUARD" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+
+          marker = '  LOCAL_AI_BACKUP=""'
+          if marker not in s:
+              start = s.find('  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then')
+              if start < 0:
+                  raise SystemExit("Deploy guard local-change check not found; no changes made.")
+              finish = s.find('  fi', start)
+              if finish < 0:
+                  raise SystemExit("Deploy guard local-change check is incomplete; no changes made.")
+              finish += len('  fi')
+              replacement = r'''  LOCAL_AI_BACKUP=""
+          OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" {print}')"
+          if [ -n "$OTHER_CHANGES" ]; then
+            echo "STOP: Unexpected tracked production changes exist; preserving them."
+            printf '%s\n' "$OTHER_CHANGES"
+            exit 1
+          fi
+          if ! git diff --quiet HEAD -- plugins/ai.js; then
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
+            LOCAL_AI_BACKUP="$BACKUP_DIR/local-ai-$(date +%Y%m%d-%H%M%S).js"
+            cp -p "$APP_DIR/plugins/ai.js" "$LOCAL_AI_BACKUP"
+            echo "Preserving local AI implementation: $LOCAL_AI_BACKUP"
+          fi'''
+              s = s[:start] + replacement + s[finish:]
+
+          fetch_marker = '  NEW_SHA="$(git rev-parse "origin/$BRANCH")"'
+          if 'Remote AI implementation changed' not in s:
+              pos = s.find(fetch_marker)
+              if pos < 0:
+                  raise SystemExit("Remote SHA insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              if line_end < 0:
+                  raise SystemExit("Remote SHA line is incomplete; no changes made.")
+              insert = r'''
+          if ! git diff --quiet "$OLD_SHA" "$NEW_SHA" -- plugins/ai.js; then
+            echo "STOP: Remote AI implementation changed; refusing to overwrite the local production AI file."
+            exit 1
+          fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          rollback_marker = '    git reset --hard "$OLD_SHA" || true'
+          rollback_restore = 'Restoring preserved local AI after rollback.'
+          if rollback_restore not in s:
+              pos = s.find(rollback_marker)
+              if pos < 0:
+                  raise SystemExit("Rollback insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              insert = r'''
+              if [ -n "$LOCAL_AI_BACKUP" ] && [ -f "$LOCAL_AI_BACKUP" ]; then
+                cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+                echo "Restoring preserved local AI after rollback."
+              fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          new_marker = '  git reset --hard "$NEW_SHA"'
+          restore_marker = 'Restored preserved local AI implementation after code update.'
+          if restore_marker not in s:
+              pos = s.find(new_marker)
+              if pos < 0:
+                  raise SystemExit("New commit reset insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              insert = r'''
+          if [ -n "$LOCAL_AI_BACKUP" ]; then
+            cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+            echo "Restored preserved local AI implementation after code update."
+          fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          old_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)"""
+          new_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json|plugins/ai[.]js[.]backup-[0-9]{8}-[0-9]{6})$' || true)"""
+          if old_allow in s:
+              s = s.replace(old_allow, new_allow, 1)
+          elif new_allow not in s:
+              raise SystemExit("Untracked backup allowlist not found; no changes made.")
+
+          p.write_text(s)
+          PY
+              bash -n "$GUARD"
+              echo "Deploy guard updated; original backup: $BACKUP"
+              sed -n "14,52p" "$GUARD"
+              ;;
+            deploy)
+              echo "Starting guarded Oracle deployment; local AI code will be preserved."
+              SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
+              sleep 5
+              print_status
+              ;;
+            restart)
+              pm2 restart hasa2 --update-env
+              sleep 6
+              print_status
+              ;;
+            remove-old)
+              # Only remove the known legacy PM2 app; refuse if its script path differs.
+              OLD_SCRIPT="$(pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasamd");
+                  console.log(p && p.pm2_env ? (p.pm2_env.pm_exec_path || "") : "NOT_FOUND");
+                });
+              ')"
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ] && [ "$OLD_SCRIPT" != "/home/opc/HASA-MD_next-Bot/index.js" ]; then
+                echo "Refusing removal: legacy PM2 script path did not match the expected old bot."
+                exit 1
+              fi
+              mkdir -p "$BACKUPS"
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                ARCHIVE="$BACKUPS/legacy-HASA-MD_next-Bot-$(date +%Y%m%d-%H%M%S).tar.gz"
+                tar -czf "$ARCHIVE" -C /home/opc HASA-MD_next-Bot
+                echo "Legacy bot archive created: $ARCHIVE"
+              fi
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ]; then
+                pm2 stop hasamd
+                pm2 delete hasamd
+              fi
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                rm -rf -- /home/opc/HASA-MD_next-Bot
+              fi
+              pm2 save
+              echo "Legacy hasamd process removed."
+              if pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasa2");
+                  if (!p || !p.pm2_env || p.pm2_env.status !== "online") process.exitCode = 1;
+                });
+              '; then
+                echo "New hasa2 process remains online."
+              else
+                echo "ERROR: new hasa2 process is not online."
+                exit 1
+              fi
+              pm2 status
+              ;;
+            rollback)
+              test -s "$BACKUPS/last-good-commit"
+              TARGET="$(cat "$BACKUPS/last-good-commit")"
+              CURRENT="$(git rev-parse HEAD)"
+              git cat-file -e "$TARGET^{commit}"
+              printf '%s\n' "$CURRENT" > "$BACKUPS/last-good-commit"
+              git reset --hard "$TARGET"
+              npm install --no-audit --no-fund
+              npm run check
+              pm2 restart hasa2 --update-env
+              sleep 8
+              print_status
+              echo "Rolled back to: $(git rev-parse --short HEAD)"
+              ;;
+          esac
+          SCRIPT
+          )"
+          set +e
+          RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
+          REMOTE_EXIT=$?
+          set -e
+          echo "Remote operation exit code: $REMOTE_EXIT"
+          {
+            echo 'result<<ORACLE_RESULT'
+            printf '%s\n' "$RESULT"
+            echo "Remote operation exit code: $REMOTE_EXIT"
+            echo 'ORACLE_RESULT'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send result to private report repository
+        env:
+          REPORT_TOKEN: ${{ secrets.BOT_TEST_REPORT_TOKEN }}
+          REPORT_REPO: ${{ secrets.BOT_TEST_REPORT_REPO }}
+          RESULT: ${{ steps.oracle.outputs.result }}
+        run: |
+          set -euo pipefail
+          test -n "$REPORT_TOKEN"
+          test -n "$REPORT_REPO"
+          TITLE="Oracle $ACTION report [$REQUEST_ID]"
+          BODY="$(printf 'Operation: %s\nRequest: %s\n\n%s' "$ACTION" "$REQUEST_ID" "$RESULT")"
+          JSON="$(jq -n --arg title "$TITLE" --arg body "$BODY" '{title:$title,body:$body}')"
+          RESPONSE="$(curl --fail-with-body --silent --show-error -X POST "https://api.github.com/repos/$REPORT_REPO/issues" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $REPORT_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/json" -d "$JSON")"
+          URL="$(printf '%s' "$RESPONSE" | jq -r '.html_url // empty')"
+          test -n "$URL"
+          echo "Private Oracle report created."
+ "$UNIT"
+              grep -q '^PIDFile=' "$UNIT"
+              grep -q '^ExecStart=.*/pm2 resurrect
+              echo "===== IDENTITY AND PRIVILEGES ====="
+              id
+              echo "groups: $(id -nG)"
+              if command -v sudo >/dev/null 2>&1; then
+                echo "sudo_noninteractive_permissions:"
+                sudo -n -l 2>&1 | sed -E 's/.*NOPASSWD:.*/NOPASSWD: [COMMANDS REDACTED]/' | head -n 25 || true
+                PM2_UNIT="/etc/systemd/system/pm2-$(id -un).service"
+                if sudo -n test -w "$PM2_UNIT" 2>/dev/null; then
+                  echo "sudo_can_write_pm2_unit=yes"
+                else
+                  echo "sudo_can_write_pm2_unit=no"
+                fi
+              else echo "sudo: unavailable"; fi
+              echo "===== HOST AND RUNTIME ====="
+              printf 'hostname: '; hostname
+              printf 'kernel: '; uname -sr
+              printf 'os: '; . /etc/os-release 2>/dev/null && printf '%s\\n' "${PRETTY_NAME:-unknown}" || true
+              printf 'node: '; node --version 2>/dev/null || echo unavailable
+              printf 'npm: '; npm --version 2>/dev/null || echo unavailable
+              printf 'git: '; git --version 2>/dev/null || echo unavailable
+              printf 'pm2: '; pm2 --version 2>/dev/null || echo unavailable
+              echo "===== PATH PERMISSIONS ====="
+              for p in "$HOME" "$APP" "$APP/plugins" "$APP/auth_info" "$APP/subbot_sessions" "$HOME/.pm2" /home/opc/bin /etc/systemd/system /usr/local/bin /var/log; do
+                if [ -e "$p" ]; then
+                  printf '%s | read=%s | write=%s | execute=%s\\n' "$p" "$([ -r "$p" ] && echo yes || echo no)" "$([ -w "$p" ] && echo yes || echo no)" "$([ -x "$p" ] && echo yes || echo no)"
+                else printf '%s | missing\\n' "$p"; fi
+              done
+              echo "===== PM2 PROCESS ====="
+              pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{for(const p of JSON.parse(s)){const e=p.pm2_env||{},m=p.monit||{};console.log("app="+p.name+" status="+(e.status||"?")+" restarts="+(e.restart_time??"?")+" memory_mb="+(m.memory==null?"?":Math.round(m.memory/1048576)));}}catch{console.log("PM2 state unavailable")}});' || true
+              echo "===== SYSTEM TOOLS ====="
+              for c in systemctl journalctl crontab ss lsof curl wget ssh; do printf '%s: ' "$c"; command -v "$c" || echo unavailable; done
+              if command -v systemctl >/dev/null 2>&1; then
+                printf 'systemd_user: '; systemctl --user is-system-running 2>&1 | head -n 1 || true
+                printf 'systemd_system: '; systemctl is-system-running 2>&1 | head -n 1 || true
+              fi
+              echo "===== GIT WORKTREE ====="
+              if [ -d "$APP/.git" ]; then
+                git -C "$APP" rev-parse --short HEAD
+                git -C "$APP" status --short
+              else echo "Application Git checkout missing"; fi
+              echo "===== RESOURCE SNAPSHOT ====="
+              uptime
+              free -h
+              df -h / /home 2>/dev/null | tail -n +1
+              echo "===== FAILED SYSTEM UNITS ====="
+              systemctl --failed --no-legend --no-pager 2>&1 | head -n 25 || true
+              while read -r unit _; do
+                [ -n "$unit" ] || continue
+                echo "--- $unit ---"
+                systemctl show "$unit" -p ActiveState -p SubState -p Result -p ExecMainStatus -p ActiveEnterTimestamp -p UnitFileState --no-pager 2>/dev/null || true
+                if [[ "$unit" == pm2-* ]]; then
+                  echo "--- Safe unit definition (environment lines hidden) ---"
+                  systemctl cat "$unit" --no-pager 2>/dev/null | sed -E '/^[[:space:]]*Environment(File)?=/d' | head -n 60 || true
+                  echo "--- Recent PM2 service journal ---"
+                  journalctl -u "$unit" -n 30 --no-pager 2>/dev/null | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 30 || true
+                fi
+              done < <(systemctl --failed --plain --no-legend --no-pager 2>/dev/null)
+              echo "===== LISTENING PORTS ====="
+              ss -lnt 2>/dev/null | head -n 25 || true
+              echo "===== CRON CONFIGURATION METADATA ====="
+              if crontab -l >/dev/null 2>&1; then
+                echo "User crontab: present"
+                printf 'entries: '
+                crontab -l 2>/dev/null | grep -Ev '^[[:space:]]*(#|$)' | wc -l
+              else echo "User crontab: none or not readable"; fi
+              echo "===== END ====="
+              echo "Read-only audit complete. No credentials, environment values, or WhatsApp session contents were read."
+              ;;
+            pm2-event-audit)
+              echo "Read-only PM2 exit/restart timeline."
+              echo "--- PM2 daemon event log ---"
+              if [ -f "$HOME/.pm2/pm2.log" ]; then
+                stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
+                grep -n -Ei 'hasa2|exited|exit code|errored|restart|online|stopped|SIG(INT|TERM|KILL)|unstable|launching' "$HOME/.pm2/pm2.log" | tail -n 180 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              else
+                echo "PM2 daemon log missing"
+              fi
+              echo "--- Bot error log: last 180 lines ---"
+              if [ -f "$HOME/.pm2/logs/hasa2-error.log" ]; then
+                tail -n 180 "$HOME/.pm2/logs/hasa2-error.log" | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              fi
+              echo "--- PM2 process describe ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- System reboot / OOM evidence ---"
+              (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
+              (last -x 2>/dev/null | head -n 12 || true)
+              ;;
+            crash-audit)
+              echo "Read-only crash diagnosis; no process/session changes."
+              echo "--- PM2 process metadata ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- PM2 log file metadata ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  stat -c '%n | bytes=%s | modified=%y' "$f"
+                  printf 'lines='; wc -l < "$f"
+                else
+                  echo "$f: MISSING"
+                fi
+              done
+              echo "--- Historical disconnect / crypto errors with stack context ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  echo "FILE: $(basename "$f")"
+                  grep -n -A 12 -E 'Bad MAC|Session error|Disconnect details|uncaughtException|UnhandledPromiseRejection|heap out of memory|ENOMEM|SIGKILL|Killed' "$f" | tail -n 100 | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' || true
+                fi
+              done
+              echo "--- Kernel OOM evidence ---"
+              (dmesg 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 20 || true)
+              echo "--- PM2 current state ---"
+              print_status || true
+              ;;
+            status)
+              print_status
+              ;;
+            auth-audit)
+              echo "Read-only auth directory metadata; no session contents or credentials are displayed."
+              for DIR in "$APP/auth_info" "$APP/subbot_sessions"; do
+                echo "--- $(basename "$DIR") ---"
+                if [ -d "$DIR" ]; then
+                  printf 'files: '; find "$DIR" -type f 2>/dev/null | wc -l
+                  printf 'total_bytes: '; du -sb "$DIR" 2>/dev/null | awk '{print $1}'
+                else
+                  echo "directory: MISSING"
+                fi
+              done
+              printf 'creds_json_present: '; [ -s "$APP/auth_info/creds.json" ] && echo yes || echo no
+              for pattern in 'session-*.json' 'pre-key-*.json' 'sender-key-*.json' 'app-state-sync-key-*.json' 'app-state-sync-version-*.json'; do
+                count="$(find "$APP/auth_info" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | wc -l)"
+                printf '%s: %s\n' "$pattern" "$count"
+              done
+              print_status
+              ;;
+            logs)
+              echo "Filtered diagnostics only; chat/message-like lines are excluded."
+              FOUND=0
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  MATCHES="$(tail -n 200 "$f" | grep -Ei 'error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|uncaught|rejection' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 30 || true)"
+                  if [ -n "$MATCHES" ]; then
+                    echo "--- $(basename "$f") ---"
+                    printf '%s\n' "$MATCHES"
+                    FOUND=1
+                  fi
+                fi
+              done
+              [ "$FOUND" -eq 1 ] || echo "No matching diagnostic lines found."
+              print_status
+              ;;
+            inspect-changes)
+              echo "Tracked and untracked file names only; file contents are not shown."
+              echo "--- git status --short ---"
+              git status --short
+              echo "--- tracked diff summary ---"
+              git diff --stat
+              echo "--- staged diff summary ---"
+              git diff --cached --stat
+              echo "--- untracked non-ignored files ---"
+              git ls-files --others --exclude-standard
+              print_status
+              ;;
+            inspect-guard-script)
+              echo "Read-only inspection of deploy guard script."
+              sed -n "1,240p" /home/opc/bin/hasa2-deploy
+              ;;
+            patch-deploy-guard)
+              GUARD=/home/opc/bin/hasa2-deploy
+              BACKUP="${GUARD}.bak-$(date +%Y%m%d-%H%M%S)"
+              cp -p "$GUARD" "$BACKUP"
+              python3 - "$GUARD" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+          old = '  if [ -n "$(git status --porcelain)" ]; then'
+          new = '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s and 'LOCAL_AI_BACKUP=""' not in s:
+              raise SystemExit("Deploy guard status check not found; no changes made.")
+          needle = '  OLD_SHA="$(git rev-parse HEAD)"'
+          if 'UNTRACKED="$(git ls-files --others --exclude-standard)"' not in s:
+              block = """  UNTRACKED=\"$(git ls-files --others --exclude-standard)\"
+            UNEXPECTED=\"$(printf '%s\\n' \"$UNTRACKED\" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)\"
+            if [ -n \"$UNEXPECTED\" ]; then
+              echo \"STOP: Unexpected untracked files exist; preserving them.\"
+              printf '%s\\n' \"$UNEXPECTED\"
+              exit 1
+            fi
+          
+          """
+              if needle not in s:
+                  raise SystemExit("Deploy guard insertion point not found; no changes made.")
+              s = s.replace(needle, block + needle, 1)
+          old_bundle = '  git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" "$OLD_SHA"'
+          if old_bundle in s:
+              new_bundle = chr(10).join([
+                  '  if ! git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all; then',
+                  '    rm -f "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle"',
+                  '    git archive --format=tar "$OLD_SHA" | gzip -c > "$BACKUP_DIR/pre-deploy-$OLD_SHA.tar.gz"',
+                  '  fi'
+              ])
+              s = s.replace(old_bundle, new_bundle, 1)
+          elif 'git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all' not in s:
+              raise SystemExit("Deploy backup command not found; no changes made.")
+          p.write_text(s)
+          PY
+              python3 - "$GUARD" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+
+          marker = '  LOCAL_AI_BACKUP=""'
+          if marker not in s:
+              start = s.find('  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then')
+              if start < 0:
+                  raise SystemExit("Deploy guard local-change check not found; no changes made.")
+              finish = s.find('  fi', start)
+              if finish < 0:
+                  raise SystemExit("Deploy guard local-change check is incomplete; no changes made.")
+              finish += len('  fi')
+              replacement = r'''  LOCAL_AI_BACKUP=""
+          OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" {print}')"
+          if [ -n "$OTHER_CHANGES" ]; then
+            echo "STOP: Unexpected tracked production changes exist; preserving them."
+            printf '%s\n' "$OTHER_CHANGES"
+            exit 1
+          fi
+          if ! git diff --quiet HEAD -- plugins/ai.js; then
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
+            LOCAL_AI_BACKUP="$BACKUP_DIR/local-ai-$(date +%Y%m%d-%H%M%S).js"
+            cp -p "$APP_DIR/plugins/ai.js" "$LOCAL_AI_BACKUP"
+            echo "Preserving local AI implementation: $LOCAL_AI_BACKUP"
+          fi'''
+              s = s[:start] + replacement + s[finish:]
+
+          fetch_marker = '  NEW_SHA="$(git rev-parse "origin/$BRANCH")"'
+          if 'Remote AI implementation changed' not in s:
+              pos = s.find(fetch_marker)
+              if pos < 0:
+                  raise SystemExit("Remote SHA insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              if line_end < 0:
+                  raise SystemExit("Remote SHA line is incomplete; no changes made.")
+              insert = r'''
+          if ! git diff --quiet "$OLD_SHA" "$NEW_SHA" -- plugins/ai.js; then
+            echo "STOP: Remote AI implementation changed; refusing to overwrite the local production AI file."
+            exit 1
+          fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          rollback_marker = '    git reset --hard "$OLD_SHA" || true'
+          rollback_restore = 'Restoring preserved local AI after rollback.'
+          if rollback_restore not in s:
+              pos = s.find(rollback_marker)
+              if pos < 0:
+                  raise SystemExit("Rollback insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              insert = r'''
+              if [ -n "$LOCAL_AI_BACKUP" ] && [ -f "$LOCAL_AI_BACKUP" ]; then
+                cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+                echo "Restoring preserved local AI after rollback."
+              fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          new_marker = '  git reset --hard "$NEW_SHA"'
+          restore_marker = 'Restored preserved local AI implementation after code update.'
+          if restore_marker not in s:
+              pos = s.find(new_marker)
+              if pos < 0:
+                  raise SystemExit("New commit reset insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              insert = r'''
+          if [ -n "$LOCAL_AI_BACKUP" ]; then
+            cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+            echo "Restored preserved local AI implementation after code update."
+          fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          old_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)"""
+          new_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json|plugins/ai[.]js[.]backup-[0-9]{8}-[0-9]{6})$' || true)"""
+          if old_allow in s:
+              s = s.replace(old_allow, new_allow, 1)
+          elif new_allow not in s:
+              raise SystemExit("Untracked backup allowlist not found; no changes made.")
+
+          p.write_text(s)
+          PY
+              bash -n "$GUARD"
+              echo "Deploy guard updated; original backup: $BACKUP"
+              sed -n "14,52p" "$GUARD"
+              ;;
+            deploy)
+              echo "Starting guarded Oracle deployment; local AI code will be preserved."
+              SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
+              sleep 5
+              print_status
+              ;;
+            restart)
+              pm2 restart hasa2 --update-env
+              sleep 6
+              print_status
+              ;;
+            remove-old)
+              # Only remove the known legacy PM2 app; refuse if its script path differs.
+              OLD_SCRIPT="$(pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasamd");
+                  console.log(p && p.pm2_env ? (p.pm2_env.pm_exec_path || "") : "NOT_FOUND");
+                });
+              ')"
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ] && [ "$OLD_SCRIPT" != "/home/opc/HASA-MD_next-Bot/index.js" ]; then
+                echo "Refusing removal: legacy PM2 script path did not match the expected old bot."
+                exit 1
+              fi
+              mkdir -p "$BACKUPS"
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                ARCHIVE="$BACKUPS/legacy-HASA-MD_next-Bot-$(date +%Y%m%d-%H%M%S).tar.gz"
+                tar -czf "$ARCHIVE" -C /home/opc HASA-MD_next-Bot
+                echo "Legacy bot archive created: $ARCHIVE"
+              fi
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ]; then
+                pm2 stop hasamd
+                pm2 delete hasamd
+              fi
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                rm -rf -- /home/opc/HASA-MD_next-Bot
+              fi
+              pm2 save
+              echo "Legacy hasamd process removed."
+              if pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasa2");
+                  if (!p || !p.pm2_env || p.pm2_env.status !== "online") process.exitCode = 1;
+                });
+              '; then
+                echo "New hasa2 process remains online."
+              else
+                echo "ERROR: new hasa2 process is not online."
+                exit 1
+              fi
+              pm2 status
+              ;;
+            rollback)
+              test -s "$BACKUPS/last-good-commit"
+              TARGET="$(cat "$BACKUPS/last-good-commit")"
+              CURRENT="$(git rev-parse HEAD)"
+              git cat-file -e "$TARGET^{commit}"
+              printf '%s\n' "$CURRENT" > "$BACKUPS/last-good-commit"
+              git reset --hard "$TARGET"
+              npm install --no-audit --no-fund
+              npm run check
+              pm2 restart hasa2 --update-env
+              sleep 8
+              print_status
+              echo "Rolled back to: $(git rev-parse --short HEAD)"
+              ;;
+          esac
+          SCRIPT
+          )"
+          set +e
+          RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
+          REMOTE_EXIT=$?
+          set -e
+          echo "Remote operation exit code: $REMOTE_EXIT"
+          {
+            echo 'result<<ORACLE_RESULT'
+            printf '%s\n' "$RESULT"
+            echo "Remote operation exit code: $REMOTE_EXIT"
+            echo 'ORACLE_RESULT'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send result to private report repository
+        env:
+          REPORT_TOKEN: ${{ secrets.BOT_TEST_REPORT_TOKEN }}
+          REPORT_REPO: ${{ secrets.BOT_TEST_REPORT_REPO }}
+          RESULT: ${{ steps.oracle.outputs.result }}
+        run: |
+          set -euo pipefail
+          test -n "$REPORT_TOKEN"
+          test -n "$REPORT_REPO"
+          TITLE="Oracle $ACTION report [$REQUEST_ID]"
+          BODY="$(printf 'Operation: %s\nRequest: %s\n\n%s' "$ACTION" "$REQUEST_ID" "$RESULT")"
+          JSON="$(jq -n --arg title "$TITLE" --arg body "$BODY" '{title:$title,body:$body}')"
+          RESPONSE="$(curl --fail-with-body --silent --show-error -X POST "https://api.github.com/repos/$REPORT_REPO/issues" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $REPORT_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/json" -d "$JSON")"
+          URL="$(printf '%s' "$RESPONSE" | jq -r '.html_url // empty')"
+          test -n "$URL"
+          echo "Private Oracle report created."
+ "$UNIT"
+              systemctl is-enabled "$UNIT" >/dev/null
+              mkdir -p "$BACKUPS"
+              chmod 700 "$BACKUPS"
+              BACKUP="$BACKUPS/pm2-systemd-before-oneshot-$(date +%Y%m%d-%H%M%S).service"
+              sudo -n cp -p "$UNIT" "$BACKUP"
+              chmod 600 "$BACKUP"
+              if ! sudo -n sed -i -e 's/^Type=forking$/Type=oneshot/' -e '/^PIDFile=/d' -e '/^RemainAfterExit=/d' -e '/^Type=oneshot$/a RemainAfterExit=yes' "$UNIT"; then
+                sudo -n cp -p "$BACKUP" "$UNIT"
+                echo "STOP: Could not update PM2 unit; original restored."
+                exit 1
+              fi
+              if ! sudo -n systemd-analyze verify "$UNIT"; then
+                sudo -n cp -p "$BACKUP" "$UNIT"
+                sudo -n systemctl daemon-reload
+                echo "STOP: systemd validation failed; original unit restored."
+                exit 1
+              fi
+              sudo -n systemctl daemon-reload
+              sudo -n systemctl reset-failed "$(basename "$UNIT")"
+              echo "Updated PM2 unit properties:"
+              systemctl show "$(basename "$UNIT")" -p Type -p RemainAfterExit -p PIDFile -p UnitFileState --no-pager
+              echo "Backup: $BACKUP"
+              echo "No PM2 restart, stop, or start command was run."
+              echo "Current bot state:"
+              pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2");console.log("hasa2="+(p?.pm2_env?.status||"NOT FOUND")+" restarts="+(p?.pm2_env?.restart_time??"?"));if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
               ;;
             access-audit)
               echo "Read-only Oracle access capability audit; no changes or restarts."
