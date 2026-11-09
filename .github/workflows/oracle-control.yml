@@ -131,6 +131,12 @@ jobs:
               if command -v sudo >/dev/null 2>&1; then
                 echo "sudo_noninteractive_permissions:"
                 sudo -n -l 2>&1 | sed -E 's/.*NOPASSWD:.*/NOPASSWD: [COMMANDS REDACTED]/' | head -n 25 || true
+                for cmd in /usr/bin/cp /usr/bin/sed /usr/bin/systemctl /usr/bin/tee; do
+                  printf 'sudo_allowed_%s: ' "$(basename "$cmd")"
+                  sudo -n -l "$cmd" >/dev/null 2>&1 && echo yes || echo no
+                done
+                printf 'sudo_can_write_pm2_unit: '
+                sudo -n test -w "/etc/systemd/system/pm2-$(id -un).service" 2>/dev/null && echo yes || echo no
               else echo "sudo: unavailable"; fi
               echo "===== HOST AND RUNTIME ====="
               printf 'hostname: '; hostname
