@@ -12,6 +12,7 @@ import pino from "pino";
 import fs from "node:fs";
 import readline from "node:readline";
 import { loadPlugins } from "./lib/plugin-loader.js";
+import { restoreSavedSubbots } from "./lib/subbot-manager.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
 const authDir = "./auth_info";
@@ -96,6 +97,9 @@ async function startBot(authState = null) {
     if (connection === "open") {
       reconnectAttempts = 0;
       console.log("✅ Hasa_2_bot connected. Pairing-code login only.");
+      void restoreSavedSubbots({ mainSock: sock, config, plugins }).catch(error =>
+        console.error("Saved Subbot restoration failed:", error.message)
+      );
     }
     if (connection === "close") {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
