@@ -43,7 +43,7 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/oracle_key
           chmod 600 ~/.ssh/oracle_key
           test -n "$SSH_KNOWN_HOSTS"
-          printf '%s\\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Execute fixed Oracle operation
