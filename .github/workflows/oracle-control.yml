@@ -159,6 +159,20 @@ jobs:
                 git -C "$APP" rev-parse --short HEAD
                 git -C "$APP" status --short
               else echo "Application Git checkout missing"; fi
+              echo "===== RESOURCE SNAPSHOT ====="
+              uptime
+              free -h
+              df -h / /home 2>/dev/null | tail -n +1
+              echo "===== FAILED SYSTEM UNITS ====="
+              systemctl --failed --no-legend --no-pager 2>&1 | head -n 25 || true
+              echo "===== LISTENING PORTS ====="
+              ss -lnt 2>/dev/null | head -n 25 || true
+              echo "===== CRON CONFIGURATION METADATA ====="
+              if crontab -l >/dev/null 2>&1; then
+                echo "User crontab: present"
+                printf 'entries: '
+                crontab -l 2>/dev/null | grep -Ev '^[[:space:]]*(#|$)' | wc -l
+              else echo "User crontab: none or not readable"; fi
               echo "===== END ====="
               echo "Read-only audit complete. No credentials, environment values, or WhatsApp session contents were read."
               ;;
