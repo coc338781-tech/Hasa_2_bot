@@ -5,7 +5,7 @@ echo "Hasa Termux Agent - one-time secure setup"
 command -v node >/dev/null || { echo "Node.js missing. Run: pkg install nodejs-lts curl -y"; exit 1; }
 command -v curl >/dev/null || { echo "curl missing. Run: pkg install curl -y"; exit 1; }
 
-read -rsp "Paste a fine-grained GitHub token (only hasa-bot-test-reports: Contents read/write): " GH_TOKEN
+read -rsp "Paste a fine-grained GitHub token (only hasa-bot-test-reports: Contents read/write): " GH_TOKEN < /dev/tty
 echo
 [ -n "$GH_TOKEN" ] || { echo "No token supplied."; exit 1; }
 
