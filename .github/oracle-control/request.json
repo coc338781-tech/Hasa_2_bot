@@ -1,4 +1,4 @@
 {
-  "action": "auth-audit",
-  "request_id": "auth-audit-hostkey-fix-20261109-3"
+  "action": "logs",
+  "request_id": "oracle-logs-after-auth-audit-20261109-4"
 }
