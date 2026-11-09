@@ -126,7 +126,7 @@ jobs:
           new = '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then'
           if old in s:
               s = s.replace(old, new, 1)
-          elif new not in s:
+          elif new not in s and 'LOCAL_AI_BACKUP=""' not in s:
               raise SystemExit("Deploy guard status check not found; no changes made.")
           needle = '  OLD_SHA="$(git rev-parse HEAD)"'
           if 'UNTRACKED="$(git ls-files --others --exclude-standard)"' not in s:
