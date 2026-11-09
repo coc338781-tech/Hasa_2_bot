@@ -68,9 +68,23 @@ test("image-to-PDF builder creates a valid PDF structure with correct stream len
   assert.match(pdf, /startxref/);
 });
 
-test("all new features are automatically documented in their catalog categories", () => {
-  const list = appendCatalogToList("BASE", commands, ".");
-  const help = appendCatalogToHelp("BASE", commands, ".");
+test("all new features are automatically documented inside existing categories", () => {
+  const listBase = [
+    "│📜 AI ASSISTANT*", "╰────────",
+    "│📜 AUTOMATIONS & AUTO REPLY*", "╰────────",
+    "│📜 STICKER & MEDIA TOOLS*", "╰────────",
+    "│📜 OWNER CONTROL*", "╰────────",
+    "│📜 UTILITY TOOLS*", "╰────────"
+  ].join("\\n");
+  const helpBase = [
+    "AI ASSISTANT 〕", "┗━━━━━━━━",
+    "SETTINGS & AUTO FEATURES 〕", "┗━━━━━━━━",
+    "STICKER & FUN 〕", "┗━━━━━━━━",
+    "OWNER & SUBBOT 〕", "┗━━━━━━━━",
+    "UTILITY TOOLS 〕", "┗━━━━━━━━"
+  ].join("\\n");
+  const list = appendCatalogToList(listBase, commands, ".");
+  const help = appendCatalogToHelp(helpBase, commands, ".");
   for (const name of ["search", "tts", "pdf", "ocr", "topdf", "qr", "vcard", "aiusage", "schedule", "schedules", "cancelschedule"]) {
     assert.match(list, new RegExp("\\." + name + "\\b"));
     assert.match(help, new RegExp("\\." + name + "\\b"));
