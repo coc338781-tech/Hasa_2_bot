@@ -63,7 +63,7 @@ async function handleStatusMessage(sock, message) {
   const mode = String(config.statusReact || "off").toLowerCase();
   const owner = message.key?.participant;
   if (!owner || !["green", "random"].includes(mode)) return;
-  const emojis = ["👍", "❤️", "🔥", "💯", "😊", "💚"];
+  const emojis = ["💝", "💖", "💗", "💓", "💞", "💕", "💟", "❣️", "💔", "❤️‍🔥", "❤️‍🩹", "♥️", "❤️", "🧡", "💛", "💚", "💙", "💜", "🤎", "🖤", "🤍", "🩷", "🩵", "🩶"];
   const reaction = mode === "green" ? "💚" : emojis[Math.floor(Math.random() * emojis.length)];
   try {
     await sock.sendMessage("status@broadcast", { react: { text: reaction, key: message.key } }, { statusJidList: [owner] });
