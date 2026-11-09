@@ -11,7 +11,9 @@ A separate WhatsApp MD bot project. It does not overwrite or share the existing 
 - Group commands: tagall, hidetag, promote, demote, kick, groupinfo, anti-link moderation, and member warnings (admin checks included).
 - AI chat using Gemini when an API key is configured, including image questions and voice transcription.
 - Video downloader for supported public URLs via yt-dlp (.dl and .fb).
-- Media tools: create static/animated stickers (.sticker / .s), extract audio from video (.toaudio), and compress video (.compress).
+- Media tools: create static/animated stickers (.sticker / .s), extract audio from video (.toaudio), compress video (.compress), and convert photos to PDF (.topdf).
+- AI and utility tools: live web search (.search), text-to-speech (.tts), PDF text extraction/summarization (.pdf), image OCR (.ocr), QR codes (.qr), and downloadable contact cards (.vcard).
+- Owner tools: Gemini/Groq usage counters (.aiusage) and persistent scheduled private messages (.schedule / .schedules / .cancelschedule).
 - Optional auto voice reply and composing presence.
 - Pairing-code Subbot with separate per-owner session storage.
 
@@ -31,7 +33,7 @@ npm start
 
 Set the `owner` number in config.json to your WhatsApp number with country code, digits only. The main bot asks for the WhatsApp number on first pairing; you can alternatively set `BOT_PHONE_NUMBER` in a private `.env` file. The pairing code is shown in the terminal. On WhatsApp: Linked devices -> Link a device -> Link with phone number instead.
 
-For AI text, image questions, and voice transcription, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in config.json. AI media input is limited to 15 MB. Sticker, audio extraction, and compression tools require FFmpeg on the server.
+For AI text, image questions, and voice transcription, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in config.json. AI media input is limited to 15 MB. OCR requires AI Chat and Gemini API access; PDF text extraction may use `pdftotext` when available. Text-to-speech and QR generation use external web services. Scheduled messages are stored in `data/scheduled-messages.json` and restored after reconnect; keep the server clock accurate. Sticker, audio extraction, and compression tools require FFmpeg on the server.
 
 ## Commands
 - `.menu`, `.ping`, `.alive`, `.uptime`
@@ -39,7 +41,9 @@ For AI text, image questions, and voice transcription, add `GEMINI_API_KEY=your_
 - `.addreply word-reply`, `.replaceeply word-reply`, `.getreply`, `.removereply word`, `.resetreply`
 - `.tagall`, `.hidetag`, `.promote @user`, `.demote @user`, `.kick @user`, `.groupinfo`, `.antilink on/off`, `.warn @user [reason]`, `.warnings @user`, `.resetwarn @user`
 - `.ai question`, reply to an image with `.ai describe this`, `.transcribe` (reply to voice/audio), `.hack` (owner-only harmless prank simulation)
-- `.sticker` / `.s` (reply to image/video), `.toaudio` (reply to video), `.compress` (reply to video)
+- `.sticker` / `.s` (reply to image/video), `.toaudio` (reply to video), `.compress` (reply to video), `.topdf` (reply to photo)
+- `.search query`, `.tts [si|en|ta] text`, `.pdf` (reply to PDF), `.ocr` (reply to photo), `.qr text`, `.vcard Name | Number | Company`
+- Owner: `.aiusage`, `.schedule 10m 9477XXXXXXX | Message`, `.schedules`, `.cancelschedule ID
 - `.dl url`, `.fb url`
 - `.subbot phone-number`, `.subcheck`, `.stopsubbot`, `.restartsubbot`, `.delsubbot`, `.helpsubbot`
 

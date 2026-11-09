@@ -1,3 +1,4 @@
+import { recordAiUsage } from "../lib/ai-usage.js";
 
 function getText(message) {
   return message.message?.conversation ||
@@ -46,10 +47,21 @@ async function groqText(prompt) {
   return text;
 }
 async function textAnswer(prompt) {
-  try { return await geminiText(prompt); }
-  catch (error) {
+  try {
+    const answer = await geminiText(prompt);
+    await recordAiUsage("gemini", true);
+    return answer;
+  } catch (error) {
+    await recordAiUsage("gemini", false).catch(() => {});
     console.warn("AI extras Gemini failed; trying Groq fallback:", error.message);
-    return groqText(prompt);
+    try {
+      const answer = await groqText(prompt);
+      await recordAiUsage("groq", true);
+      return answer;
+    } catch (fallbackError) {
+      await recordAiUsage("groq", false).catch(() => {});
+      throw fallbackError;
+    }
   }
 }
 async function imagine(prompt) {
