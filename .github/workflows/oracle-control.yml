@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -152,6 +152,30 @@ jobs:
               sudo -n systemctl reset-failed "$UNIT_NAME"
               systemctl show "$UNIT_NAME" -p Type -p RemainAfterExit -p UnitFileState --no-pager
               echo "Backup: $BACKUP"
+              pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2");console.log("hasa2="+(p?.pm2_env?.status||"NOT FOUND"));if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
+              ;;
+            disable-unsupported-diagnostics)
+              echo "Disable only two verified, nonfunctional crash-diagnostic services; bot/session untouched."
+              systemctl is-failed --quiet kdump.service
+              systemctl is-failed --quiet mcelog.service
+              journalctl -u kdump.service --no-pager 2>/dev/null | grep -Fq "No memory reserved for crash kernel"
+              journalctl -u mcelog.service --no-pager 2>/dev/null | grep -Eq "mcelog does not support this processor|CPU is unsupported"
+              mkdir -p "$BACKUPS"
+              chmod 700 "$BACKUPS"
+              BACKUP="$BACKUPS/failed-diagnostic-units-$(date +%Y%m%d-%H%M%S).txt"
+              {
+                echo "Captured: $(date -Is)"
+                systemctl is-enabled kdump.service 2>&1 || true
+                systemctl is-enabled mcelog.service 2>&1 || true
+                systemctl show kdump.service mcelog.service -p UnitFileState -p ActiveState -p SubState --no-pager
+              } > "$BACKUP"
+              chmod 600 "$BACKUP"
+              sudo -n systemctl disable kdump.service mcelog.service
+              sudo -n systemctl reset-failed kdump.service mcelog.service
+              echo "Saved prior service states: $BACKUP"
+              echo "Verification:"
+              systemctl is-enabled kdump.service mcelog.service 2>&1 || true
+              systemctl --failed --no-legend --no-pager
               pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2");console.log("hasa2="+(p?.pm2_env?.status||"NOT FOUND"));if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
               ;;
             access-audit)
