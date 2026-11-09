@@ -75,14 +75,14 @@ test("all new features are automatically documented inside existing categories",
     "│📜 STICKER & MEDIA TOOLS*", "╰────────",
     "│📜 OWNER CONTROL*", "╰────────",
     "│📜 UTILITY TOOLS*", "╰────────"
-  ].join("\\n");
+  ].join("\n");
   const helpBase = [
     "AI ASSISTANT 〕", "┗━━━━━━━━",
     "SETTINGS & AUTO FEATURES 〕", "┗━━━━━━━━",
     "STICKER & FUN 〕", "┗━━━━━━━━",
     "OWNER & SUBBOT 〕", "┗━━━━━━━━",
     "UTILITY TOOLS 〕", "┗━━━━━━━━"
-  ].join("\\n");
+  ].join("\n");
   const list = appendCatalogToList(listBase, commands, ".");
   const help = appendCatalogToHelp(helpBase, commands, ".");
   for (const name of ["search", "tts", "pdf", "ocr", "topdf", "qr", "vcard", "aiusage", "schedule", "schedules", "cancelschedule"]) {
