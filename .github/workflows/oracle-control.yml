@@ -206,6 +206,14 @@ jobs:
                 [ -n "$unit" ] || continue
                 echo "--- $unit ---"
                 systemctl show "$unit" -p ActiveState -p SubState -p Result -p ExecMainStatus -p ActiveEnterTimestamp -p UnitFileState --no-pager 2>/dev/null || true
+                case "$unit" in
+                  kdump.service|mcelog.service)
+                    echo "--- Unit definition (environment lines hidden) ---"
+                    systemctl cat "$unit" --no-pager 2>/dev/null | sed -E '/^[[:space:]]*Environment(File)?=/d' | head -n 70 || true
+                    echo "--- Recent service journal ---"
+                    journalctl -u "$unit" -n 35 --no-pager 2>/dev/null | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 35 || true
+                    ;;
+                esac
                 if [[ "$unit" == pm2-* ]]; then
                   echo "--- Safe unit definition (environment lines hidden) ---"
                   systemctl cat "$unit" --no-pager 2>/dev/null | sed -E '/^[[:space:]]*Environment(File)?=/d' | head -n 60 || true
