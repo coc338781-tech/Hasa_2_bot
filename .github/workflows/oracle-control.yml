@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -155,9 +155,74 @@ jobs:
               raise SystemExit("Deploy backup command not found; no changes made.")
           p.write_text(s)
           PY
+              python3 - "$GUARD" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+
+          old_check = '''  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            echo "STOP: Production folder has local changes."
+            exit 1
+          fi
+          '''
+          new_check = '''  LOCAL_AI_BACKUP=""
+          OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" {print}')"
+          if [ -n "$OTHER_CHANGES" ]; then
+            echo "STOP: Unexpected tracked production changes exist; preserving them."
+            printf '%s\\n' "$OTHER_CHANGES"
+            exit 1
+          fi
+          if ! git diff --quiet HEAD -- plugins/ai.js; then
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
+            LOCAL_AI_BACKUP="$BACKUP_DIR/local-ai-$(date +%Y%m%d-%H%M%S).js"
+            cp -p "$APP_DIR/plugins/ai.js" "$LOCAL_AI_BACKUP"
+            echo "Preserving local AI implementation: $LOCAL_AI_BACKUP"
+          fi
+          '''
+          if old_check in s:
+              s = s.replace(old_check, new_check, 1)
+          elif 'LOCAL_AI_BACKUP=""' not in s:
+              raise SystemExit("Expected deploy guard check not found; no changes made.")
+
+          fetch_line = '  NEW_SHA="$(git rev-parse "origin/$BRANCH")"\\n'
+          fetch_add = fetch_line + '''  if ! git diff --quiet "$OLD_SHA" "$NEW_SHA" -- plugins/ai.js; then
+            echo "STOP: Remote AI implementation changed; refusing to overwrite the local production AI file."
+            exit 1
+          fi
+          '''
+          if fetch_line in s and 'Remote AI implementation changed' not in s:
+              s = s.replace(fetch_line, fetch_add, 1)
+          elif 'Remote AI implementation changed' not in s:
+              raise SystemExit("Remote SHA insertion point not found; no changes made.")
+
+          rollback_line = '    git reset --hard "$OLD_SHA" || true\\n'
+          rollback_add = rollback_line + '''    if [ -n "$LOCAL_AI_BACKUP" ] && [ -f "$LOCAL_AI_BACKUP" ]; then
+              cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+            fi
+          '''
+          if rollback_line in s and 'cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"' not in s:
+              s = s.replace(rollback_line, rollback_add, 1)
+
+          new_reset = '  git reset --hard "$NEW_SHA"\\n'
+          new_restore = new_reset + '''  if [ -n "$LOCAL_AI_BACKUP" ]; then
+            cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+            echo "Restored preserved local AI implementation after code update."
+          fi
+          '''
+          if new_reset in s and 'Restored preserved local AI implementation after code update.' not in s:
+              s = s.replace(new_reset, new_restore, 1)
+          p.write_text(s)
+          PY
               bash -n "$GUARD"
               echo "Deploy guard updated; original backup: $BACKUP"
               sed -n "14,52p" "$GUARD"
+              ;;
+            deploy)
+              echo "Starting guarded Oracle deployment; local AI code will be preserved."
+              SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
+              sleep 5
+              print_status
               ;;
             restart)
               pm2 restart hasa2 --update-env
