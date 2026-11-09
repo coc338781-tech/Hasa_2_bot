@@ -362,21 +362,10 @@ export default async function core({ sock, message, config }) {
   }
 
   if (command === "ping") {
-    // Measure real bot-side command processing time up to response dispatch.
+    // Measure bot-side response time and keep the reply compact.
     const elapsedNs = process.hrtime.bigint() - commandReceivedAt;
-    const responseMs = Math.max(0.01, Number(elapsedNs) / 1e6).toFixed(2);
-    const caption = [
-      "🏓 *PONG RESPONSE*",
-      "",
-      "🟢 *ONLINE*  |  *HASA 2 BOT*",
-      "",
-      "⚡ *" + responseMs + "ms*",
-      "_RESPONSE SPEED_",
-      "",
-      "────────────────",
-      "❤️ *POWERED BY HASA*"
-    ].join("\n");
-    return send(caption);
+    const responseMs = Math.max(1, Math.round(Number(elapsedNs) / 1e6));
+    return send("⚡ *Ping: " + responseMs + " ms*");
   }
 
   if (command === "alive") {
