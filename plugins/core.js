@@ -28,7 +28,7 @@ const CATEGORIES = {
   "1": ["GENERAL & SYSTEM", [
     ".menu", ".list", ".ping", ".alive", ".uptime", ".system", ".ram", ".fastmode", ".loadavg"
   ]],
-  "2": ["AI ASSISTANT", [".ai <question>", ".transcribe (reply to voice)"]],
+  "2": ["AI ASSISTANT", [".ai <question>", ".ask <question>", ".summarize (reply to text)", ".imagine <prompt>", ".translate [language] <text>", ".transcribe (reply to voice)"]],
   "3": ["MEDIA DOWNLOADS", [".dl <public video url>", ".fb <public video url>", ".video <name or url>", ".song <name or url>", ".fbtest"]],
   "4": ["GROUP MANAGEMENT", [
     ".tagall [message]", ".hidetag [message]", ".promote @user",
@@ -37,7 +37,7 @@ const CATEGORIES = {
   ]],
   "5": ["AUTOMATIONS", [
     ".settings", ".autoreply on|off", ".statusseen on|off",
-    ".statusreact green|random|off", ".antidelete on|off", ".viewonce on|off",
+    ".statusreact green|random|off", ".antidelete on|off", ".viewonce on|off", ".autoreact on|off",
     ".aichat on|off", ".groupcmd on|off", ".composing on|off", ".autovoice on|off",
     ".addreply word-reply", ".replacereply word-reply", ".getreply",
     ".removereply word", ".resetreply"
@@ -45,16 +45,16 @@ const CATEGORIES = {
   "6": ["STICKER & MEDIA TOOLS", [".sticker (reply to photo/video)", ".toaudio (reply to video)", ".compress (reply to video)"]],
   "7": ["PRANK & FUN", [".hack"]],
   "8": ["OWNER CONTROL", [
-    ".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"
+    ".status", ".system", ".logs", ".backup", ".owner", ".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"
   ]],
   "9": ["SUBBOT MANAGER", [
     ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
     ".restartsubbot", ".delsubbot", ".delallsubbot confirm", ".restartallsubbot", ".helpsubbot"
   ]],
   "10": ["UTILITY TOOLS", [
-    ".math <expression>", ".cal <expression>", ".mathstep <expression>",
-    ".id", ".jid", ".quote (reply to message)", ".wame <number> [message]", ".readmore <preview> | <text>", ".fancy <text>",
-    ".dictionary <English word>", ".trt [language] <text>"
+    ".weather <city>", ".movie <title>", ".quote (reply to message)", ".math <expression>", ".cal <expression>", ".mathstep <expression>",
+    ".id", ".jid", ".wame <number> [message]", ".readmore <preview> | <text>", ".fancy <text>",
+    ".dictionary <English word>", ".trt [language] <text>", ".translate [language] <text>"
   ]]
 };
 
@@ -159,15 +159,15 @@ function makeMainMenu(config) {
 function makeCommandList(config, prefix) {
   const groups = [
     ["GENERAL & SYSTEM", [prefix+"menu", prefix+"list", prefix+"ping", prefix+"alive", prefix+"uptime", prefix+"system", prefix+"ram", prefix+"fastmode", prefix+"loadavg"]],
-    ["AI ASSISTANT", [prefix+"ai <question>", prefix+"transcribe (reply to voice)"]],
+    ["AI ASSISTANT", [prefix+"ai <question>", prefix+"ask <question>", prefix+"summarize (reply to text)", prefix+"imagine <prompt>", prefix+"translate [language] <text>", prefix+"transcribe (reply to voice)"]],
     ["MEDIA DOWNLOADS", [prefix+"dl <public video url>", prefix+"fb <public video url>", prefix+"video <name or url>", prefix+"song <name or url>", prefix+"fbtest"]],
     ["GROUP MANAGEMENT", [prefix+"tagall [message]", prefix+"hidetag [message]", prefix+"promote @user", prefix+"demote @user", prefix+"kick @user", prefix+"groupinfo", prefix+"antilink on/off", prefix+"warn @user [reason]", prefix+"warnings @user", prefix+"resetwarn @user"]],
-    ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
+    ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"autoreact on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
-    ["OWNER CONTROL", [prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
+    ["OWNER CONTROL", [prefix+"status", prefix+"system", prefix+"logs", prefix+"backup", prefix+"owner", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
     ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"delallsubbot confirm", prefix+"restartallsubbot", prefix+"helpsubbot"]],
-    ["UTILITY TOOLS", [prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"quote (reply to message)", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>"]]
+    ["UTILITY TOOLS", [prefix+"weather <city>", prefix+"movie <title>", prefix+"quote (reply to message)", prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>", prefix+"translate [language] <text>"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
@@ -184,6 +184,153 @@ function makeCommandList(config, prefix) {
     ]),
     "",
     "✨ *Hasa_2_bot | Command Center*"
+  ].join("\n");
+}
+
+function makeHelpGuide(prefix) {
+  return [
+    "*📖 HASA 2 BOT — සම්පූර්ණ HELP GUIDE*",
+    "",
+    "ආයුබෝවන්! 👋 මේ Bot එකේ Commands භාවිතා කරන ආකාරය මෙහි දැක්වේ.",
+    "",
+    "┏━━〔 🚀 1. ආරම්භය 〕",
+    "┃ සියලුම Commands ආරම්භයේ Prefix එක යොදන්න.",
+    "┃ Default Prefix: *" + prefix + "*",
+    "┃ උදා: " + prefix + "ping",
+    "┃",
+    "┃ " + prefix + "help  — මෙම උපදෙස්",
+    "┃ " + prefix + "menu  — ප්‍රධාන Menu එක",
+    "┃ " + prefix + "list  — සම්පූර්ණ Command List එක",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 🤖 2. GENERAL & SYSTEM 〕",
+    "┃ " + prefix + "ping — Response Speed පරීක්ෂා කරන්න.",
+    "┃ " + prefix + "alive — Bot එක Online ද බලන්න.",
+    "┃ " + prefix + "uptime — Bot එක ක්‍රියාත්මක කාලය.",
+    "┃ " + prefix + "system / " + prefix + "ram — Server, CPU, RAM සහ Storage විස්තර.",
+    "┃ " + prefix + "fastmode — Fast Mode තත්ත්වය.",
+    "┃ " + prefix + "loadavg — Server Load Average.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 🧠 3. AI ASSISTANT 〕",
+    "┃ " + prefix + "ai <ප්‍රශ්නය> — AI සමඟ කතා කරන්න.",
+    "┃ " + prefix + "ask <ප්‍රශ්නය> — AI වෙතින් පිළිතුරක් ගන්න.",
+    "┃ " + prefix + "summarize — Text එකකට Reply කර සාරාංශයක් ගන්න.",
+    "┃ " + prefix + "summarize <text> — දුන් Text එක සාරාංශ කරන්න.",
+    "┃ " + prefix + "imagine <විස්තරය> — විස්තරයෙන් AI Image එකක් සකස් කරන්න.",
+    "┃ " + prefix + "translate [භාෂා කේතය] <text> — පරිවර්තනය කරන්න.",
+    "┃ " + prefix + "trt [භාෂා කේතය] <text> — පරිවර්තනය සඳහා කෙටි Command එක.",
+    "┃ " + prefix + "transcribe — Voice Message එකකට Reply කර Text කරන්න.",
+    "┃ උදා: " + prefix + "ask ශ්‍රී ලංකාවේ අගනුවර කුමක්ද?",
+    "┃ උදා: " + prefix + "trt si Hello, how are you?",
+    "┃ සටහන: AI Commands සඳහා Owner විසින් AI Chat ON කර තිබිය යුතුයි.",
+    "┃ Image generation සඳහා Gemini Image API access සහ quota අවශ්‍යයි.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 📥 4. MEDIA DOWNLOADS 〕",
+    "┃ " + prefix + "dl <public URL> — සහාය දක්වන Video Link එකක් Download කරන්න.",
+    "┃ " + prefix + "fb <public URL> — සහාය දක්වන Facebook Link එකක්.",
+    "┃ " + prefix + "video <නම හෝ URL> — Video සෙවීම/ලබාගැනීම.",
+    "┃ " + prefix + "song <නම හෝ URL> — Song සෙවීම/ලබාගැනීම.",
+    "┃ " + prefix + "fbtest — Facebook Downloader පරීක්ෂාව.",
+    "┃ සටහන: Public සහ Downloader එකෙන් සහාය දක්වන Links පමණක් භාවිතා කරන්න.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 👥 5. GROUP COMMANDS 〕",
+    "┃ " + prefix + "tagall [පණිවිඩය] — Members සියල්ල Tag කරන්න.",
+    "┃ " + prefix + "hidetag [පණිවිඩය] — සියල්ලන් Mention කර පණිවිඩය යවන්න.",
+    "┃ " + prefix + "promote @user — Member කෙනෙකු Admin කරන්න.",
+    "┃ " + prefix + "demote @user — Admin බලතල ඉවත් කරන්න.",
+    "┃ " + prefix + "kick @user — Member ඉවත් කරන්න.",
+    "┃ " + prefix + "groupinfo — Group විස්තර.",
+    "┃ " + prefix + "antilink on/off — Link ආරක්ෂාව පාලනය.",
+    "┃ " + prefix + "warn @user [හේතුව] — Warning එකක් දෙන්න.",
+    "┃ " + prefix + "warnings @user — Warnings බලන්න.",
+    "┃ " + prefix + "resetwarn @user — Warnings Reset කරන්න.",
+    "┃ සටහන: Group එකේ Bot එකට අවශ්‍ය Admin අවසර තිබිය යුතුයි.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 ⚙️ 6. SETTINGS & AUTO FEATURES 〕",
+    "┃ " + prefix + "settings — Owner Settings Panel එක.",
+    "┃ " + prefix + "autoreply on/off — Auto Reply පාලනය.",
+    "┃ " + prefix + "statusseen on/off — Auto Status Seen පාලනය.",
+    "┃ " + prefix + "statusreact green/random/off — Status Reaction.",
+    "┃ " + prefix + "antidelete on/off — Anti Delete පාලනය.",
+    "┃ " + prefix + "viewonce on/off — View Once පහසුකම පාලනය.",
+    "┃ " + prefix + "aichat on/off — AI Chat සක්‍රීය/අක්‍රීය කරන්න.",
+    "┃ " + prefix + "groupcmd on/off — Group Commands පාලනය.",
+    "┃ " + prefix + "composing on/off — Typing Presence පාලනය.",
+    "┃ " + prefix + "autovoice on/off — Auto Voice පාලනය.",
+    "┃ " + prefix + "autoreact on/off — Auto Reaction පාලනය.",
+    "┃ මේ Settings වෙනස් කළ හැක්කේ Ownerට පමණයි.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 💬 7. AUTO REPLY 〕",
+    "┃ " + prefix + "addreply වචනය|පිළිතුර — අලුත් Reply එකක් එකතු කරන්න.",
+    "┃ " + prefix + "replacereply වචනය|පිළිතුර — Reply එකක් වෙනස් කරන්න.",
+    "┃ " + prefix + "getreply — සුරැකි Replies බලන්න.",
+    "┃ " + prefix + "removereply වචනය — Reply එකක් ඉවත් කරන්න.",
+    "┃ " + prefix + "resetreply — Replies Reset කරන්න.",
+    "┃ " + prefix + "autoreply on/off — Auto Reply සක්‍රීය/අක්‍රීය කරන්න.",
+    "┃ උදා: " + prefix + "addreply hello|Hello! කොහොමද?",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 🎨 8. STICKER & FUN 〕",
+    "┃ " + prefix + "sticker / " + prefix + "s — Photo/Video එකකට Reply කර යවන්න.",
+    "┃ " + prefix + "toaudio — Video එකකට Reply කර Audio ලබාගන්න.",
+    "┃ " + prefix + "compress — Video එකකට Reply කර Compress කරන්න.",
+    "┃ " + prefix + "hack — Fun prank message එක.",
+    "┃ Sticker සෑදීමට Server එකේ ffmpeg තිබිය යුතුයි.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 👑 9. OWNER & SUBBOT 〕",
+    "┃ " + prefix + "status — Bot Status (Owner only).",
+    "┃ " + prefix + "logs — Filter කළ Diagnostic Logs (Owner only).",
+    "┃ " + prefix + "backup — Config Backup එකක් ලබාගන්න (Owner only).",
+    "┃ " + prefix + "owner — Owner සැකසුම් (Owner only).",
+    "┃ " + prefix + "apply — Bot Logo/Appearance සැකසුම්.",
+    "┃ set 1.1 <නම> — Bot Name වෙනස් කරන්න.",
+    "┃ set 1.3 <පෙළ> — Footer වෙනස් කරන්න.",
+    "┃ set 1.4 <පෙළ> — Alive Message වෙනස් කරන්න.",
+    "┃ " + prefix + "subbot <number> — Subbot එකක් සම්බන්ධ කරන්න.",
+    "┃ " + prefix + "subcheck — Subbot තත්ත්වය බලන්න.",
+    "┃ " + prefix + "getsubbot — Subbot විස්තර ලබාගන්න.",
+    "┃ " + prefix + "stopsubbot — Subbot නවත්වන්න.",
+    "┃ " + prefix + "restartsubbot — Subbot නැවත ආරම්භ කරන්න.",
+    "┃ " + prefix + "delsubbot — Subbot ඉවත් කරන්න.",
+    "┃ " + prefix + "delallsubbot confirm — සියලු Subbots ඉවත් කරන්න.",
+    "┃ " + prefix + "restartallsubbot — සියලු Subbots Restart කරන්න.",
+    "┃ " + prefix + "helpsubbot — Subbot උපදෙස්.",
+    "┃ Owner Commands භාවිතා කළ හැක්කේ අවසරලත් Ownerට පමණයි.",
+    "┃ Backup එකට config පමණක් ඇතුළත් වේ; WhatsApp Session නොවේ.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 🧰 10. UTILITY TOOLS 〕",
+    "┃ " + prefix + "weather <නගරය> — වත්මන් කාලගුණය.",
+    "┃ " + prefix + "movie <නම> — TV Show තොරතුරු සොයන්න.",
+    "┃ " + prefix + "quote — Message එකකට Reply කර Quote කරන්න.",
+    "┃ " + prefix + "math <ගණනය> — ගණනයක් කරන්න.",
+    "┃ " + prefix + "cal <ගණනය> — Calculator.",
+    "┃ " + prefix + "mathstep <ගණනය> — පියවර සමඟ ගණනය.",
+    "┃ " + prefix + "id / " + prefix + "jid — Chat/Group ID තොරතුරු.",
+    "┃ " + prefix + "wame <අංකය> [පණිවිඩය] — WhatsApp Chat Link.",
+    "┃ " + prefix + "readmore <කෙටි පෙළ>|<දිගු පෙළ> — Read More පෙළ.",
+    "┃ " + prefix + "fancy <පෙළ> — Fancy Text.",
+    "┃ " + prefix + "dictionary / " + prefix + "dict <word> — English අර්ථය.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "┏━━〔 🛠️ 11. ගැටලු විසඳීම 〕",
+    "┃ • Command එක ඉදිරියෙන් නිවැරදි Prefix එක යොදන්න.",
+    "┃ • Reply අවශ්‍ය Command එකකදී අදාල Photo/Video/Message එකට Reply කරන්න.",
+    "┃ • Mention අවශ්‍ය Group Command එකකදී User කෙනෙකු Mention කරන්න.",
+    "┃ • Admin අවසර අවශ්‍ය නම් Bot එක Group Admin කරන්න.",
+    "┃ • AI වැඩ නොකරන්නේ නම් " + prefix + "aichat on තත්ත්වය Ownerගෙන් පරීක්ෂා කරගන්න.",
+    "┃ • තවමත් ගැටලුවක් නම් Bot Owner අමතන්න.",
+    "┗━━━━━━━━━━━━━━━━",
+    "",
+    "❤️ *HASA 2 BOT — YOUR WHATSAPP ASSISTANT*",
+    "📜 Commands ලැයිස්තුව: " + prefix + "list",
+    "🏠 Main Menu: " + prefix + "menu"
   ].join("\n");
 }
 
@@ -353,7 +500,11 @@ export default async function core({ sock, message, config }) {
     }
   }
 
-  if (command === "menu" || command === "help") {
+  if (command === "help") {
+    return send(makeHelpGuide(prefix));
+  }
+
+  if (command === "menu") {
     return sendWithLogo(sock, jid, message, makeMainMenu(config), config);
   }
 

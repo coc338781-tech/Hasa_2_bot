@@ -68,8 +68,8 @@ export default async function languageTools({ sock, message, config }) {
     try { return send(await lookupDictionary(query)); }
     catch (error) { return send("❌ " + error.message); }
   }
-  if (command === "trt") {
-    if (!query) return send("🌐 භාවිතය: " + prefix + "trt [language] text\nඋදා: " + prefix + "trt si Hello, how are you?");
+  if (command === "trt" || command === "translate") {
+    if (!query) return send("🌐 භාවිතය: " + prefix + command + " [language] text\nඋදා: " + prefix + "trt si Hello, how are you?");
     try { return send(await translateText(query)); }
     catch (error) { return send("❌ " + error.message); }
   }
