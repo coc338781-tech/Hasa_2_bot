@@ -7,21 +7,38 @@ const catalog = [
   { name: "newmedia", category: "3", usage: "newmedia <url>", description: "Process a media link" }
 ];
 
+const baseList = [
+  "│📜 AI ASSISTANT*",
+  "*│►* .ai <question>",
+  "╰────────",
+  "│📜 MEDIA DOWNLOADS & STATUS SAVER*",
+  "*│►* .dl <url>",
+  "╰────────"
+].join("\n");
+
+const baseHelp = [
+  "AI ASSISTANT 〕",
+  "┃ .ai <question>",
+  "┗━━━━━━━━",
+  "MEDIA DOWNLOADS 〕",
+  "┃ .dl <url>",
+  "┗━━━━━━━━"
+].join("\n");
+
 test("new plugin commands are categorized for the numbered menu", () => {
   assert.deepEqual(getCategoryCommandLines(catalog, "2", "."), [".newai <question> — Ask the new AI assistant"]);
 });
-test("new plugin commands appear in the categorized command list", () => {
-  const output = appendCatalogToList("BASE LIST", catalog, ".");
-  assert.match(output, /AI ASSISTANT — NEW COMMANDS/);
-  assert.match(output, /\.newai <question> — Ask the new AI assistant/);
-  assert.match(output, /MEDIA DOWNLOADS — NEW COMMANDS/);
-  assert.match(output, /\.newmedia <url> — Process a media link/);
+test("new plugin commands are inserted inside their existing command-list categories", () => {
+  const output = appendCatalogToList(baseList, catalog, ".");
+  assert.match(output, /AI ASSISTANT\*[\s\S]*\.newai <question> — Ask the new AI assistant[\s\S]*╰/);
+  assert.match(output, /MEDIA DOWNLOADS & STATUS SAVER\*[\s\S]*\.newmedia <url> — Process a media link[\s\S]*╰/);
+  assert.doesNotMatch(output, /NEW COMMANDS|COMMAND GUIDE/);
 });
-test("new plugin commands appear in the detailed help guide", () => {
-  const output = appendCatalogToHelp("BASE HELP", catalog, ".");
-  assert.match(output, /අලුතින් එකතු කළ Commands/);
-  assert.match(output, /\.newai <question> — Ask the new AI assistant/);
-  assert.match(output, /\.newmedia <url> — Process a media link/);
+test("new plugin commands are inserted inside their existing detailed-help categories", () => {
+  const output = appendCatalogToHelp(baseHelp, catalog, ".");
+  assert.match(output, /AI ASSISTANT 〕[\s\S]*\.newai <question> — Ask the new AI assistant[\s\S]*┗/);
+  assert.match(output, /MEDIA DOWNLOADS 〕[\s\S]*\.newmedia <url> — Process a media link[\s\S]*┗/);
+  assert.doesNotMatch(output, /අලුතින් එකතු කළ Commands|NEW COMMANDS/);
 });
 test("invalid or incomplete command documentation is excluded", () => {
   assert.deepEqual(normalizeCommandCatalog([...catalog,
