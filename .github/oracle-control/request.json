@@ -1,4 +1,4 @@
 {
-  "action": "logs",
-  "request_id": "diagnose-command-failure-20261109"
+  "action": "auth-audit",
+  "request_id": "auth-metadata-audit-20261109"
 }
