@@ -132,7 +132,7 @@ jobs:
               grep -Fq 'Type=forking' "$UNIT"
               grep -Fq 'PIDFile=' "$UNIT"
               grep -Fq 'pm2 resurrect' "$UNIT"
-              systemctl is-enabled "$UNIT" >/dev/null
+              systemctl is-enabled "$UNIT_NAME" >/dev/null
               pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2");if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
               BACKUP="$BACKUPS/pm2-systemd-backup-$(date +%Y%m%d-%H%M%S).service"
               mkdir -p "$BACKUPS"
