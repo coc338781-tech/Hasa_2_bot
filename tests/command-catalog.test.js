@@ -13,15 +13,15 @@ test("new plugin commands are categorized for the numbered menu", () => {
 test("new plugin commands appear in the categorized command list", () => {
   const output = appendCatalogToList("BASE LIST", catalog, ".");
   assert.match(output, /AI ASSISTANT — NEW COMMANDS/);
-  assert.match(output, /\\.newai <question> — Ask the new AI assistant/);
+  assert.match(output, /\.newai <question> — Ask the new AI assistant/);
   assert.match(output, /MEDIA DOWNLOADS — NEW COMMANDS/);
-  assert.match(output, /\\.newmedia <url> — Process a media link/);
+  assert.match(output, /\.newmedia <url> — Process a media link/);
 });
 test("new plugin commands appear in the detailed help guide", () => {
   const output = appendCatalogToHelp("BASE HELP", catalog, ".");
   assert.match(output, /අලුතින් එකතු කළ Commands/);
-  assert.match(output, /\\.newai <question> — Ask the new AI assistant/);
-  assert.match(output, /\\.newmedia <url> — Process a media link/);
+  assert.match(output, /\.newai <question> — Ask the new AI assistant/);
+  assert.match(output, /\.newmedia <url> — Process a media link/);
 });
 test("invalid or incomplete command documentation is excluded", () => {
   assert.deepEqual(normalizeCommandCatalog([...catalog,
