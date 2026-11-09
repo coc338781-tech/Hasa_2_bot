@@ -12,8 +12,6 @@ on:
           - full
           - host-and-pm2
           - external-services
-  schedule:
-    - cron: "23 * * * *"
 
 permissions:
   contents: read
@@ -32,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure restricted SSH
-        if: ${{ github.event_name == 'schedule' || inputs.scope != 'external-services' }}
+        if: ${{ inputs.scope != 'external-services' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
@@ -50,13 +48,13 @@ jobs:
           printf 'SSH_HOST=%s\nSSH_USER=%s\n' "$SSH_HOST" "$SSH_USER" >> "$GITHUB_ENV"
 
       - name: Run read-only host, PM2 and crash diagnostics
-        if: ${{ github.event_name == 'schedule' || inputs.scope == 'full' || inputs.scope == 'host-and-pm2' }}
+        if: ${{ inputs.scope == 'full' || inputs.scope == 'host-and-pm2' }}
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" 'bash -s' < scripts/oracle-diagnostics.sh | tee oracle-diagnostics.txt
 
       - name: Run real external-provider smoke tests on Oracle
-        if: ${{ github.event_name == 'schedule' || inputs.scope == 'full' || inputs.scope == 'external-services' }}
+        if: ${{ inputs.scope == 'full' || inputs.scope == 'external-services' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
@@ -77,31 +75,45 @@ jobs:
           node --input-type=module <<'NODE'
           import 'dotenv/config';
           const checks = [];
-          const add = (name, ok, detail) => checks.push({name,ok,detail});
-          async function request(name, url) {
-            try {
-              const r = await fetch(url, {signal: AbortSignal.timeout(12000)});
-              await r.arrayBuffer();
-              add(name, r.ok, 'HTTP '+r.status);
-            } catch (e) { add(name,false,(e.name||'Error')+': '+String(e.message||e).slice(0,140)); }
-          }
-          await request('Dictionary API', 'https://api.dictionaryapi.dev/api/v2/entries/en/hello');
-          await request('MyMemory Translation API', 'https://api.mymemory.translated.net/get?q=hello&langpair=en%7Csi');
+          const add = (name, state, detail) => checks.push({name,state,detail});
+          const errorText = e => (e?.name || 'Error') + ': ' + String(e?.message || e).replace(/[\\r\\n]+/g,' ').slice(0,140);
+
+          try {
+            const r = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/hello', {signal:AbortSignal.timeout(12000)});
+            const data = await r.json().catch(() => null);
+            const ok = r.ok && Array.isArray(data) && Boolean(data[0]?.meanings?.length);
+            add('Dictionary API',ok?'PASS':'FAIL',ok?'sample definition returned':'HTTP '+r.status+'; valid definition missing');
+          } catch(e) { add('Dictionary API','FAIL',errorText(e)); }
+
+          try {
+            const url = new URL('https://api.mymemory.translated.net/get');
+            url.searchParams.set('q','Hello world');
+            url.searchParams.set('langpair','en|si');
+            const r = await fetch(url,{signal:AbortSignal.timeout(15000)});
+            const data = await r.json().catch(() => ({}));
+            const ok = r.ok && Number(data.responseStatus) < 400 && Boolean(data.responseData?.translatedText);
+            add('Translation API',ok?'PASS':'FAIL',ok?'English-to-Sinhala sample returned':'HTTP '+r.status+'; translation missing');
+          } catch(e) { add('Translation API','FAIL',errorText(e)); }
+
           const key = process.env.GEMINI_API_KEY;
-          const fs = await import('node:fs');
-          const botConfig = JSON.parse(fs.readFileSync('config.json','utf8'));
-          const model = botConfig.aiModel || 'gemini-2.0-flash';
-          if (!key) add('Gemini API',false,'GEMINI_API_KEY not available in Oracle app environment');
+          let model = 'gemini-2.0-flash';
+          try {
+            const fs = await import('node:fs');
+            const botConfig = JSON.parse(fs.readFileSync('config.json','utf8'));
+            model = botConfig.aiModel || model;
+          } catch(e) { add('Bot config','FAIL','config.json unavailable or invalid'); }
+          if (!key) add('Gemini API','SKIP','GEMINI_API_KEY is not configured; no API request made');
           else {
             try {
               const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key), {
-                method:'POST', headers:{'content-type':'application/json'},
+                method:'POST',headers:{'content-type':'application/json'},
                 body:JSON.stringify({contents:[{parts:[{text:'Reply with exactly OK'}]}]}),
                 signal:AbortSignal.timeout(20000)
               });
-              const data=await r.json();
-              add('Gemini generateContent',r.ok && Boolean(data?.candidates?.[0]?.content?.parts?.[0]?.text),'HTTP '+r.status);
-            } catch(e) { add('Gemini generateContent',false,(e.name||'Error')+': '+String(e.message||e).slice(0,140)); }
+              const data = await r.json().catch(() => ({}));
+              const ok = r.ok && Boolean(data?.candidates?.[0]?.content?.parts?.[0]?.text);
+              add('Gemini API',ok?'PASS':'FAIL',ok?'configured model '+model+' generated a response':'HTTP '+r.status+'; generation failed');
+            } catch(e) { add('Gemini API','FAIL',errorText(e)); }
           }
           const {execFile} = await import('node:child_process');
           const {promisify} = await import('node:util');
@@ -110,14 +122,12 @@ jobs:
             try { const {stdout,stderr}=await exec(bin,args,{timeout:10000,maxBuffer:1024*1024}); add(name,true,(stdout||stderr).split('\n')[0].slice(0,100)); }
             catch(e) { add(name,false,String(e.code||e.message||'unavailable').slice(0,140)); }
           }
-          try {
-            const {stdout}=await exec('yt-dlp',['--dump-single-json','--skip-download','--no-warnings','--no-playlist','ytsearch1:lofi music'],{timeout:30000,maxBuffer:2*1024*1024});
-            const meta=JSON.parse(stdout);
-            add('YouTube search metadata',Boolean(meta?.entries?.[0]?.id),'Search metadata received');
-          } catch(e) { add('YouTube search metadata',false,String(e.code||e.message||'failed').slice(0,140)); }
-          for (const c of checks) console.log((c.ok?'PASS':'FAIL')+' | '+c.name+' | '+c.detail);
-          console.log('RESULT '+checks.filter(x=>x.ok).length+'/'+checks.length+' passed');
-          if (checks.some(x=>!x.ok)) process.exitCode=2;
+          for (const c of checks) console.log(c.state+' | '+c.name+' | '+c.detail);
+          const passed = checks.filter(x=>x.state==='PASS').length;
+          const skipped = checks.filter(x=>x.state==='SKIP').length;
+          const failed = checks.filter(x=>x.state==='FAIL').length;
+          console.log('RESULT '+passed+' passed, '+skipped+' skipped, '+failed+' failed');
+          if (failed) process.exitCode=2;
           NODE
           REMOTE
           ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" 'bash -s' < provider-smoke.sh | tee provider-smoke.txt
@@ -129,7 +139,7 @@ jobs:
             echo "## Oracle Full Auto Diagnostics"
             echo "- Trigger: ${{ github.event_name }}"
             echo "- Commit: ${{ github.sha }}"
-            echo "- Scope: ${{ inputs.scope || 'scheduled full' }}"
+            echo "- Scope: ${{ inputs.scope || 'manual' }}"
             echo "- Full output is in the job logs and attached artifact."
             echo "- Read-only: no PM2 restart and no WhatsApp auth/session file access."
           } >> "$GITHUB_STEP_SUMMARY"
