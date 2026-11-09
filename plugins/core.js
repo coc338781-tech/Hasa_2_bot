@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import { downloadContentFromMessage } from "@whiskeysockets/baileys";
+import { appendCatalogToHelp, appendCatalogToList, getCategoryCommandLines } from "../lib/command-catalog.js";
 
 const SETTINGS = [
   { id: "1.1", key: "autoReply", label: "Auto Reply", value: true },
@@ -404,9 +405,11 @@ export default async function core({ sock, message, config }) {
     if (quotedBody.includes("COMMANDS PANEL") || quotedBody.includes("LIST MENU") || quotedBody.includes("MAIN MENU")) {
       const category = CATEGORIES[body];
       if (!category) return send("❌ ඒ Menu අංකය හමු වුණේ නැහැ. .menu යවලා නැවත තෝරන්න.");
+      const commandCatalog = globalThis.__hasaPlugins?.commands || [];
       const caption = [
         "╭━━━〔 " + category[0] + " 〕━━━┈",
         ...category[1].map(item => "│► " + item),
+        ...getCategoryCommandLines(commandCatalog, body, prefix).map(item => "│► " + item),
         "╰━━━━━━━━━━━━━━━━━━━┈",
         "",
         "📌 ආපසු Main Menu එකට: " + prefix + "menu"
@@ -505,7 +508,8 @@ export default async function core({ sock, message, config }) {
   }
 
   if (command === "help") {
-    return send(makeHelpGuide(prefix));
+    const commandCatalog = globalThis.__hasaPlugins?.commands || [];
+    return send(appendCatalogToHelp(makeHelpGuide(prefix), commandCatalog, prefix));
   }
 
   if (command === "menu") {
@@ -513,7 +517,8 @@ export default async function core({ sock, message, config }) {
   }
 
   if (command === "list" || command === "listcmd" || command === "listcommands") {
-    return sendWithLogo(sock, jid, message, makeCommandList(config, prefix), config);
+    const commandCatalog = globalThis.__hasaPlugins?.commands || [];
+    return sendWithLogo(sock, jid, message, appendCatalogToList(makeCommandList(config, prefix), commandCatalog, prefix), config);
   }
 
   if (command === "ping") {
