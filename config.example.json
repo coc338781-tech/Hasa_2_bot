@@ -5,6 +5,7 @@
   "autoReply": false,
   "autoStatusSeen": true,
   "statusReact": "off",
+  "autoReact": false,
   "antiDelete": true,
   "antiDeleteToInbox": false,
   "viewOnce": true,
