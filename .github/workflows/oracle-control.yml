@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -122,6 +122,31 @@ jobs:
                   tail -n 40 "$f" | grep -Ei 'connected|connection open|error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|online' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 20 || true
                 fi
               done
+              ;;
+            crash-audit)
+              echo "Read-only crash diagnosis; no process/session changes."
+              echo "--- PM2 process metadata ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- PM2 log file metadata ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  stat -c '%n | bytes=%s | modified=%y' "$f"
+                  printf 'lines='; wc -l < "$f"
+                else
+                  echo "$f: MISSING"
+                fi
+              done
+              echo "--- Historical disconnect / crypto errors with stack context ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  echo "FILE: $(basename "$f")"
+                  grep -n -A 12 -E 'Bad MAC|Session error|Disconnect details|uncaughtException|UnhandledPromiseRejection|heap out of memory|ENOMEM|SIGKILL|Killed' "$f" | tail -n 100 | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' || true
+                fi
+              done
+              echo "--- Kernel OOM evidence ---"
+              (dmesg 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 20 || true)
+              echo "--- PM2 current state ---"
+              print_status || true
               ;;
             status)
               print_status
