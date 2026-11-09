@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit|pm2-event-audit) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit|pm2-event-audit|access-audit) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -122,6 +122,10 @@ jobs:
                   tail -n 40 "$f" | grep -Ei 'connected|connection open|error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|online' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 20 || true
                 fi
               done
+              ;;
+            access-audit)
+              echo "Read-only Oracle access capability audit; no changes or restarts."
+              bash "$APP/scripts/remote-access-audit.sh"
               ;;
             pm2-event-audit)
               echo "Read-only PM2 exit/restart timeline."
