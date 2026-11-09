@@ -1,0 +1,25 @@
+name: Actions Runner Smoke Test
+
+on:
+  push:
+    branches:
+      - assistant-workflow
+    paths:
+      - '.github/workflows/actions-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify hosted runner
+        run: |
+          set -eu
+          echo "GitHub Actions runner started."
+          echo "OS: $RUNNER_OS"
+          echo "Node: $(node --version)"
+          echo "UTC: $(date -u +%FT%TZ)"
