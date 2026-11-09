@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "verify-after-menu-fix-20261109"
+  "action": "logs",
+  "request_id": "diagnose-command-failure-20261109"
 }
