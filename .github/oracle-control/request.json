@@ -1,4 +1,4 @@
 {
-  "action": "deploy",
-  "request_id": "safe-deploy-20261109-03"
+  "action": "inspect-changes",
+  "request_id": "verify-deploy-20261109-01"
 }
