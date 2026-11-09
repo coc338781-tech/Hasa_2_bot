@@ -116,6 +116,7 @@ async function startBot(authState = null) {
     if (connection === "open") {
       reconnectAttempts = 0;
       console.log("✅ Hasa_2_bot connected. Pairing-code login only.");
+      void plugins.onConnection?.(sock).catch(error => console.error("Plugin connection hook failed:", error.message));
       if (restoredSubbotsGeneration !== generation) {
         restoredSubbotsGeneration = generation;
         void restoreSubbots({ mainSock: sock, config, plugins })

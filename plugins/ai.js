@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { downloadContentFromMessage } from "@whiskeysockets/baileys";
+import { recordAiUsage } from "../lib/ai-usage.js";
 
 function messageText(message) {
   return message.message?.conversation ||
@@ -83,11 +84,13 @@ export default async function ai({ sock, message, config }) {
       if (image) parts.push(await mediaPart(image, "image"));
     }
     const result = await model.generateContent(parts);
+    await recordAiUsage("gemini", true);
     const answer = result.response.text()?.trim();
     return sock.sendMessage(jid, {
       text: answer || "AI පිළිතුරක් ලබාගත නොහැකි වුණා. නැවත උත්සාහ කරන්න."
     }, { quoted: message });
   } catch (error) {
+    await recordAiUsage("gemini", false).catch(() => {});
     console.error("AI request failed:", error?.message || error);
     return sock.sendMessage(jid, { text: "❌ " + friendlyError(error) }, { quoted: message });
   }

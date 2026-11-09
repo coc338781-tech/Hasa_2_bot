@@ -1,3 +1,4 @@
+import { recordAiUsage } from "../lib/ai-usage.js";
 
 function getText(message) {
   return message.message?.conversation ||
@@ -46,10 +47,21 @@ async function groqText(prompt) {
   return text;
 }
 async function textAnswer(prompt) {
-  try { return await geminiText(prompt); }
-  catch (error) {
+  try {
+    const answer = await geminiText(prompt);
+    await recordAiUsage("gemini", true);
+    return answer;
+  } catch (error) {
+    await recordAiUsage("gemini", false).catch(() => {});
     console.warn("AI extras Gemini failed; trying Groq fallback:", error.message);
-    return groqText(prompt);
+    try {
+      const answer = await groqText(prompt);
+      await recordAiUsage("groq", true);
+      return answer;
+    } catch (fallbackError) {
+      await recordAiUsage("groq", false).catch(() => {});
+      throw fallbackError;
+    }
   }
 }
 async function imagine(prompt) {
@@ -92,8 +104,10 @@ export default async function aiExtras({ sock, message, config }) {
     await send("🎨 AI image එක සකස් කරමින්...");
     try {
       const image = await imagine(arg);
+      await recordAiUsage("gemini", true);
       return sock.sendMessage(jid, { image, caption: "🎨 *HASA AI IMAGE*" }, { quoted: message });
     } catch (error) {
+      await recordAiUsage("gemini", false).catch(() => {});
       console.error("AI image generation failed:", error.message);
       return send("❌ Image එක හදන්න බැරි වුණා. Gemini image API access / quota පරීක්ෂා කරන්න.");
     }
