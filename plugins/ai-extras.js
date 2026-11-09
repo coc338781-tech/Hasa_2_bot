@@ -104,8 +104,10 @@ export default async function aiExtras({ sock, message, config }) {
     await send("🎨 AI image එක සකස් කරමින්...");
     try {
       const image = await imagine(arg);
+      await recordAiUsage("gemini", true);
       return sock.sendMessage(jid, { image, caption: "🎨 *HASA AI IMAGE*" }, { quoted: message });
     } catch (error) {
+      await recordAiUsage("gemini", false).catch(() => {});
       console.error("AI image generation failed:", error.message);
       return send("❌ Image එක හදන්න බැරි වුණා. Gemini image API access / quota පරීක්ෂා කරන්න.");
     }

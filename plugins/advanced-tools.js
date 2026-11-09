@@ -164,22 +164,27 @@ async function webSearch(query) {
   return results;
 }
 async function gemini(prompt, media, mimeType, config) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY සකස් කර නැහැ.");
-  const model = config.aiModel || "gemini-2.0-flash";
-  const parts = [{ text: prompt }];
-  if (media) parts.push({ inline_data: { mime_type: mimeType, data: media.toString("base64") } });
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" +
-    encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts }] }), signal: AbortSignal.timeout(45000)
-  });
-  if (!response.ok) throw new Error("Gemini HTTP " + response.status);
-  const data = await response.json();
-  const answer = data?.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("").trim();
-  if (!answer) throw new Error("Gemini පිළිතුරක් ලබාදුන්නේ නැහැ.");
-  await recordAiUsage("gemini", true);
-  return answer;
+  try {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) throw new Error("GEMINI_API_KEY සකස් කර නැහැ.");
+    const model = config.aiModel || "gemini-2.0-flash";
+    const parts = [{ text: prompt }];
+    if (media) parts.push({ inline_data: { mime_type: mimeType, data: media.toString("base64") } });
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts }] }), signal: AbortSignal.timeout(45000)
+    });
+    if (!response.ok) throw new Error("Gemini HTTP " + response.status);
+    const data = await response.json();
+    const answer = data?.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("").trim();
+    if (!answer) throw new Error("Gemini පිළිතුරක් ලබාදුන්නේ නැහැ.");
+    await recordAiUsage("gemini", true);
+    return answer;
+  } catch (error) {
+    await recordAiUsage("gemini", false).catch(() => {});
+    throw error;
+  }
 }
 function jpegSize(buffer) {
   let offset = 2;
@@ -200,12 +205,13 @@ export function createJpegPdf(jpeg) {
   const scale = Math.min(595 / size.width, 842 / size.height, 1);
   const width = Math.round(size.width * scale);
   const height = Math.round(size.height * scale);
+  const contentStream = Buffer.from("q " + width + " 0 0 " + height + " 0 0 cm /Im0 Do Q\n");
   const objects = [
     Buffer.from("<< /Type /Catalog /Pages 2 0 R >>"),
     Buffer.from("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
     Buffer.from("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + width + " " + height + "] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>"),
     Buffer.concat([Buffer.from("<< /Type /XObject /Subtype /Image /Width " + size.width + " /Height " + size.height + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + jpeg.length + " >>\nstream\n"), jpeg, Buffer.from("\nendstream")]),
-    Buffer.from("<< /Length 35 >>\nstream\nq " + width + " 0 0 " + height + " 0 0 cm /Im0 Do Q\nendstream")
+    Buffer.concat([Buffer.from("<< /Length " + contentStream.length + " >>\nstream\n"), contentStream, Buffer.from("endstream")])
   ];
   const chunks = [Buffer.from("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n")];
   const offsets = [0];
@@ -250,7 +256,9 @@ function armSchedules(sock) {
     const timer = setTimeout(async () => {
       timers.delete(item.id);
       const current = pending.find(entry => entry.id === item.id);
-      if (!current || !activeSocket) return;
+      if (!current) return;
+      if (current.dueAt > Date.now()) { armSchedules(activeSocket); return; }
+      if (!activeSocket) { armSchedules(null); return; }
       try {
         await activeSocket.sendMessage(current.jid, { text: current.text });
         console.log("[SCHEDULE] Delivered scheduled message " + current.id);
@@ -375,7 +383,6 @@ export default async function advancedTools({ sock, message, config }) {
       const answer = await gemini("Extract all visible text from this image exactly. Preserve the original language, line breaks, numbers and spelling. If there is no readable text, say so.", image, media.mimetype || "image/jpeg", config);
       return send("📝 *OCR TEXT*\n\n" + answer.slice(0, 3800));
     } catch (error) {
-      await recordAiUsage("gemini", false).catch(() => {});
       return send("❌ OCR අසාර්ථකයි: " + error.message);
     }
   }
