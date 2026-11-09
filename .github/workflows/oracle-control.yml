@@ -24,9 +24,9 @@ jobs:
 
       - name: Prepare SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_KEY }}
-          SSH_HOST: ${{ secrets.ORACLE_HOST }}
-          SSH_USER: ${{ secrets.ORACLE_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
+          SSH_USER: ${{ secrets.ORACLE_SSH_USER }}
           SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
@@ -49,8 +49,8 @@ jobs:
       - name: Execute fixed Oracle operation
         id: oracle
         env:
-          SSH_HOST: ${{ secrets.ORACLE_HOST }}
-          SSH_USER: ${{ secrets.ORACLE_USER }}
+          SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
+          SSH_USER: ${{ secrets.ORACLE_SSH_USER }}
         run: |
           set -euo pipefail
           REMOTE_SCRIPT="$(cat <<'SCRIPT'
