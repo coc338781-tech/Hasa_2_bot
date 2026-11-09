@@ -136,7 +136,18 @@ export default async function extraTools({ sock, message, config }) {
     await fs.writeFile("./config.json", JSON.stringify(config, null, 2));
     return sock.sendMessage(jid, { text: "✅ Auto React " + (config.autoReact ? "ON 🟢" : "OFF 🔴") }, { quoted: message });
   }
-  if (!body.startsWith(prefix)) return;
+  if (!body.startsWith(prefix)) {
+    if (!message.key?.fromMe && config.autoReact &&
+        !message.message?.protocolMessage && !message.message?.reactionMessage) {
+      try {
+        const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+        await sock.sendMessage(jid, { react: { text: emoji, key: message.key } });
+      } catch (error) {
+        console.error("Auto react failed:", error.message);
+      }
+    }
+    return;
+  }
   const rest = body.slice(prefix.length).trim();
   const split = rest.search(/\s/);
   const command = (split < 0 ? rest : rest.slice(0, split)).toLowerCase();
@@ -155,15 +166,5 @@ export default async function extraTools({ sock, message, config }) {
   if (command === "sticker") {
     try { return await makeSticker(sock, jid, message); }
     catch (error) { return send("❌ " + error.message + (error.code === "ENOENT" ? "\nServer එකේ ffmpeg අවශ්‍යයි." : "")); }
-  }
-  if (!message.key?.fromMe && config.autoReact &&
-      !body.startsWith(prefix) &&
-      !message.message?.protocolMessage && !message.message?.reactionMessage) {
-    try {
-      const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-      await sock.sendMessage(jid, { react: { text: emoji, key: message.key } });
-    } catch (error) {
-      console.error("Auto react failed:", error.message);
-    }
   }
 }
