@@ -83,7 +83,7 @@ jobs:
   deploy:
     name: Deploy to Oracle with rollback
     needs: [check, oracle-health]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/assistant-workflow' && vars.ORACLE_DEPLOY_ENABLED == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/assistant-workflow' && vars.ORACLE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
