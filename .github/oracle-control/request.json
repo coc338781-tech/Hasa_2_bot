@@ -1,4 +1,4 @@
 {
-  "action": "inspect-changes",
-  "request_id": "verify-deploy-20261109-01"
+  "action": "logs",
+  "request_id": "post-restart-logs-20261109-01"
 }
