@@ -1,23 +1,7 @@
-import path from "node:path";
-import os from "node:os";
-import { promisify } from "node:util";
-import { execFile } from "node:child_process";
-import { downloadContentFromMessage } from "@whiskeysockets/baileys";
-
-const exec = promisify(execFile);
 const EMOJIS = ["❤️", "🔥", "👍", "😂", "💯", "😍"];
 function bodyOf(message) {
   return message.message?.conversation || message.message?.extendedTextMessage?.text ||
     message.message?.imageMessage?.caption || message.message?.videoMessage?.caption || "";
-}
-function quotedMedia(message) {
-  const current = message.message || {};
-  const quoted = current.extendedTextMessage?.contextInfo?.quotedMessage || {};
-  const q = quoted.viewOnceMessageV2?.message || quoted;
-  return current.imageMessage ? { media: current.imageMessage, kind: "image" } :
-    current.videoMessage ? { media: current.videoMessage, kind: "video" } :
-    q.imageMessage ? { media: q.imageMessage, kind: "image" } :
-    q.videoMessage ? { media: q.videoMessage, kind: "video" } : null;
 }
 function isOwner(message, jid, config) {
   if (message.key?.fromMe) return true;
@@ -91,37 +75,6 @@ async function movie(query) {
     show.url || ""
   ].filter(Boolean).join("\n");
 }
-async function makeSticker(sock, jid, message) {
-  const found = quotedMedia(message);
-  if (!found) throw new Error("Photo/Video එකකට Reply කර .sticker යවන්න.");
-  const stream = await downloadContentFromMessage(found.media, found.kind);
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of stream) {
-    size += chunk.length;
-    if (size > 18 * 1024 * 1024) throw new Error("Media file එක 18 MB සීමාව ඉක්මවා ඇත.");
-    chunks.push(chunk);
-  }
-  const input = Buffer.concat(chunks);
-  if (!input.length) throw new Error("Media data ලබාගත නොහැක.");
-  const dir = path.resolve("./tmp/stickers");
-  await fs.mkdir(dir, { recursive: true });
-  const id = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-  const source = path.join(dir, id + (found.kind === "video" ? ".mp4" : ".jpg"));
-  const output = path.join(dir, id + ".webp");
-  try {
-    await fs.writeFile(source, input);
-    await exec("ffmpeg", ["-y", "-i", source, "-vf",
-      "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000",
-      "-vcodec", "libwebp", "-lossless", "0", "-q:v", "65", "-loop", "0",
-      "-an", "-vsync", "0", "-t", "6", "-fs", "512k", output], { timeout: 45000 });
-    const sticker = await fs.readFile(output);
-    return sock.sendMessage(jid, { sticker }, { quoted: message });
-  } finally {
-    await fs.rm(source, { force: true }).catch(() => {});
-    await fs.rm(output, { force: true }).catch(() => {});
-  }
-}
 export default async function extraTools({ sock, message, config }) {
   const jid = message.key?.remoteJid;
   if (!jid || jid === "status@broadcast") return;
@@ -162,9 +115,5 @@ export default async function extraTools({ sock, message, config }) {
     if (!arg) return send("භාවිතය: " + prefix + "movie Interstellar");
     try { return send(await movie(arg)); }
     catch (error) { return send("❌ " + error.message); }
-  }
-  if (command === "sticker") {
-    try { return await makeSticker(sock, jid, message); }
-    catch (error) { return send("❌ " + error.message + (error.code === "ENOENT" ? "\nServer එකේ ffmpeg අවශ්‍යයි." : "")); }
   }
 }
