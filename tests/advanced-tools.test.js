@@ -73,7 +73,7 @@ test("all new features are automatically documented in their catalog categories"
   const help = appendCatalogToHelp("BASE", commands, ".");
   for (const name of ["search", "tts", "pdf", "ocr", "topdf", "qr", "vcard", "aiusage", "schedule", "schedules", "cancelschedule"]) {
     assert.match(list, new RegExp("\\." + name + "\\b"));
-    assert.match(help, new RegExp("\\\\." + name + "\\\\b"));
+    assert.match(help, new RegExp("\\." + name + "\\b"));
   }
   assert.ok(getCategoryCommandLines(commands, "5", ".").some(line => line.includes(".schedule ")));
   assert.ok(getCategoryCommandLines(commands, "8", ".").some(line => line.includes(".aiusage")));
