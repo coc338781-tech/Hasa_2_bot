@@ -190,7 +190,7 @@ jobs:
               pos = s.find(fetch_marker)
               if pos < 0:
                   raise SystemExit("Remote SHA insertion point not found; no changes made.")
-              line_end = s.find('\\n', pos)
+              line_end = s.find('\n', pos)
               if line_end < 0:
                   raise SystemExit("Remote SHA line is incomplete; no changes made.")
               insert = '''
@@ -206,7 +206,7 @@ jobs:
               pos = s.find(rollback_marker)
               if pos < 0:
                   raise SystemExit("Rollback insertion point not found; no changes made.")
-              line_end = s.find('\\n', pos)
+              line_end = s.find('\n', pos)
               insert = '''
               if [ -n "$LOCAL_AI_BACKUP" ] && [ -f "$LOCAL_AI_BACKUP" ]; then
                 cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
@@ -220,7 +220,7 @@ jobs:
               pos = s.find(new_marker)
               if pos < 0:
                   raise SystemExit("New commit reset insertion point not found; no changes made.")
-              line_end = s.find('\\n', pos)
+              line_end = s.find('\n', pos)
               insert = '''
           if [ -n "$LOCAL_AI_BACKUP" ]; then
             cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
