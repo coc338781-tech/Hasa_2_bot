@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -80,6 +80,24 @@ jobs:
           echo "Current commit: $(git rev-parse --short HEAD)"
           case "$ACTION" in
             status)
+              print_status
+              ;;
+            auth-audit)
+              echo "Read-only auth directory metadata; no session contents or credentials are displayed."
+              for DIR in "$APP/auth_info" "$APP/subbot_sessions"; do
+                echo "--- $(basename "$DIR") ---"
+                if [ -d "$DIR" ]; then
+                  printf 'files: '; find "$DIR" -type f 2>/dev/null | wc -l
+                  printf 'total_bytes: '; du -sb "$DIR" 2>/dev/null | awk '{print $1}'
+                else
+                  echo "directory: MISSING"
+                fi
+              done
+              printf 'creds_json_present: '; [ -s "$APP/auth_info/creds.json" ] && echo yes || echo no
+              for pattern in 'session-*.json' 'pre-key-*.json' 'sender-key-*.json' 'app-state-sync-key-*.json' 'app-state-sync-version-*.json'; do
+                count="$(find "$APP/auth_info" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | wc -l)"
+                printf '%s: %s\n' "$pattern" "$count"
+              done
               print_status
               ;;
             logs)
