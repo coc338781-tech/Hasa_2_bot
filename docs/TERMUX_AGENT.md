@@ -28,16 +28,26 @@ The script prompts for the token without echoing it, downloads the agent from th
 
 ## Supported operations
 
+Termux-local diagnostics:
 - `health`, `pm2-status`, `bot-check`, `git-status`, `pkg-list`
 - `file-list`, `file-read`
 - `file-write` and `file-trash` only with explicit approval; trash is reversible
-- `pm2-restart` only for a named known app and explicit approval
+- `pm2-restart` only for the known `hasa2` app and explicit approval
 
-It does not read `.env`, SSH keys, API tokens, WhatsApp auth/session folders, Subbot sessions, `.git`, or `node_modules`. It does not run arbitrary shell commands, access Android-private app data, or bypass Android/root permissions.
+Oracle bridge (uses the existing Termux SSH alias `oracle`):
+- `oracle-health`, `oracle-pm2-status`, `oracle-log-summary`
+- `oracle-bot-check`, `oracle-git-status`, `oracle-git-fetch`, `oracle-subbot-status`
+- `oracle-file-list`, `oracle-file-read`
+- `oracle-file-write` and `oracle-file-trash` require `approved:true`; writes make a backup and trash is reversible
+- `oracle-git-pull` and `oracle-pm2-restart` require `approved:true`; pull aborts if the working tree is dirty and runs the bot check afterward
+
+Remote file access is limited to paths inside `/home/opc/Hasa_2_bot`. The agent blocks credentials, `.env`, `config.json`, WhatsApp auth, Subbot sessions, downloads, `.git`, and `node_modules`. It does not expose arbitrary shell execution, read private keys, or reboot the server. The SSH alias must already work from Termux using `ssh oracle`.
+
+To upgrade an existing installation after an agent release, run the same installer command again. It reuses the token stored in the protected config file and replaces the agent after checking its syntax.
 
 ## Background operation
 
-For reliable background operation, set Android Settings → Apps → Termux → Battery → Unrestricted. The agent log is at `~/.local/share/hasa-termux-agent/agent.log`. If Android stops Termux, open Termux and start the agent again; automatic boot startup requires the separate Termux:Boot app and has not been enabled by this installer.
+For reliable background operation, set Android Settings → Apps → Termux → Battery → Unrestricted. The agent log is at `~/.local/share/hasa-termux-agent/agent.log`. The installer also creates a Termux:Boot launch script; automatic startup still requires installing and opening the separate Termux:Boot app once and Android allowing Termux to run in the background.
 
 ## Security
 
