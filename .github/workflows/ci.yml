@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - "**"
+    paths-ignore:
+      - ".github/oracle-control/request.json"
   pull_request:
     branches:
       - "**"
