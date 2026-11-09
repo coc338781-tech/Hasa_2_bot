@@ -86,8 +86,8 @@ jobs:
               DUMP="$HOME/.pm2/dump.pm2"
               if [ -s "$DUMP" ]; then
                 echo "PM2 dump: present"
-                node -e 'const a=require(process.argv[1]); for(const x of a){const e=x.pm2_env||{}; console.log("Saved app: "+(e.name||x.name||"unknown")+" | script: "+(e.pm_exec_path||"unknown"))}' "$DUMP"
-                if node -e 'const a=require(process.argv[1]); process.exit(a.some(x=>(x.pm2_env||{}).name==="hasa2")?0:1)' "$DUMP"; then
+                node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); const a=Array.isArray(d)?d:(d.apps||d.pm2||[]); console.log("Dump structure: "+(Array.isArray(d)?"array":Object.keys(d).join(","))); for(const x of a){const e=x.pm2_env||{}; console.log("Saved app: "+(e.name||x.name||"unknown")+" | script: "+(e.pm_exec_path||"unknown"))}' "$DUMP"
+                if node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); const a=Array.isArray(d)?d:(d.apps||d.pm2||[]); process.exit(a.some(x=>(x.pm2_env||{}).name==="hasa2")?0:1)' "$DUMP"; then
                   echo "Restoring saved PM2 processes."
                   pm2 resurrect
                 else
