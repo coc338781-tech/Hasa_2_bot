@@ -63,17 +63,43 @@ else
   exit 1
 fi
 
+# A small watchdog restarts the agent if it exits or stops updating its heartbeat.
+cat > "$AGENT_DIR/watchdog.sh" <<'WATCH'
+#!/data/data/com.termux/files/usr/bin/bash
+AGENT_DIR="$HOME/.local/share/hasa-termux-agent"
+while true; do
+  NOW="$(date +%s)"
+  LAST="$(stat -c %Y "$AGENT_DIR/heartbeat" 2>/dev/null || echo 0)"
+  if ! pgrep -f '[n]ode .*/hasa-termux-agent/agent.mjs' >/dev/null 2>&1 || [ "$LAST" -eq 0 ] || [ $((NOW - LAST)) -gt 300 ]; then
+    pkill -f '[n]ode .*/hasa-termux-agent/agent.mjs' 2>/dev/null || true
+    sleep 2
+    nohup node "$AGENT_DIR/agent.mjs" >> "$AGENT_DIR/agent.log" 2>&1 &
+    echo "$!" > "$AGENT_DIR/agent.pid"
+  fi
+  sleep 30
+done
+WATCH
+chmod 700 "$AGENT_DIR/watchdog.sh"
+
 BOOT_DIR="$HOME/.termux/boot"
 mkdir -p "$BOOT_DIR"
 cat > "$BOOT_DIR/start-hasa-agent" <<'BOOT'
 #!/data/data/com.termux/files/usr/bin/bash
 termux-wake-lock >/dev/null 2>&1 || true
 AGENT_DIR="$HOME/.local/share/hasa-termux-agent"
-if ! pgrep -f "$AGENT_DIR/agent.mjs" >/dev/null 2>&1; then
+if ! pgrep -f '[b]ash .*/hasa-termux-agent/watchdog.sh' >/dev/null 2>&1; then
+  nohup bash "$AGENT_DIR/watchdog.sh" >> "$AGENT_DIR/watchdog.log" 2>&1 &
+fi
+if ! pgrep -f '[n]ode .*/hasa-termux-agent/agent.mjs' >/dev/null 2>&1; then
   nohup node "$AGENT_DIR/agent.mjs" >> "$AGENT_DIR/agent.log" 2>&1 &
+  echo "$!" > "$AGENT_DIR/agent.pid"
 fi
 BOOT
 chmod 700 "$BOOT_DIR/start-hasa-agent"
+
+# Restart an older watchdog so the updated recovery loop takes effect now.
+pkill -f '[b]ash .*/hasa-termux-agent/watchdog.sh' 2>/dev/null || true
+nohup bash "$AGENT_DIR/watchdog.sh" >> "$AGENT_DIR/watchdog.log" 2>&1 &
 
 echo "Agent log: $AGENT_DIR/agent.log"
 echo "Token stored with mode 600; never share it."
