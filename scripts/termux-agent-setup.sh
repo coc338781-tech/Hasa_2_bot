@@ -5,8 +5,19 @@ echo "Hasa Termux Agent - one-time secure setup"
 command -v node >/dev/null || { echo "Node.js missing. Run: pkg install nodejs-lts curl -y"; exit 1; }
 command -v curl >/dev/null || { echo "curl missing. Run: pkg install curl -y"; exit 1; }
 
-read -rsp "Paste a fine-grained GitHub token (only hasa-bot-test-reports: Contents read/write): " GH_TOKEN < /dev/tty
-echo
+AGENT_DIR="$HOME/.local/share/hasa-termux-agent"
+CONFIG_DIR="$HOME/.config/hasa-termux-agent"
+mkdir -p "$AGENT_DIR" "$CONFIG_DIR"
+chmod 700 "$CONFIG_DIR" "$AGENT_DIR"
+
+GH_TOKEN=""
+if [ -f "$CONFIG_DIR/config.json" ]; then
+  GH_TOKEN="$(node -e 'try { process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).token || "") } catch {}' "$CONFIG_DIR/config.json")"
+fi
+if [ -z "$GH_TOKEN" ]; then
+  read -rsp "Paste a fine-grained GitHub token (only hasa-bot-test-reports: Contents read/write): " GH_TOKEN < /dev/tty
+  echo
+fi
 [ -n "$GH_TOKEN" ] || { echo "No token supplied."; exit 1; }
 
 API="https://api.github.com/repos/coc338781-tech/hasa-bot-test-reports/contents/termux-agent/agent.mjs?ref=main"
@@ -16,11 +27,6 @@ if ! curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.
   echo "Could not access the private agent file. Check token repository access and Contents: Read."
   exit 1
 fi
-
-AGENT_DIR="$HOME/.local/share/hasa-termux-agent"
-CONFIG_DIR="$HOME/.config/hasa-termux-agent"
-mkdir -p "$AGENT_DIR" "$CONFIG_DIR"
-chmod 700 "$CONFIG_DIR" "$AGENT_DIR"
 
 node - "$TMP" "$AGENT_DIR/agent.mjs" "$CONFIG_DIR/config.json" "$GH_TOKEN" <<'NODE'
 const fs=require("fs");
@@ -39,6 +45,12 @@ echo "Checking agent syntax..."
 node --check "$AGENT_DIR/agent.mjs"
 echo "Starting agent..."
 if command -v termux-wake-lock >/dev/null 2>&1; then termux-wake-lock || true; fi
+OLD_PID=""
+[ -f "$AGENT_DIR/agent.pid" ] && OLD_PID="$(cat "$AGENT_DIR/agent.pid" 2>/dev/null || true)"
+if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+  kill "$OLD_PID" 2>/dev/null || true
+  sleep 1
+fi
 nohup node "$AGENT_DIR/agent.mjs" >> "$AGENT_DIR/agent.log" 2>&1 &
 echo "$!" > "$AGENT_DIR/agent.pid"
 sleep 2
