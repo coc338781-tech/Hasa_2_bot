@@ -306,10 +306,15 @@ jobs:
           esac
           SCRIPT
           )"
+          set +e
           RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
+          REMOTE_EXIT=$?
+          set -e
+          echo "Remote operation exit code: $REMOTE_EXIT"
           {
             echo 'result<<ORACLE_RESULT'
             printf '%s\n' "$RESULT"
+            echo "Remote operation exit code: $REMOTE_EXIT"
             echo 'ORACLE_RESULT'
           } >> "$GITHUB_OUTPUT"
 
