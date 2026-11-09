@@ -123,6 +123,25 @@ jobs:
                 fi
               done
               ;;
+            pm2-event-audit)
+              echo "Read-only PM2 exit/restart timeline."
+              echo "--- PM2 daemon event log ---"
+              if [ -f "$HOME/.pm2/pm2.log" ]; then
+                stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
+                grep -n -Ei 'hasa2|exited|exit code|errored|restart|online|stopped|SIG(INT|TERM|KILL)|unstable|launching' "$HOME/.pm2/pm2.log" | tail -n 180 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              else
+                echo "PM2 daemon log missing"
+              fi
+              echo "--- Bot error log: last 180 lines ---"
+              if [ -f "$HOME/.pm2/logs/hasa2-error.log" ]; then
+                tail -n 180 "$HOME/.pm2/logs/hasa2-error.log" | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              fi
+              echo "--- PM2 process describe ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- System reboot / OOM evidence ---"
+              (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
+              (last -x 2>/dev/null | head -n 12 || true)
+              ;;
             crash-audit)
               echo "Read-only crash diagnosis; no process/session changes."
               echo "--- PM2 process metadata ---"
