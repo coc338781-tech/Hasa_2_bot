@@ -50,7 +50,8 @@ export default async function statusSave({ sock, message, config, cache }) {
     if (!isOwner(message, config)) {
       return sock.sendMessage(jid, { text: "⛔ Status aliases වෙනස් කළ හැක්කේ Ownerට පමණයි." }, { quoted: message });
     }
-    const [action, ...rest] = args;
+    const [rawAction, ...rest] = args;
+    const action = String(rawAction || "").toLowerCase();
     const alias = normalizeStatusAlias(rest.join(" "));
     if (action === "list") {
       return sock.sendMessage(jid, {
