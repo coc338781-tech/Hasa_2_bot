@@ -88,10 +88,13 @@ jobs:
           await request('Dictionary API', 'https://api.dictionaryapi.dev/api/v2/entries/en/hello');
           await request('MyMemory Translation API', 'https://api.mymemory.translated.net/get?q=hello&langpair=en%7Csi');
           const key = process.env.GEMINI_API_KEY;
+          const fs = await import('node:fs');
+          const botConfig = JSON.parse(fs.readFileSync('config.json','utf8'));
+          const model = botConfig.aiModel || 'gemini-2.0-flash';
           if (!key) add('Gemini API',false,'GEMINI_API_KEY not available in Oracle app environment');
           else {
             try {
-              const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+encodeURIComponent(key), {
+              const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key), {
                 method:'POST', headers:{'content-type':'application/json'},
                 body:JSON.stringify({contents:[{parts:[{text:'Reply with exactly OK'}]}]}),
                 signal:AbortSignal.timeout(20000)
