@@ -185,7 +185,7 @@ jobs:
           elif 'LOCAL_AI_BACKUP=""' not in s:
               raise SystemExit("Expected deploy guard check not found; no changes made.")
 
-          fetch_line = '  NEW_SHA="$(git rev-parse "origin/$BRANCH")"\\n'
+          fetch_line = '  NEW_SHA="$(git rev-parse "origin/$BRANCH")"\n'
           fetch_add = fetch_line + '''  if ! git diff --quiet "$OLD_SHA" "$NEW_SHA" -- plugins/ai.js; then
             echo "STOP: Remote AI implementation changed; refusing to overwrite the local production AI file."
             exit 1
@@ -196,7 +196,7 @@ jobs:
           elif 'Remote AI implementation changed' not in s:
               raise SystemExit("Remote SHA insertion point not found; no changes made.")
 
-          rollback_line = '    git reset --hard "$OLD_SHA" || true\\n'
+          rollback_line = '    git reset --hard "$OLD_SHA" || true\n'
           rollback_add = rollback_line + '''    if [ -n "$LOCAL_AI_BACKUP" ] && [ -f "$LOCAL_AI_BACKUP" ]; then
               cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
             fi
@@ -204,7 +204,7 @@ jobs:
           if rollback_line in s and 'cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"' not in s:
               s = s.replace(rollback_line, rollback_add, 1)
 
-          new_reset = '  git reset --hard "$NEW_SHA"\\n'
+          new_reset = '  git reset --hard "$NEW_SHA"\n'
           new_restore = new_reset + '''  if [ -n "$LOCAL_AI_BACKUP" ]; then
             cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
             echo "Restored preserved local AI implementation after code update."
