@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 
 function getText(message) {
   return message.message?.conversation ||
@@ -56,23 +55,24 @@ async function textAnswer(prompt) {
 async function imagine(prompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY missing");
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+  const model = process.env.HASA_IMAGE_MODEL || "gemini-3.1-flash-image";
+  const response = await fetch("https://generativelanguage.googleapis.com/v1/models/" +
+    encodeURIComponent(model) + ":generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": key, "content-type": "application/json" },
     body: JSON.stringify({
-      model: process.env.HASA_IMAGE_MODEL || "gemini-3.1-flash-image",
-      input: "Create one high-quality image from this prompt: " + prompt,
-      response_format: { type: "image", aspect_ratio: "1:1", image_size: "1K" }
+      contents: [{ parts: [{ text: "Create one high-quality image from this prompt: " + prompt }] }],
+      generationConfig: { responseModalities: ["IMAGE"] }
     }),
     signal: AbortSignal.timeout(90000)
   });
   if (!response.ok) throw new Error("Image generation HTTP " + response.status);
   const data = await response.json();
-  const encoded = data?.output_image?.data ||
-    data?.steps?.find(step => step?.output_image?.data)?.output_image?.data ||
-    data?.steps?.find(step => step?.type === "image" && step?.data)?.data;
-  if (!encoded) throw new Error("Image model did not return an image");
-  return Buffer.from(encoded, "base64");
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const encoded = parts.find(part => part?.inlineData?.data || part?.inline_data?.data);
+  const imageData = encoded?.inlineData?.data || encoded?.inline_data?.data;
+  if (!imageData) throw new Error("Image model did not return an image");
+  return Buffer.from(imageData, "base64");
 }
 export default async function aiExtras({ sock, message, config }) {
   const jid = message.key?.remoteJid;
