@@ -6,6 +6,8 @@ on:
       - "**"
     paths-ignore:
       - ".github/oracle-control/request.json"
+      - "README.md"
+      - "docs/**"
   pull_request:
     branches:
       - "**"
@@ -68,10 +70,10 @@ jobs:
           test -n "$ORACLE_KNOWN_HOSTS"
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\\n' "$ORACLE_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-          printf 'ORACLE_HOST=%s\nORACLE_USER=%s\n' "$ORACLE_HOST" "$ORACLE_USER" >> "$GITHUB_ENV"
+          printf 'ORACLE_HOST=%s\\nORACLE_USER=%s\\n' "$ORACLE_HOST" "$ORACLE_USER" >> "$GITHUB_ENV"
 
       - name: Run read-only health check
         run: |
@@ -99,10 +101,10 @@ jobs:
           test -n "$ORACLE_KNOWN_HOSTS" || { echo "Missing ORACLE_KNOWN_HOSTS secret"; exit 1; }
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\\n' "$ORACLE_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-          printf 'ORACLE_HOST=%s\nORACLE_USER=%s\n' "$ORACLE_HOST" "$ORACLE_USER" >> "$GITHUB_ENV"
+          printf 'ORACLE_HOST=%s\\nORACLE_USER=%s\\n' "$ORACLE_HOST" "$ORACLE_USER" >> "$GITHUB_ENV"
 
       - name: Request restricted Oracle deployment
         run: |
