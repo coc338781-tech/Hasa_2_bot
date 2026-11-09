@@ -24,7 +24,7 @@ Then run the setup script:
 curl -fsSL https://raw.githubusercontent.com/coc338781-tech/Hasa_2_bot/main/scripts/termux-agent-setup.sh | bash
 ```
 
-The script prompts for the token without echoing it, downloads the agent from the private repository, stores the token in `~/.config/hasa-termux-agent/config.json` with mode 600, checks syntax, and starts the agent.
+On first install, the script prompts for the token without echoing it. On an upgrade, it reuses the token already stored in `~/.config/hasa-termux-agent/config.json`. It downloads the agent from the private repository, stores the token with mode 600, checks syntax before starting the new process, and preserves the existing boot launcher.
 
 ## Supported operations
 
