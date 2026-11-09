@@ -169,11 +169,11 @@ jobs:
               if finish < 0:
                   raise SystemExit("Deploy guard local-change check is incomplete; no changes made.")
               finish += len('  fi')
-              replacement = '''  LOCAL_AI_BACKUP=""
+              replacement = r'''  LOCAL_AI_BACKUP=""
           OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" {print}')"
           if [ -n "$OTHER_CHANGES" ]; then
             echo "STOP: Unexpected tracked production changes exist; preserving them."
-            printf '%s\\n' "$OTHER_CHANGES"
+            printf '%s\n' "$OTHER_CHANGES"
             exit 1
           fi
           if ! git diff --quiet HEAD -- plugins/ai.js; then
@@ -193,7 +193,7 @@ jobs:
               line_end = s.find('\n', pos)
               if line_end < 0:
                   raise SystemExit("Remote SHA line is incomplete; no changes made.")
-              insert = '''
+              insert = r'''
           if ! git diff --quiet "$OLD_SHA" "$NEW_SHA" -- plugins/ai.js; then
             echo "STOP: Remote AI implementation changed; refusing to overwrite the local production AI file."
             exit 1
@@ -201,13 +201,13 @@ jobs:
               s = s[:line_end] + insert + s[line_end:]
 
           rollback_marker = '    git reset --hard "$OLD_SHA" || true'
-          rollback_restore = '    echo "Restoring preserved local AI after rollback."'
+          rollback_restore = 'Restoring preserved local AI after rollback.'
           if rollback_restore not in s:
               pos = s.find(rollback_marker)
               if pos < 0:
                   raise SystemExit("Rollback insertion point not found; no changes made.")
               line_end = s.find('\n', pos)
-              insert = '''
+              insert = r'''
               if [ -n "$LOCAL_AI_BACKUP" ] && [ -f "$LOCAL_AI_BACKUP" ]; then
                 cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
                 echo "Restoring preserved local AI after rollback."
@@ -221,223 +221,15 @@ jobs:
               if pos < 0:
                   raise SystemExit("New commit reset insertion point not found; no changes made.")
               line_end = s.find('\n', pos)
-              insert = '''
+              insert = r'''
           if [ -n "$LOCAL_AI_BACKUP" ]; then
             cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
             echo "Restored preserved local AI implementation after code update."
           fi'''
               s = s[:line_end] + insert + s[line_end:]
 
-          old_allow = r'''  UNEXPECTED="$(printf '%s\\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)
-              echo "Deploy guard updated; original backup: $BACKUP"
-              sed -n "14,52p" "$GUARD"
-              ;;
-            deploy)
-              echo "Starting guarded Oracle deployment; local AI code will be preserved."
-              SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
-              sleep 5
-              print_status
-              ;;
-            restart)
-              pm2 restart hasa2 --update-env
-              sleep 6
-              print_status
-              ;;
-            remove-old)
-              # Only remove the known legacy PM2 app; refuse if its script path differs.
-              OLD_SCRIPT="$(pm2 jlist | node -e '
-                let s = "";
-                process.stdin.on("data", d => s += d);
-                process.stdin.on("end", () => {
-                  const p = JSON.parse(s).find(x => x.name === "hasamd");
-                  console.log(p && p.pm2_env ? (p.pm2_env.pm_exec_path || "") : "NOT_FOUND");
-                });
-              ')"
-              if [ "$OLD_SCRIPT" != "NOT_FOUND" ] && [ "$OLD_SCRIPT" != "/home/opc/HASA-MD_next-Bot/index.js" ]; then
-                echo "Refusing removal: legacy PM2 script path did not match the expected old bot."
-                exit 1
-              fi
-              mkdir -p "$BACKUPS"
-              if [ -d /home/opc/HASA-MD_next-Bot ]; then
-                ARCHIVE="$BACKUPS/legacy-HASA-MD_next-Bot-$(date +%Y%m%d-%H%M%S).tar.gz"
-                tar -czf "$ARCHIVE" -C /home/opc HASA-MD_next-Bot
-                echo "Legacy bot archive created: $ARCHIVE"
-              fi
-              if [ "$OLD_SCRIPT" != "NOT_FOUND" ]; then
-                pm2 stop hasamd
-                pm2 delete hasamd
-              fi
-              if [ -d /home/opc/HASA-MD_next-Bot ]; then
-                rm -rf -- /home/opc/HASA-MD_next-Bot
-              fi
-              pm2 save
-              echo "Legacy hasamd process removed."
-              if pm2 jlist | node -e '
-                let s = "";
-                process.stdin.on("data", d => s += d);
-                process.stdin.on("end", () => {
-                  const p = JSON.parse(s).find(x => x.name === "hasa2");
-                  if (!p || !p.pm2_env || p.pm2_env.status !== "online") process.exitCode = 1;
-                });
-              '; then
-                echo "New hasa2 process remains online."
-              else
-                echo "ERROR: new hasa2 process is not online."
-                exit 1
-              fi
-              pm2 status
-              ;;
-            rollback)
-              test -s "$BACKUPS/last-good-commit"
-              TARGET="$(cat "$BACKUPS/last-good-commit")"
-              CURRENT="$(git rev-parse HEAD)"
-              git cat-file -e "$TARGET^{commit}"
-              printf '%s\n' "$CURRENT" > "$BACKUPS/last-good-commit"
-              git reset --hard "$TARGET"
-              npm install --no-audit --no-fund
-              npm run check
-              pm2 restart hasa2 --update-env
-              sleep 8
-              print_status
-              echo "Rolled back to: $(git rev-parse --short HEAD)"
-              ;;
-          esac
-          SCRIPT
-          )"
-          set +e
-          RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
-          REMOTE_EXIT=$?
-          set -e
-          echo "Remote operation exit code: $REMOTE_EXIT"
-          {
-            echo 'result<<ORACLE_RESULT'
-            printf '%s\n' "$RESULT"
-            echo "Remote operation exit code: $REMOTE_EXIT"
-            echo 'ORACLE_RESULT'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Send result to private report repository
-        env:
-          REPORT_TOKEN: ${{ secrets.BOT_TEST_REPORT_TOKEN }}
-          REPORT_REPO: ${{ secrets.BOT_TEST_REPORT_REPO }}
-          RESULT: ${{ steps.oracle.outputs.result }}
-        run: |
-          set -euo pipefail
-          test -n "$REPORT_TOKEN"
-          test -n "$REPORT_REPO"
-          TITLE="Oracle $ACTION report [$REQUEST_ID]"
-          BODY="$(printf 'Operation: %s\nRequest: %s\n\n%s' "$ACTION" "$REQUEST_ID" "$RESULT")"
-          JSON="$(jq -n --arg title "$TITLE" --arg body "$BODY" '{title:$title,body:$body}')"
-          RESPONSE="$(curl --fail-with-body --silent --show-error -X POST "https://api.github.com/repos/$REPORT_REPO/issues" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $REPORT_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/json" -d "$JSON")"
-          URL="$(printf '%s' "$RESPONSE" | jq -r '.html_url // empty')"
-          test -n "$URL"
-          echo "Private Oracle report created."
- || true)"'''
-          new_allow = r'''  UNEXPECTED="$(printf '%s\\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json|plugins/ai[.]js[.]backup-[0-9]{8}-[0-9]{6})
-              echo "Deploy guard updated; original backup: $BACKUP"
-              sed -n "14,52p" "$GUARD"
-              ;;
-            deploy)
-              echo "Starting guarded Oracle deployment; local AI code will be preserved."
-              SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
-              sleep 5
-              print_status
-              ;;
-            restart)
-              pm2 restart hasa2 --update-env
-              sleep 6
-              print_status
-              ;;
-            remove-old)
-              # Only remove the known legacy PM2 app; refuse if its script path differs.
-              OLD_SCRIPT="$(pm2 jlist | node -e '
-                let s = "";
-                process.stdin.on("data", d => s += d);
-                process.stdin.on("end", () => {
-                  const p = JSON.parse(s).find(x => x.name === "hasamd");
-                  console.log(p && p.pm2_env ? (p.pm2_env.pm_exec_path || "") : "NOT_FOUND");
-                });
-              ')"
-              if [ "$OLD_SCRIPT" != "NOT_FOUND" ] && [ "$OLD_SCRIPT" != "/home/opc/HASA-MD_next-Bot/index.js" ]; then
-                echo "Refusing removal: legacy PM2 script path did not match the expected old bot."
-                exit 1
-              fi
-              mkdir -p "$BACKUPS"
-              if [ -d /home/opc/HASA-MD_next-Bot ]; then
-                ARCHIVE="$BACKUPS/legacy-HASA-MD_next-Bot-$(date +%Y%m%d-%H%M%S).tar.gz"
-                tar -czf "$ARCHIVE" -C /home/opc HASA-MD_next-Bot
-                echo "Legacy bot archive created: $ARCHIVE"
-              fi
-              if [ "$OLD_SCRIPT" != "NOT_FOUND" ]; then
-                pm2 stop hasamd
-                pm2 delete hasamd
-              fi
-              if [ -d /home/opc/HASA-MD_next-Bot ]; then
-                rm -rf -- /home/opc/HASA-MD_next-Bot
-              fi
-              pm2 save
-              echo "Legacy hasamd process removed."
-              if pm2 jlist | node -e '
-                let s = "";
-                process.stdin.on("data", d => s += d);
-                process.stdin.on("end", () => {
-                  const p = JSON.parse(s).find(x => x.name === "hasa2");
-                  if (!p || !p.pm2_env || p.pm2_env.status !== "online") process.exitCode = 1;
-                });
-              '; then
-                echo "New hasa2 process remains online."
-              else
-                echo "ERROR: new hasa2 process is not online."
-                exit 1
-              fi
-              pm2 status
-              ;;
-            rollback)
-              test -s "$BACKUPS/last-good-commit"
-              TARGET="$(cat "$BACKUPS/last-good-commit")"
-              CURRENT="$(git rev-parse HEAD)"
-              git cat-file -e "$TARGET^{commit}"
-              printf '%s\n' "$CURRENT" > "$BACKUPS/last-good-commit"
-              git reset --hard "$TARGET"
-              npm install --no-audit --no-fund
-              npm run check
-              pm2 restart hasa2 --update-env
-              sleep 8
-              print_status
-              echo "Rolled back to: $(git rev-parse --short HEAD)"
-              ;;
-          esac
-          SCRIPT
-          )"
-          set +e
-          RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
-          REMOTE_EXIT=$?
-          set -e
-          echo "Remote operation exit code: $REMOTE_EXIT"
-          {
-            echo 'result<<ORACLE_RESULT'
-            printf '%s\n' "$RESULT"
-            echo "Remote operation exit code: $REMOTE_EXIT"
-            echo 'ORACLE_RESULT'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Send result to private report repository
-        env:
-          REPORT_TOKEN: ${{ secrets.BOT_TEST_REPORT_TOKEN }}
-          REPORT_REPO: ${{ secrets.BOT_TEST_REPORT_REPO }}
-          RESULT: ${{ steps.oracle.outputs.result }}
-        run: |
-          set -euo pipefail
-          test -n "$REPORT_TOKEN"
-          test -n "$REPORT_REPO"
-          TITLE="Oracle $ACTION report [$REQUEST_ID]"
-          BODY="$(printf 'Operation: %s\nRequest: %s\n\n%s' "$ACTION" "$REQUEST_ID" "$RESULT")"
-          JSON="$(jq -n --arg title "$TITLE" --arg body "$BODY" '{title:$title,body:$body}')"
-          RESPONSE="$(curl --fail-with-body --silent --show-error -X POST "https://api.github.com/repos/$REPORT_REPO/issues" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $REPORT_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/json" -d "$JSON")"
-          URL="$(printf '%s' "$RESPONSE" | jq -r '.html_url // empty')"
-          test -n "$URL"
-          echo "Private Oracle report created."
- || true)"'''
+          old_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)"""
+          new_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json|plugins/ai[.]js[.]backup-[0-9]{8}-[0-9]{6})$' || true)"""
           if old_allow in s:
               s = s.replace(old_allow, new_allow, 1)
           elif new_allow not in s:
