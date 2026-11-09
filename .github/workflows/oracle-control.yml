@@ -124,7 +124,7 @@ jobs:
               done
               ;;
             repair-pm2-startup)
-              echo "Guarded PM2 systemd startup repair. The running WhatsApp process will not be restarted."
+              echo "Guarded PM2 systemd startup repair; running bot will not be restarted."
               UNIT="/etc/systemd/system/pm2-$(id -un).service"
               UNIT_NAME="$(basename "$UNIT")"
               DUMP="$HOME/.pm2/dump.pm2"
@@ -920,16 +920,7 @@ jobs:
           echo "Private Oracle report created."
  "$UNIT"
               systemctl is-enabled "$UNIT" >/dev/null
-              node - "$DUMP" <<'NODE'
-          const fs = require("fs");
-          const data = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          const apps = Array.isArray(data) ? data : (data.apps || data.pm2 || []);
-          if (!apps.some(x => (x.pm2_env || {}).name === "hasa2" || x.name === "hasa2")) {
-            console.error("STOP: saved PM2 dump does not contain hasa2");
-            process.exit(2);
-          }
-          console.log("Saved PM2 dump contains hasa2.");
-          NODE
+              node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const a=Array.isArray(d)?d:(d.apps||d.pm2||[]);if(!a.some(x=>(x.pm2_env||{}).name==="hasa2"||x.name==="hasa2"))process.exit(2);console.log("Saved dump contains hasa2.")' "$DUMP"
               pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2");if(!p||p.pm2_env?.status!=="online")process.exit(2);console.log("Current hasa2 process is online.");});'
               mkdir -p "$BACKUPS"
               chmod 700 "$BACKUPS"
@@ -944,15 +935,14 @@ jobs:
               if ! systemd-analyze verify "$UNIT"; then
                 sudo -n cp -p "$BACKUP" "$UNIT"
                 sudo -n systemctl daemon-reload
-                echo "STOP: systemd validation failed; original unit restored."
+                echo "STOP: validation failed; original unit restored."
                 exit 1
               fi
               sudo -n systemctl daemon-reload
               sudo -n systemctl reset-failed "$UNIT_NAME"
-              echo "Updated unit:"
               systemctl show "$UNIT_NAME" -p Type -p RemainAfterExit -p PIDFile -p UnitFileState --no-pager
-              echo "Backup saved: $BACKUP"
-              echo "No PM2 start, stop, restart, or WhatsApp re-pair command was run."
+              echo "Backup: $BACKUP"
+              echo "No PM2 start/stop/restart was run."
               pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2");console.log("Final hasa2 status: "+(p?.pm2_env?.status||"NOT FOUND"));if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
               ;;
             access-audit)
