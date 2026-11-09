@@ -89,7 +89,17 @@ jobs:
           await request('MyMemory Translation API', 'https://api.mymemory.translated.net/get?q=hello&langpair=en%7Csi');
           const key = process.env.GEMINI_API_KEY;
           if (!key) add('Gemini API',false,'GEMINI_API_KEY not available in Oracle app environment');
-          else await request('Gemini API', 'https://generativelanguage.googleapis.com/v1beta/models?key='+encodeURIComponent(key));
+          else {
+            try {
+              const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+encodeURIComponent(key), {
+                method:'POST', headers:{'content-type':'application/json'},
+                body:JSON.stringify({contents:[{parts:[{text:'Reply with exactly OK'}]}]}),
+                signal:AbortSignal.timeout(20000)
+              });
+              const data=await r.json();
+              add('Gemini generateContent',r.ok && Boolean(data?.candidates?.[0]?.content?.parts?.[0]?.text),'HTTP '+r.status);
+            } catch(e) { add('Gemini generateContent',false,(e.name||'Error')+': '+String(e.message||e).slice(0,140)); }
+          }
           const {execFile} = await import('node:child_process');
           const {promisify} = await import('node:util');
           const exec = promisify(execFile);
@@ -97,6 +107,11 @@ jobs:
             try { const {stdout,stderr}=await exec(bin,args,{timeout:10000,maxBuffer:1024*1024}); add(name,true,(stdout||stderr).split('\n')[0].slice(0,100)); }
             catch(e) { add(name,false,String(e.code||e.message||'unavailable').slice(0,140)); }
           }
+          try {
+            const {stdout}=await exec('yt-dlp',['--dump-single-json','--skip-download','--no-warnings','--no-playlist','ytsearch1:lofi music'],{timeout:30000,maxBuffer:2*1024*1024});
+            const meta=JSON.parse(stdout);
+            add('YouTube search metadata',Boolean(meta?.entries?.[0]?.id),'Search metadata received');
+          } catch(e) { add('YouTube search metadata',false,String(e.code||e.message||'failed').slice(0,140)); }
           for (const c of checks) console.log((c.ok?'PASS':'FAIL')+' | '+c.name+' | '+c.detail);
           console.log('RESULT '+checks.filter(x=>x.ok).length+'/'+checks.length+' passed');
           if (checks.some(x=>!x.ok)) process.exitCode=2;
