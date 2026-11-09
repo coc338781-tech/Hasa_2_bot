@@ -49,6 +49,19 @@ else
   exit 1
 fi
 
+BOOT_DIR="$HOME/.termux/boot"
+mkdir -p "$BOOT_DIR"
+cat > "$BOOT_DIR/start-hasa-agent" <<'BOOT'
+#!/data/data/com.termux/files/usr/bin/bash
+termux-wake-lock >/dev/null 2>&1 || true
+AGENT_DIR="$HOME/.local/share/hasa-termux-agent"
+if ! pgrep -f "$AGENT_DIR/agent.mjs" >/dev/null 2>&1; then
+  nohup node "$AGENT_DIR/agent.mjs" >> "$AGENT_DIR/agent.log" 2>&1 &
+fi
+BOOT
+chmod 700 "$BOOT_DIR/start-hasa-agent"
+
 echo "Agent log: $AGENT_DIR/agent.log"
 echo "Token stored with mode 600; never share it."
+echo "Boot script installed. Install and open the separate Termux:Boot app once to enable boot launch."
 echo "For reliable background operation, set Android Settings > Apps > Termux > Battery > Unrestricted."
