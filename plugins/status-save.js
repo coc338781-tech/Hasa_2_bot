@@ -18,8 +18,8 @@ function getBody(message) {
 function isOwner(message, config) {
   if (message.key?.fromMe) return true;
   const sender = String(message.key?.participant || message.key?.remoteJid || "")
-    .split("@")[0].split(":")[0].replace(/\\D/g, "");
-  return (config.owner || []).some(item => String(item).replace(/\\D/g, "") === sender);
+    .split("@")[0].split(":")[0].replace(/\D/g, "");
+  return (config.owner || []).some(item => String(item).replace(/\D/g, "") === sender);
 }
 
 async function downloadStatus(media, kind) {
@@ -42,7 +42,7 @@ export default async function statusSave({ sock, message, config, cache }) {
   const body = getBody(message).trim();
   if (!body.startsWith(prefix)) return;
 
-  const [rawCommand, ...args] = body.slice(prefix.length).trim().split(/\\s+/);
+  const [rawCommand, ...args] = body.slice(prefix.length).trim().split(/\s+/);
   const command = normalizeStatusAlias(rawCommand);
   const aliases = getStatusSaveAliases(config);
 
@@ -54,13 +54,13 @@ export default async function statusSave({ sock, message, config, cache }) {
     const alias = normalizeStatusAlias(rest.join(" "));
     if (action === "list") {
       return sock.sendMessage(jid, {
-        text: "📌 *STATUS SAVE ALIASES*\\n" + aliases.map(item => prefix + item).join("  |  ") +
-          "\\n\\nඅලුත් එකක්: " + prefix + "statusalias add <නම>\\nඉවත් කිරීමට: " + prefix + "statusalias remove <නම>"
+        text: "📌 *STATUS SAVE ALIASES*\n" + aliases.map(item => prefix + item).join("  |  ") +
+          "\n\nඅලුත් එකක්: " + prefix + "statusalias add <නම>\nඉවත් කිරීමට: " + prefix + "statusalias remove <නම>"
       }, { quoted: message });
     }
-    if (!["add", "remove"].includes(String(action || "").toLowerCase()) || !alias || /\\s/.test(alias)) {
+    if (!["add", "remove"].includes(String(action || "").toLowerCase()) || !alias || /\s/.test(alias)) {
       return sock.sendMessage(jid, {
-        text: "භාවිතය:\\n" + prefix + "statusalias list\\n" + prefix + "statusalias add <නම>\\n" + prefix + "statusalias remove <නම>"
+        text: "භාවිතය:\n" + prefix + "statusalias list\n" + prefix + "statusalias add <නම>\n" + prefix + "statusalias remove <නම>"
       }, { quoted: message });
     }
     const next = [...aliases];
@@ -89,7 +89,7 @@ export default async function statusSave({ sock, message, config, cache }) {
   const status = findStatusForCommand(message, cache, jid);
   if (!status) {
     return sock.sendMessage(jid, {
-      text: "❌ මේ Chat එකට අදාල Status එක හමු වුණේ නැහැ.\\n\\nමුලින් ඒ Status එකට Reply එකක් යවලා, ඒ Reply ගිය මේ Chat එකේම " +
+      text: "❌ මේ Chat එකට අදාල Status එක හමු වුණේ නැහැ.\n\nමුලින් ඒ Status එකට Reply එකක් යවලා, ඒ Reply ගිය මේ Chat එකේම " +
         prefix + command + " යවන්න. Status එක පැය 24 ඉක්මවා ඇත්නම් නැවත ලබාගත නොහැක."
     }, { quoted: message });
   }
