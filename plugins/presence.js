@@ -4,6 +4,32 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const exec = promisify(execFile);
+let onlineTimer = null;
+
+async function applyAlwaysOnline(sock, enabled) {
+  if (onlineTimer) {
+    clearInterval(onlineTimer);
+    onlineTimer = null;
+  }
+  if (!enabled) {
+    await sock.sendPresenceUpdate("unavailable").catch(() => {});
+    return;
+  }
+  await sock.sendPresenceUpdate("available").catch(() => {});
+  onlineTimer = setInterval(() => {
+    if (sock?.user) sock.sendPresenceUpdate("available").catch(() => {});
+  }, 30_000);
+  onlineTimer.unref?.();
+}
+
+export async function onConnection(sock, config) {
+  await applyAlwaysOnline(sock, config?.alwaysOnline === true);
+}
+
+export async function onConfigUpdate(sock, config) {
+  await applyAlwaysOnline(sock, config?.alwaysOnline === true);
+}
+
 export default async function presence({ sock, message, config }) {
   const jid = message.key?.remoteJid;
   if (!jid || jid === "status@broadcast" || message.key.fromMe) return;
