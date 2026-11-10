@@ -84,7 +84,7 @@ jobs:
             backup-restore-test)
               echo "Read-only production restore drill: extract code backup into an isolated temporary directory only."
               DEST=/home/opc/.hasa-agent-backups
-              ARCHIVE="$(find "$DEST" -maxdepth 1 -type f -name 'hasa2-code-*.tar.gz' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-)"
+              ARCHIVE="$(find "$DEST" -maxdepth 1 -type f -name 'hasa2-code-*.tar.gz' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
               test -n "$ARCHIVE"
               TMP="$(mktemp -d "/tmp/hasa2-restore-test-${REQUEST_ID}.XXXXXX")"
               chmod 700 "$TMP"
