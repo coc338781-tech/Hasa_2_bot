@@ -28,6 +28,13 @@ if ! curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.
   exit 1
 fi
 
+AGENT_BACKUP=""
+if [ -f "$AGENT_DIR/agent.mjs" ]; then
+  AGENT_BACKUP="$AGENT_DIR/agent.mjs.backup.$(date -u +%Y%m%dT%H%M%SZ)"
+  cp "$AGENT_DIR/agent.mjs" "$AGENT_BACKUP"
+  chmod 600 "$AGENT_BACKUP"
+fi
+
 node - "$TMP" "$AGENT_DIR/agent.mjs" "$CONFIG_DIR/config.json" "$GH_TOKEN" <<'NODE'
 const fs=require("fs");
 const [,,src,dest,config,token]=process.argv;
@@ -42,7 +49,15 @@ chmod 700 "$AGENT_DIR/agent.mjs"
 chmod 600 "$CONFIG_DIR/config.json"
 
 echo "Checking agent syntax..."
-node --check "$AGENT_DIR/agent.mjs"
+if ! node --check "$AGENT_DIR/agent.mjs"; then
+  echo "Updated agent syntax check failed."
+  if [ -n "${AGENT_BACKUP:-}" ] && [ -f "$AGENT_BACKUP" ]; then
+    cp "$AGENT_BACKUP" "$AGENT_DIR/agent.mjs"
+    chmod 700 "$AGENT_DIR/agent.mjs"
+    echo "Previous working agent restored."
+  fi
+  exit 1
+fi
 echo "Starting agent..."
 if command -v termux-wake-lock >/dev/null 2>&1; then termux-wake-lock || true; fi
 # Seed the heartbeat before launching so the watchdog does not mistake startup for a hang.
