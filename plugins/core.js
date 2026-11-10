@@ -396,8 +396,8 @@ function makeSettingsMenu(config, prefix) {
     "│  10.2 | Disable",
     "│",
     "└─ *[11] PUBLIC / PRIVATE MODE*",
-    "   11.1 | Public — ඕනෑම Chat එකක Commands වැඩ කරයි " + (current("publicMode") === "🟢 ON" ? "🟢" : ""),
-    "   11.2 | Private — Ownerගේ තමන්ගේ Chat එකේ පමණයි " + (current("publicMode") === "🔴 OFF" ? "🟢" : ""),
+    "   11.1 | Public  " + (current("publicMode") === "🟢 ON" ? "🟢" : ""),
+    "   11.2 | Private " + (current("publicMode") === "🔴 OFF" ? "🟢" : ""),
     "",
     "📌 *Setting එක ON/OFF කිරීමට අදාල අංකය Reply කරන්න.*",
     "🔹 Prefix commands: " + prefix + "settings"
@@ -444,7 +444,9 @@ export default async function core({ sock, message, config }) {
         : String(currentValue || "off").toLowerCase() === String(setting.value).toLowerCase();
 
       if (alreadySelected) {
-        const state = setting.value === false || setting.value === "off" ? "OFF 🔴" : "ON 🟢";
+        const state = setting.key === "publicMode"
+          ? "Enabled 🟢"
+          : (setting.value === false || setting.value === "off" ? "OFF 🔴" : "ON 🟢");
         return send("ℹ️ *" + setting.label + "* දැනටමත් " + state + " කරලා තියෙන්නේ.");
       }
 
@@ -458,7 +460,7 @@ export default async function core({ sock, message, config }) {
       if (setting.key === "alwaysOnline") {
         await globalThis.__hasaPlugins?.onConfigUpdate?.(sock, config);
       }
-      const enabled = setting.value !== false && setting.value !== "off";
+      const enabled = setting.key === "publicMode" || (setting.value !== false && setting.value !== "off");
       return send("✅ *" + setting.label + "* " + (enabled ? "Enabled 🟢" : "Disabled 🔴"));
     }
   }
