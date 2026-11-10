@@ -387,7 +387,7 @@ function makeSettingsMenu(config, prefix) {
     "│  7.1 | Enable  " + (current("composing") === "🟢 ON" ? "🟢" : ""),
     "│  7.2 | Disable",
     "│",
-    "└─ *[8] AUTO VOICE*",
+    "├─ *[8] AUTO VOICE*",
     "   8.1 | Enable  " + (current("autoVoice") === "🟢 ON" ? "🟢" : ""),
     "   8.2 | Disable",
     "│",
