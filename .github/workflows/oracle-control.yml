@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -81,6 +81,32 @@ jobs:
           echo "Operation: $ACTION"
           echo "Current commit: $(git rev-parse --short HEAD)"
           case "$ACTION" in
+            backup-restore-test)
+              echo "Read-only production restore drill: extract code backup into an isolated temporary directory only."
+              DEST=/home/opc/.hasa-agent-backups
+              ARCHIVE="$(find "$DEST" -maxdepth 1 -type f -name 'hasa2-code-*.tar.gz' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-)"
+              test -n "$ARCHIVE"
+              TMP="$(mktemp -d "/tmp/hasa2-restore-test-${REQUEST_ID}.XXXXXX")"
+              chmod 700 "$TMP"
+              trap 'rm -rf -- "$TMP"' EXIT
+              echo "Archive selected: $(basename "$ARCHIVE")"
+              echo "Archive SHA256: $(sha256sum "$ARCHIVE" | awk '{print $1}')"
+              tar -tzf "$ARCHIVE" > "$TMP/archive.list"
+              if grep -Eq '(^|/)(auth_info|auth_info_backup|subbot_sessions|node_modules|config[.]json|[.]env([.]|$))(/|$)' "$TMP/archive.list"; then
+                echo "FAIL: sensitive/session paths found in code-only archive."
+                exit 3
+              fi
+              tar -xzf "$ARCHIVE" -C "$TMP" --no-same-owner --no-same-permissions
+              RESTORED="$TMP/Hasa_2_bot"
+              for file in index.js package.json plugins/ai.js bot_logo.jpg package-lock.json plugins/ai.js.backup-20261109-034153 plugins/ai.js.backup-20261109-035407 plugins/ai.js.backup-20261109-041452; do
+                test -s "$RESTORED/$file" || { echo "FAIL: missing restored file $file"; exit 4; }
+                cmp -s "$APP/$file" "$RESTORED/$file" || { echo "FAIL: restored copy differs from live file $file"; exit 5; }
+                echo "RESTORED_AND_MATCHED: $file"
+              done
+              echo "ARCHIVE_EXTRACT_TEST=PASS"
+              echo "SENSITIVE_PATH_EXCLUSION=PASS"
+              echo "LIVE_APP_FILES_CHANGED=NO"
+              ;;
             restore-start)
               echo "Checking saved PM2 state and WhatsApp session registration."
               DUMP="$HOME/.pm2/dump.pm2"
