@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "always-online-private-postdeploy-status-20261111-01"
+  "action": "logs",
+  "request_id": "always-online-private-postdeploy-logs-20261111-01"
 }
