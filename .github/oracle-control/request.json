@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "always-online-private-postdeploy-status2-20261111-01"
+  "action": "deploy",
+  "request_id": "fix-private-mode-labels-20261111-01"
 }
