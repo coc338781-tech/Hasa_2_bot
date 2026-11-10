@@ -1,4 +1,4 @@
 {
-  "action": "disable-unsupported-diagnostics",
-  "request_id": "oracle-disable-unsupported-diagnostics-20261110-1"
+  "action": "backup-restore-test",
+  "request_id": "hasa2-code-restore-drill-20261110-01"
 }
