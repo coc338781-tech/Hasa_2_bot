@@ -10,3 +10,8 @@ test("private mode blocks another person's chat", () => assert.equal(isMessageAl
 test("private mode blocks owner commands sent to another person's chat", () => assert.equal(isMessageAllowedByMode(message("94771111111@s.whatsapp.net", true), sock, { publicMode: false, owner: [owner] }), false));
 test("private mode blocks groups", () => assert.equal(isMessageAllowedByMode(message("120363000000000000@g.us", true), sock, { publicMode: false, owner: [owner] }), false));
 test("private mode recognizes the linked account JID when owner list is empty", () => assert.equal(isMessageAllowedByMode(message(owner + "@s.whatsapp.net"), sock, { publicMode: false, owner: [] }), true));
+
+test("private mode does not allow a second configured owner chat", () => {
+  const otherOwner = "94772222222";
+  assert.equal(isMessageAllowedByMode(message(otherOwner + "@s.whatsapp.net"), sock, { publicMode: false, owner: [owner, otherOwner] }), false);
+});
