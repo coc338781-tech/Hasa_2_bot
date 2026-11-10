@@ -1,3 +1,4 @@
+import "./lib/session-log-redaction.js";
 import "dotenv/config";
 import makeWASocket, {
   DisconnectReason,
