@@ -45,6 +45,9 @@ echo "Checking agent syntax..."
 node --check "$AGENT_DIR/agent.mjs"
 echo "Starting agent..."
 if command -v termux-wake-lock >/dev/null 2>&1; then termux-wake-lock || true; fi
+# Seed the heartbeat before launching so the watchdog does not mistake startup for a hang.
+touch "$AGENT_DIR/heartbeat"
+chmod 600 "$AGENT_DIR/heartbeat"
 # Stop every stale copy of this exact agent, not only a possibly outdated PID file.
 pkill -f '[n]ode .*/hasa-termux-agent/agent.mjs' 2>/dev/null || true
 OLD_PID=""
