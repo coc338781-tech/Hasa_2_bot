@@ -22,7 +22,11 @@ const SETTINGS = [
   { id: "8.2", key: "autoVoice", label: "Auto Voice", value: false },
   { id: "9.1", key: "statusReact", label: "Status React: Green Heart 💚", value: "green" },
   { id: "9.2", key: "statusReact", label: "Status React: Random Emoji 🎲", value: "random" },
-  { id: "9.3", key: "statusReact", label: "Status React", value: "off" }
+  { id: "9.3", key: "statusReact", label: "Status React", value: "off" },
+  { id: "10.1", key: "alwaysOnline", label: "Always Online", value: true },
+  { id: "10.2", key: "alwaysOnline", label: "Always Online", value: false },
+  { id: "11.1", key: "publicMode", label: "Public Mode", value: true },
+  { id: "11.2", key: "publicMode", label: "Private Mode", value: false }
 ];
 
 const CATEGORIES = {
@@ -46,7 +50,10 @@ const CATEGORIES = {
   "6": ["STICKER & MEDIA TOOLS", [".sticker (reply to photo/video)", ".toaudio (reply to video)", ".compress (reply to video)"]],
   "7": ["PRANK & FUN", [".hack"]],
   "8": ["OWNER CONTROL", [
-    ".status", ".system", ".logs", ".backup", ".owner", ".apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"
+    ".status", ".system", ".logs", ".backup", ".owner", ".settings", ".apply",
+    "10.1 / 10.2 — Always Online ON/OFF",
+    "11.1 / 11.2 — Public / Private Mode",
+    "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"
   ]],
   "9": ["SUBBOT MANAGER", [
     ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
@@ -133,7 +140,7 @@ function makeMainMenu(config) {
     "05  AUTOMATIONS",
     "06  STICKER & MEDIA TOOLS",
     "07  PRANK & FUN",
-    "08  OWNER CONTROL",
+    "08  OWNER CONTROL & SETTINGS",
     "09  SUBBOT MANAGER",
     "10  UTILITY TOOLS"
   ];
@@ -166,7 +173,7 @@ function makeCommandList(config, prefix) {
     ["AUTOMATIONS & AUTO REPLY", [prefix+"settings", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"autoreact on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off", prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["STICKER & MEDIA TOOLS", [prefix+"sticker (reply to photo/video)", prefix+"toaudio (reply to video)", prefix+"compress (reply to video)"]],
     ["PRANK & FUN", [prefix+"hack"]],
-    ["OWNER CONTROL", [prefix+"status", prefix+"system", prefix+"logs", prefix+"backup", prefix+"owner", prefix+"statusalias list/add/remove", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
+    ["OWNER CONTROL", [prefix+"status", prefix+"system", prefix+"logs", prefix+"backup", prefix+"owner", prefix+"settings", prefix+"statusalias list/add/remove", prefix+"apply", "10.1 / 10.2 — Always Online ON/OFF (via "+prefix+"settings)", "11.1 / 11.2 — Public / Private Mode (via "+prefix+"settings)", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
     ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"delallsubbot confirm", prefix+"restartallsubbot", prefix+"helpsubbot"]],
     ["UTILITY TOOLS", [prefix+"weather <city>", prefix+"movie <title>", prefix+"quote (reply to message)", prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>", prefix+"translate [language] <text>"]]
   ];
@@ -256,6 +263,8 @@ function makeHelpGuide(prefix) {
     "",
     "┏━━〔 ⚙️ 6. SETTINGS & AUTO FEATURES 〕",
     "┃ " + prefix + "settings — Owner Settings Panel එක.",
+    "┃ Always Online — Settings තුළ 10.1 ON / 10.2 OFF; Bot එක Online ලෙස පෙන්වීම පාලනය.",
+    "┃ Public / Private — Settings තුළ 11.1 Public / 11.2 Private; Private කළ විට Ownerගේ තමන්ගේ Chat එකේ පමණක් Bot වැඩ කරයි.",
     "┃ " + prefix + "autoreply on/off — Auto Reply පාලනය.",
     "┃ " + prefix + "statusseen on/off — Auto Status Seen පාලනය.",
     "┃ " + prefix + "statusreact green/random/off — Status Reaction.",
@@ -381,6 +390,14 @@ function makeSettingsMenu(config, prefix) {
     "└─ *[8] AUTO VOICE*",
     "   8.1 | Enable  " + (current("autoVoice") === "🟢 ON" ? "🟢" : ""),
     "   8.2 | Disable",
+    "│",
+    "├─ *[10] ALWAYS ONLINE*",
+    "│  10.1 | Enable  " + (current("alwaysOnline") === "🟢 ON" ? "🟢" : ""),
+    "│  10.2 | Disable",
+    "│",
+    "└─ *[11] PUBLIC / PRIVATE MODE*",
+    "   11.1 | Public — ඕනෑම Chat එකක Commands වැඩ කරයි " + (current("publicMode") === "🟢 ON" ? "🟢" : ""),
+    "   11.2 | Private — Ownerගේ තමන්ගේ Chat එකේ පමණයි " + (current("publicMode") === "🔴 OFF" ? "🟢" : ""),
     "",
     "📌 *Setting එක ON/OFF කිරීමට අදාල අංකය Reply කරන්න.*",
     "🔹 Prefix commands: " + prefix + "settings"
@@ -437,6 +454,9 @@ export default async function core({ sock, message, config }) {
       } catch (error) {
         console.error("Numeric setting save failed:", error);
         return send("❌ Setting Save කරන්න බැරි වුණා: " + error.message);
+      }
+      if (setting.key === "alwaysOnline") {
+        await globalThis.__hasaPlugins?.onConfigUpdate?.(sock, config);
       }
       const enabled = setting.value !== false && setting.value !== "off";
       return send("✅ *" + setting.label + "* " + (enabled ? "Enabled 🟢" : "Disabled 🔴"));
