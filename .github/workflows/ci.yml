@@ -40,6 +40,9 @@ jobs:
       - name: Check syntax and plugin loading
         run: npm run check
 
+      - name: Test private/public chat mode guard
+        run: npm run test:bot-mode
+
       - name: Test Baileys decrypt retry
         run: npm run test:decrypt-retry
 
