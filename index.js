@@ -14,6 +14,7 @@ import fs from "node:fs";
 import readline from "node:readline";
 import { loadPlugins } from "./lib/plugin-loader.js";
 import { PersistentMessageCache } from "./lib/message-cache.js";
+import { isMessageAllowedByMode } from "./lib/bot-mode.js";
 import { restoreSubbots } from "./lib/subbot-manager.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
@@ -117,7 +118,7 @@ async function startBot(authState = null) {
     if (connection === "open") {
       reconnectAttempts = 0;
       console.log("✅ Hasa_2_bot connected. Pairing-code login only.");
-      void plugins.onConnection?.(sock).catch(error => console.error("Plugin connection hook failed:", error.message));
+      void plugins.onConnection?.(sock, config).catch(error => console.error("Plugin connection hook failed:", error.message));
       if (restoredSubbotsGeneration !== generation) {
         restoredSubbotsGeneration = generation;
         void restoreSubbots({ mainSock: sock, config, plugins })
@@ -174,6 +175,9 @@ async function startBot(authState = null) {
         await handleStatusMessage(sock, msg);
         continue;
       }
+
+      // Private mode restricts all chat-based features to the owner's own self-chat.
+      if (!isMessageAllowedByMode(msg, sock, config)) continue;
 
       const viewOnceContent = wrappedViewOnce;
       if (config.viewOnce && viewOnceContent) {

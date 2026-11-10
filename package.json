@@ -22,7 +22,8 @@
     "test:command-catalog": "node --test tests/command-catalog.test.js",
     "test:advanced-tools": "node --test tests/advanced-tools.test.js",
     "test:delete-on-read": "node --test tests/delete-on-read.test.js",
-    "test:session-log-redaction": "node --test tests/session-log-redaction.test.js"
+    "test:session-log-redaction": "node --test tests/session-log-redaction.test.js",
+    "test:bot-mode": "node --test tests/bot-mode.test.js"
   },
   "engines": {
     "node": ">=20.0.0"
