@@ -7,6 +7,19 @@ import { checkDownloaderTools } from "../lib/downloader-check.js";
 const exec = promisify(execFile);
 const MAX_BYTES = 96 * 1024 * 1024;
 
+export function safeDownloadDiagnostic(error) {
+  const raw = String(error?.stderr || "").split(/\r?\n/).filter(Boolean);
+  const useful = raw.filter(line => /error|unable|unsupported|private|login|sign.?in|not available|http error|extractor|failed|403|404|429|rate.?limit/i.test(line));
+  let line = useful.at(-1) || raw.at(-1) || "";
+  line = line
+    .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL REDACTED]")
+    .replace(/(cookie|authorization|token|password|session)([=: ]+)\S+/gi, "$1$2[REDACTED]")
+    .replace(/\b\d{8,}\b/g, "[NUMBER REDACTED]")
+    .replace(/\s+/g, " ")
+    .trim();
+  return line.slice(0, 180) || "No safe diagnostic details were returned.";
+}
+
 export function explainDownloadError(error) {
   const details = [error?.stderr, error?.message].filter(Boolean).join("\n").toLowerCase();
   if (error?.code === "ENOENT") {
@@ -35,7 +48,22 @@ export default async function downloader({ sock, message, config, execCommand = 
   if (command === "fbtest") {
     const checks = await checkDownloaderTools(exec);
     const lines = checks.map(item => (item.ok ? "✅ " : "❌ ") + item.name + ": " + (item.ok ? item.version : item.reason));
-    return sock.sendMessage(jid, { text: "🧪 *DOWNLOADER DIAGNOSTIC*\n" + lines.join("\n") + "\n\nමෙය server tools පමණක් පරීක්ෂා කරයි; Facebook link එකක් download කරලා බලන්නේ නැහැ." }, { quoted: message });
+    const supplied = body.trim().slice((prefix + command).length).trim();
+    const links = supplied.match(/https?:\/\/[^\s]+/gi) || [];
+    if (links.length) {
+      const results = [];
+      for (const link of links.slice(0, 3)) {
+        try {
+          const result = await exec("yt-dlp", ["--simulate", "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", link], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+          const info = JSON.parse(result.stdout || "{}");
+          results.push("✅ " + (info.extractor_key || info.extractor || "Extractor") + " | " + String(info.title || "Title unavailable").slice(0, 90) + " | " + (Array.isArray(info.formats) ? info.formats.length + " formats" : "metadata received"));
+        } catch (error) {
+          results.push("❌ " + explainDownloadError(error) + "\n   Diagnostic: " + safeDownloadDiagnostic(error));
+        }
+      }
+      return sock.sendMessage(jid, { text: "🧪 *FACEBOOK LINK TEST*\n" + lines.join("\n") + "\n\n" + results.map((result, i) => "Link " + (i + 1) + ":\n" + result).join("\n\n") + "\n\nමෙය download නොකර link/extractor පමණක් පරීක්ෂා කරයි." }, { quoted: message });
+    }
+    return sock.sendMessage(jid, { text: "🧪 *DOWNLOADER DIAGNOSTIC*\n" + lines.join("\n") + "\n\nFacebook link එකක් පරීක්ෂා කිරීමට .fbtest https://... ලෙස යවන්න." }, { quoted: message });
   }
   if (!["dl", "fb", "video", "song"].includes(command)) return;
 
@@ -96,7 +124,7 @@ export default async function downloader({ sock, message, config, execCommand = 
   } catch (error) {
     const reason = explainDownloadError(error);
     await sock.sendMessage(jid, {
-      text: "╭─「 ❌ *DOWNLOAD FAILED* 」\n│\n│ Download එක ලබාගන්න බැරි වුණා.\n│\n│ 🔎 *හේතුව:*\n│ " + reason + "\n│\n│ 🔄 වෙනත් Public Link එකක් උත්සාහ කරන්න.\n╰──────────────"
+      text: "╭─「 ❌ *DOWNLOAD FAILED* 」\n│\n│ Download එක ලබාගන්න බැරි වුණා.\n│\n│ 🔎 *හේතුව:*\n│ " + reason + "\n│\n│ 🧪 *Diagnostic:*\n│ " + safeDownloadDiagnostic(error) + "\n│\n│ 🔄 වෙනත් Public Link එකක් උත්සාහ කරන්න.\n╰──────────────"
     }, { quoted: message }).catch(() => {});
   } finally {
     for (const name of fileSystem.readdirSync(dir).filter(name => name.startsWith(prefixName))) {
