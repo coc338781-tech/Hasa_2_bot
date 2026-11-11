@@ -14,6 +14,7 @@ export function safeDownloadDiagnostic(error) {
   line = line
     .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL REDACTED]")
     .replace(/(cookie|authorization|token|password|session)([=: ]+)\S+/gi, "$1$2[REDACTED]")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [REDACTED]")
     .replace(/\b\d{8,}\b/g, "[NUMBER REDACTED]")
     .replace(/\s+/g, " ")
     .trim();
