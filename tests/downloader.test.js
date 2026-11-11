@@ -152,6 +152,7 @@ test("Facebook downloads do not force unsupported browser impersonation", async 
   };
   try {
     await downloader({ ...state, execCommand });
+    assert.ok(!downloadArgs.includes("--max-downloads"), "single-video downloads must not use yt-dlp max-downloads (it exits 101 even after success)");
     assert.ok(!downloadArgs.includes("--impersonate"));
     assert.ok(!downloadArgs.includes("--list-impersonate-targets"));
     assert.equal(state.sent[1].payload.video.toString(), "video-data");
