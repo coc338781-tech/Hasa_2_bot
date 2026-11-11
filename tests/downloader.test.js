@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import downloader, { explainDownloadError } from "../plugins/downloader.js";
+import downloader, { explainDownloadError, safeDownloadDiagnostic } from "../plugins/downloader.js";
 
 function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-downloader-"));
@@ -120,4 +120,12 @@ test("video command searches one result and sends video", async () => {
   } finally {
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
+});
+
+test("safe downloader diagnostic redacts URLs and secrets", () => {
+  const error = new Error("failed");
+  error.stderr = "ERROR: [facebook] Unable to download webpage https://facebook.com/watch/?token=secret123456789\\nAuthorization: Bearer secret-token";
+  const output = safeDownloadDiagnostic(error);
+  assert.match(output, /URL REDACTED/);
+  assert.doesNotMatch(output, /secret123456789|secret-token/);
 });
