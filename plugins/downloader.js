@@ -67,10 +67,9 @@ export default async function downloader({ sock, message, config, execCommand = 
     await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     const downloadArgs = [
       "--no-playlist", "--no-warnings", "--max-downloads", "1",
-      "--max-filesize", isAudio ? "32M" : "96M", 
       ...(isAudio
-        ? ["-x", "--audio-format", "mp3", "--audio-quality", "5"]
-        : ["-f", "best[ext=mp4][filesize<96M]/best[filesize<96M]/best[height<=720]/best[height<=480]", "--merge-output-format", "mp4"]),
+        ? ["--max-filesize", "32M", "-x", "--audio-format", "mp3", "--audio-quality", "5"]
+        : ["-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best", "--merge-output-format", "mp4"]),
       "-o", path.join(dir, prefixName + ".%(ext)s"), target
     ];
     await execCommand("yt-dlp", downloadArgs, { timeout: 240000, maxBuffer: 8 * 1024 * 1024 });
