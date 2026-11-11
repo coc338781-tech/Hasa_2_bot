@@ -13,7 +13,7 @@ export function safeDownloadDiagnostic(error) {
   let line = useful.at(-1) || raw.at(-1) || "";
   line = line
     .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL REDACTED]")
-    .replace(/(cookie|authorization|token|password|session)([=: ]+)\S+/gi, "$1$2[REDACTED]")
+    .replace(/(cookie|authorization|token|password|session)([=: ]+)(?:Bearer\s+)?\S+/gi, "$1$2[REDACTED]")
     .replace(/\bBearer\s+\S+/gi, "Bearer [REDACTED]")
     .replace(/\b\d{8,}\b/g, "[NUMBER REDACTED]")
     .replace(/\s+/g, " ")
