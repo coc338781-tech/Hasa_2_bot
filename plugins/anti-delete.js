@@ -34,7 +34,8 @@ export default async function antiDelete({ sock, message, config, cache }) {
   if (!jid || jid === "status@broadcast" || !protocol || protocol.type !== 0) return;
 
   const deletedKey = protocol.key;
-  if (!deletedKey?.id) return;
+  // Only restore messages sent by someone else; ignore the owner's own deletions.
+  if (!deletedKey?.id || deletedKey.fromMe === true) return;
   const cacheKey = (deletedKey.remoteJid || jid) + ":" + deletedKey.id;
   const original = cache?.get(cacheKey);
   if (!original?.message) return;
