@@ -69,7 +69,7 @@ test("downloader rejects invalid links without starting external tools", async (
 });
 
 test("download errors provide useful size and timeout explanations", () => {
-  assert.match(explainDownloadError(new Error("File is larger than max-filesize")), /64 MB/);
+  assert.match(explainDownloadError(new Error("File is larger than max-filesize")), /96 MB/);
   const timeout = new Error("timed out");
   timeout.killed = true;
   assert.match(explainDownloadError(timeout), /වැඩි වෙලාවක්/);
@@ -90,7 +90,7 @@ test("song command searches one result, extracts mp3, and sends audio", async ()
     await downloader({ ...state, execCommand });
     assert.equal(downloadArgs.at(-1), "ytsearch1:coldplay yellow");
     assert.ok(downloadArgs.includes("-x"));
-    assert.ok(downloadArgs.includes("16M"));
+    assert.ok(downloadArgs.includes("32M"));
     assert.equal(state.sent[1].payload.audio.toString(), "audio-data");
     assert.equal(state.sent[1].payload.mimetype, "audio/mpeg");
     assert.equal(fs.readdirSync(state.dir).length, 0);
@@ -113,7 +113,8 @@ test("video command searches one result and sends video", async () => {
   try {
     await downloader({ ...state, execCommand });
     assert.equal(downloadArgs.at(-1), "ytsearch1:nature documentary");
-    assert.ok(downloadArgs.includes("64M"));
+    assert.ok(downloadArgs.includes("96M"));
+    assert.ok(downloadArgs.some(value => String(value).includes("height<=720")));
     assert.equal(state.sent[1].payload.video.toString(), "video-data");
   } finally {
     fs.rmSync(state.dir, { recursive: true, force: true });
