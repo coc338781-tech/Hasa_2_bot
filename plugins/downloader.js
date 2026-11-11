@@ -5,7 +5,7 @@ import path from "node:path";
 import { checkDownloaderTools } from "../lib/downloader-check.js";
 
 const exec = promisify(execFile);
-const MAX_BYTES = 64 * 1024 * 1024;
+const MAX_BYTES = 96 * 1024 * 1024;
 
 export function explainDownloadError(error) {
   const details = [error?.stderr, error?.message].filter(Boolean).join("\n").toLowerCase();
@@ -21,7 +21,7 @@ export function explainDownloadError(error) {
   if (/unsupported url|not a valid url|no suitable extractor/i.test(details)) return "මේ Link එක හඳුනාගන්න බැහැ. නිවැරදි Public වීඩියෝ Link එකක් යවන්න.";
   if (/private|login required|sign in|authentication|cookies/i.test(details)) return "මේ වීඩියෝ එක Private හෝ Login අවශ්‍ය එකක්. Public Link එකක් යවන්න.";
   if (/geo.?restricted|not available in your country/i.test(details)) return "මේ වීඩියෝ එක ඔබේ ප්‍රදේශයෙන් ලබාගත නොහැක.";
-  if (/max-filesize|file is larger|larger than/i.test(details)) return "ගොනුවේ ප්‍රමාණය අවසර ලත් සීමාව ඉක්මවා ඇත (Video 64 MB / Audio 16 MB).";
+  if (/max-filesize|file is larger|larger than/i.test(details)) return "ගොනුවේ ප්‍රමාණය අවසර ලත් සීමාව ඉක්මවා ඇත (Video 96 MB / Audio 32 MB).";
   if (/429|too many requests|rate.?limit/i.test(details)) return "වෙබ් අඩවියෙන් තාවකාලික සීමාවක් දමා තිබෙනවා. ටික වේලාවකින් නැවත උත්සාහ කරන්න.";
   return "වීඩියෝ එක ලබාගැනීමේදී දෝෂයක් ඇති වුණා. Link එක Public ද කියලා පරීක්ෂා කර නැවත උත්සාහ කරන්න.";
 }
@@ -53,7 +53,7 @@ export default async function downloader({ sock, message, config, execCommand = 
     }, { quoted: message });
   }
   const target = supportsSearch && !/^https?:\/\//i.test(input) ? "ytsearch1:" + input : input;
-  const sizeLimit = isAudio ? 16 * 1024 * 1024 : MAX_BYTES;
+  const sizeLimit = isAudio ? 32 * 1024 * 1024 : MAX_BYTES;
   const dir = path.resolve(config.downloadDir || "downloads");
   fileSystem.mkdirSync(dir, { recursive: true });
   const prefixName = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
@@ -67,10 +67,10 @@ export default async function downloader({ sock, message, config, execCommand = 
     await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     const downloadArgs = [
       "--no-playlist", "--no-warnings", "--max-downloads", "1",
-      "--max-filesize", isAudio ? "16M" : "64M",
+      "--max-filesize", isAudio ? "32M" : "96M", 
       ...(isAudio
         ? ["-x", "--audio-format", "mp3", "--audio-quality", "5"]
-        : ["-f", "best[ext=mp4][filesize<64M]/best[filesize<64M]/best", "--merge-output-format", "mp4"]),
+        : ["-f", "best[ext=mp4][filesize<96M]/best[filesize<96M]/best[height<=720]/best[height<=480]", "--merge-output-format", "mp4"]),
       "-o", path.join(dir, prefixName + ".%(ext)s"), target
     ];
     await execCommand("yt-dlp", downloadArgs, { timeout: 240000, maxBuffer: 8 * 1024 * 1024 });
@@ -84,7 +84,7 @@ export default async function downloader({ sock, message, config, execCommand = 
     const file = files[0];
     const size = fileSystem.statSync(file).size;
     if (size <= 0) throw new Error("Downloaded file is empty.");
-    if (size > sizeLimit) throw new Error(isAudio ? "Audio is larger than 16 MB." : "Video is larger than 64 MB.");
+    if (size > sizeLimit) throw new Error(isAudio ? "Audio is larger than 32 MB." : "Video is larger than 96 MB.");
     const data = fileSystem.readFileSync(file);
     if (isAudio) {
       await sock.sendMessage(jid, { audio: data, mimetype: "audio/mpeg", fileName: path.basename(file) }, { quoted: message });
