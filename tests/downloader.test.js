@@ -130,13 +130,12 @@ test("safe downloader diagnostic redacts URLs and secrets", () => {
   assert.doesNotMatch(output, /secret123456789|secret-token/);
 });
 
-test("Facebook downloads use Firefox impersonation when yt-dlp supports it", async () => {
+test("Facebook downloads do not force unsupported browser impersonation", async () => {
   const state = fixture();
   state.message.message.conversation = ".fb https://www.facebook.com/share/r/example/";
   let downloadArgs;
   const execCommand = async (command, args) => {
     if (args.includes("--version") || args[0] === "-version") return { stdout: "ok" };
-    if (args[0] === "--list-impersonate-targets") return { stdout: "firefox" };
     downloadArgs = args;
     const template = args[args.indexOf("-o") + 1];
     fs.writeFileSync(template.replace("%(ext)s", "mp4"), Buffer.from("video-data"));
@@ -144,8 +143,8 @@ test("Facebook downloads use Firefox impersonation when yt-dlp supports it", asy
   };
   try {
     await downloader({ ...state, execCommand });
-    assert.ok(downloadArgs.includes("--impersonate"));
-    assert.ok(downloadArgs.includes("firefox"));
+    assert.ok(!downloadArgs.includes("--impersonate"));
+    assert.ok(!downloadArgs.includes("--list-impersonate-targets"));
     assert.equal(state.sent[1].payload.video.toString(), "video-data");
   } finally {
     fs.rmSync(state.dir, { recursive: true, force: true });
