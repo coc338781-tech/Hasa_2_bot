@@ -130,6 +130,15 @@ test("safe downloader diagnostic redacts URLs and secrets", () => {
   assert.doesNotMatch(output, /secret123456789|secret-token/);
 });
 
+
+test("safe downloader diagnostic falls back to sanitized error messages", () => {
+  const error = new Error("Command failed: yt-dlp https://facebook.com/share/v/example ERROR: unable to download media token=secret-value");
+  const output = safeDownloadDiagnostic(error);
+  assert.match(output, /ERROR|unable/i);
+  assert.match(output, /URL REDACTED/);
+  assert.doesNotMatch(output, /secret-value|facebook.com/);
+});
+
 test("Facebook downloads do not force unsupported browser impersonation", async () => {
   const state = fixture();
   state.message.message.conversation = ".fb https://www.facebook.com/share/r/example/";
