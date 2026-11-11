@@ -8,11 +8,15 @@ const exec = promisify(execFile);
 const MAX_BYTES = 96 * 1024 * 1024;
 
 export function safeDownloadDiagnostic(error) {
-  const sources = [error?.stderr, error?.message, error?.stdout]
+  const candidates = [error?.stderr, error?.stdout, error?.message]
     .filter(value => typeof value === "string" && value.trim());
-  const lines = sources.flatMap(value => value.split(/\r?\n/).filter(Boolean));
-  const useful = lines.filter(line => /error|unable|unsupported|private|login|sign.?in|not available|http error|extractor|failed|403|404|429|rate.?limit|command failed|enoent|larger than|empty/i.test(line));
-  let line = useful.at(-1) || lines.at(-1) || "";
+  let line = "";
+  for (const source of candidates) {
+    const lines = source.split(/\r?\n/).filter(Boolean);
+    const useful = lines.filter(item => /error|unable|unsupported|private|login|sign.?in|not available|http error|extractor|failed|403|404|429|rate.?limit|command failed|enoent|larger than|empty/i.test(item));
+    line = useful.at(-1) || lines.at(-1) || "";
+    if (line) break;
+  }
   line = line
     .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL REDACTED]")
     .replace(/(cookie|authorization|token|password|session)([=: ]+)(?:Bearer\s+)?\S+/gi, "$1$2[REDACTED]")
