@@ -35,6 +35,14 @@ test("anti-delete restores text and clears the delivered cache entry", async () 
   assert.deepEqual(state.deleted, ["chat@g.us:original-1"]);
 });
 
+test("anti-delete ignores messages deleted by the owner", async () => {
+  const state = setup({ original: { message: { conversation: "my own message" } } });
+  state.message.message.protocolMessage.key.fromMe = true;
+  await antiDelete(state);
+  assert.equal(state.sent.length, 0);
+  assert.deepEqual(state.deleted, []);
+});
+
 test("anti-delete forwards media and supports the owner inbox target", async () => {
   const original = { message: { imageMessage: { caption: "photo" } } };
   const state = setup({ original, toInbox: true });
