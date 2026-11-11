@@ -49,27 +49,22 @@ export default async function downloader({ sock, message, config, execCommand = 
   if (command === "fbtest") {
     const checks = await checkDownloaderTools(exec);
     const lines = checks.map(item => (item.ok ? "✅ " : "❌ ") + item.name + ": " + (item.ok ? item.version : item.reason));
-    let impersonationAvailable = false;
-    try {
-      const targets = await exec("yt-dlp", ["--list-impersonate-targets"], { timeout: 15000, maxBuffer: 1024 * 1024 });
-      impersonationAvailable = /firefox/i.test(String(targets.stdout || ""));
-    } catch {}
     const supplied = body.trim().slice((prefix + command).length).trim();
     const links = supplied.match(/https?:\/\/[^\s]+/gi) || [];
     if (links.length) {
       const results = [];
       for (const link of links.slice(0, 3)) {
         try {
-          const result = await exec("yt-dlp", [...(impersonationAvailable ? ["--impersonate", "firefox"] : []), "--simulate", "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", link], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+          const result = await exec("yt-dlp", ["--simulate", "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", link], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
           const info = JSON.parse(result.stdout || "{}");
           results.push("✅ " + (info.extractor_key || info.extractor || "Extractor") + " | " + String(info.title || "Title unavailable").slice(0, 90) + " | " + (Array.isArray(info.formats) ? info.formats.length + " formats" : "metadata received"));
         } catch (error) {
           results.push("❌ " + explainDownloadError(error) + "\n   Diagnostic: " + safeDownloadDiagnostic(error));
         }
       }
-      return sock.sendMessage(jid, { text: "🧪 *FACEBOOK LINK TEST*\n" + lines.join("\n") + "\nFirefox impersonation: " + (impersonationAvailable ? "✅ Available" : "❌ Not available") + "\n\n" + results.map((result, i) => "Link " + (i + 1) + ":\n" + result).join("\n\n") + "\n\nමෙය download නොකර link/extractor පමණක් පරීක්ෂා කරයි." }, { quoted: message });
+      return sock.sendMessage(jid, { text: "🧪 *FACEBOOK LINK TEST*\n" + lines.join("\n") + "\n\n" + results.map((result, i) => "Link " + (i + 1) + ":\n" + result).join("\n\n") + "\n\nමෙය download නොකර link/extractor පමණක් පරීක්ෂා කරයි." }, { quoted: message });
     }
-    return sock.sendMessage(jid, { text: "🧪 *DOWNLOADER DIAGNOSTIC*\n" + lines.join("\n") + "\nFirefox impersonation: " + (impersonationAvailable ? "✅ Available" : "❌ Not available") + "\n\nFacebook link එකක් පරීක්ෂා කිරීමට .fbtest https://... ලෙස යවන්න." }, { quoted: message });
+    return sock.sendMessage(jid, { text: "🧪 *DOWNLOADER DIAGNOSTIC*\n" + lines.join("\n") + "\n\nFacebook link එකක් පරීක්ෂා කිරීමට .fbtest https://... ලෙස යවන්න." }, { quoted: message });
   }
   if (!["dl", "fb", "video", "song"].includes(command)) return;
 
@@ -99,15 +94,8 @@ export default async function downloader({ sock, message, config, execCommand = 
 
     await execCommand("yt-dlp", ["--version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
-    let impersonationArgs = [];
-    if (/^https?:\/\/(?:www\.)?facebook\.com\//i.test(target)) {
-      try {
-        const targets = await execCommand("yt-dlp", ["--list-impersonate-targets"], { timeout: 15000, maxBuffer: 1024 * 1024 });
-        if (/firefox/i.test(String(targets.stdout || ""))) impersonationArgs = ["--impersonate", "firefox"];
-      } catch {}
-    }
     const downloadArgs = [
-      ...impersonationArgs, "--no-playlist", "--no-warnings", "--max-downloads", "1",
+      "--no-playlist", "--no-warnings", "--max-downloads", "1",
       ...(isAudio
         ? ["--max-filesize", "32M", "-x", "--audio-format", "mp3", "--audio-quality", "5"]
         : ["-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best", "--merge-output-format", "mp4"]),
