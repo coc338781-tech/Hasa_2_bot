@@ -8,9 +8,11 @@ const exec = promisify(execFile);
 const MAX_BYTES = 96 * 1024 * 1024;
 
 export function safeDownloadDiagnostic(error) {
-  const raw = String(error?.stderr || "").split(/\r?\n/).filter(Boolean);
-  const useful = raw.filter(line => /error|unable|unsupported|private|login|sign.?in|not available|http error|extractor|failed|403|404|429|rate.?limit/i.test(line));
-  let line = useful.at(-1) || raw.at(-1) || "";
+  const sources = [error?.stderr, error?.message, error?.stdout]
+    .filter(value => typeof value === "string" && value.trim());
+  const lines = sources.flatMap(value => value.split(/\r?\n/).filter(Boolean));
+  const useful = lines.filter(line => /error|unable|unsupported|private|login|sign.?in|not available|http error|extractor|failed|403|404|429|rate.?limit|command failed|enoent|larger than|empty/i.test(line));
+  let line = useful.at(-1) || lines.at(-1) || "";
   line = line
     .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL REDACTED]")
     .replace(/(cookie|authorization|token|password|session)([=: ]+)(?:Bearer\s+)?\S+/gi, "$1$2[REDACTED]")
@@ -18,6 +20,7 @@ export function safeDownloadDiagnostic(error) {
     .replace(/\b\d{8,}\b/g, "[NUMBER REDACTED]")
     .replace(/\s+/g, " ")
     .trim();
+  if (!line && error?.code) line = "Process error code: " + String(error.code).slice(0, 40);
   return line.slice(0, 180) || "No safe diagnostic details were returned.";
 }
 
