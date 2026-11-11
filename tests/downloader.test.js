@@ -113,7 +113,8 @@ test("video command searches one result and sends video", async () => {
   try {
     await downloader({ ...state, execCommand });
     assert.equal(downloadArgs.at(-1), "ytsearch1:nature documentary");
-    assert.ok(downloadArgs.includes("96M"));
+    assert.ok(!downloadArgs.includes("--max-filesize"), "video downloads must not be rejected by yt-dlp's early filesize estimate");
+    assert.ok(downloadArgs.some(value => String(value).includes("height<=480")));
     assert.ok(downloadArgs.some(value => String(value).includes("height<=720")));
     assert.equal(state.sent[1].payload.video.toString(), "video-data");
   } finally {
