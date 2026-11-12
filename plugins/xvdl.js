@@ -280,9 +280,8 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       return send(sock, jid, categoryMenu(), message);
     }
     if (body === "2") {
-      setSession(senderKey, { step: "xhamster-url", source: "xhamster" });
-      return send(sock, jid,
-        "🔗 xHamster හි Public video URL එකක් හෝ creator profile videos URL එකක් යවන්න.\n\nCategory browser එක මෙහි සහාය නොදක්වයි.", message);
+      setSession(senderKey, { step: "xhamster-browse", source: "xhamster" });
+      return send(sock, jid, xhamsterMenu(), message);
     }
     return send(sock, jid, "1 හෝ 2 තෝරන්න.", message);
   }
