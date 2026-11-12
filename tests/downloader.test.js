@@ -8,7 +8,11 @@ import downloader, { explainDownloadError, safeDownloadDiagnostic } from "../plu
 function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-downloader-"));
   const sent = [];
-  const sock = { async sendMessage(jid, payload) {\n    const mediaPath = payload.video?.url || payload.audio?.url;\n    if (mediaPath) assert.equal(fs.existsSync(mediaPath), true, "media file must remain on disk until Baileys finishes sending");\n    sent.push({ jid, payload });\n  } };
+  const sock = { async sendMessage(jid, payload) {
+    const mediaPath = payload.video?.url || payload.audio?.url;
+    if (mediaPath) assert.equal(fs.existsSync(mediaPath), true, "media file must remain on disk until Baileys finishes sending");
+    sent.push({ jid, payload });
+  } };
   const message = { key: { remoteJid: "chat@s.whatsapp.net" }, message: { conversation: ".dl https://example.com/video" } };
   return { dir, sent, sock, message, config: { prefix: ".", downloadDir: dir } };
 }
