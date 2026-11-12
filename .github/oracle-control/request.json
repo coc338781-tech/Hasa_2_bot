@@ -1,4 +1,4 @@
 {
-  "action": "inspect-changes",
-  "request_id": "xvdl-after-checkpoint-20261112-01"
+  "action": "inspect-downloader-diff",
+  "request_id": "xvdl-target-diff-20261112-01"
 }
