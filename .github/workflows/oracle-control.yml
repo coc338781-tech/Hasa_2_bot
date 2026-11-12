@@ -382,6 +382,9 @@ jobs:
             inspect-downloader-diff)
               echo "Read-only diff for plugins/downloader.js only; no app/session/config changes."
               git diff --no-ext-diff --unified=5 -- plugins/downloader.js | sed -E 's/(api[_-]?key|token|password|secret)([=:][[:space:]]*)[^[:space:]]+/\\1\\2[REDACTED]/Ig; s/[0-9]{8,}/[REDACTED_NUMBER]/g'
+              git fetch origin assistant-workflow
+              echo "--- Difference against incoming GitHub downloader ---"
+              git diff --no-ext-diff --unified=5 origin/assistant-workflow -- plugins/downloader.js | sed -E 's/(api[_-]?key|token|password|secret)([=:][[:space:]]*)[^[:space:]]+/\\1\\2[REDACTED]/Ig; s/[0-9]{8,}/[REDACTED_NUMBER]/g'
               echo "--- File metadata ---"
               if [ -f plugins/downloader.js ]; then
                 printf 'working_tree_sha256: '; sha256sum plugins/downloader.js | awk '{print $1}'
