@@ -113,7 +113,7 @@ test("video listing uses bounded metadata output", async () => {
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     assert.ok(metadataArgs.includes("--playlist-end"));
-    assert.ok(metadataArgs.includes("8"));
+    assert.ok(metadataArgs.includes("6"));
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
