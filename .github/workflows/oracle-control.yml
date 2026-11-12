@@ -622,6 +622,37 @@ jobs:
                   fi
                 fi
               done
+              echo "--- XHAMSTER SINGLE VIDEO METADATA ---"
+              if curl -4 -L -sS --connect-timeout 8 --max-time 25 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/133.0.0.0 Safari/537.36" "https://xhamster.com/categories/amateur" -o "$TMP/xh-video.html"; then
+                VIDEO_URL="$(python3 - "$TMP/xh-video.html" <<'PY'
+          import re,html,sys
+          s=open(sys.argv[1],errors="ignore").read()
+          m=re.search(r'''(?i)(?:https?:\\?/\\?/xhamster\\.com)?\\?/videos\\?/[^"'\\\\<> ]+''',s)
+          if m:
+              u=html.unescape(m.group(0)).replace("\\/", "/")
+              print(u if u.startswith("https://") else "https://xhamster.com"+u)
+          PY
+                )"
+                if [ -n "$VIDEO_URL" ] && timeout 75 yt-dlp --skip-download --dump-single-json --no-warnings --no-playlist "$VIDEO_URL" >"$TMP/xh-video.json" 2>"$TMP/xh-video.err"; then
+                  python3 - "$TMP/xh-video.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1])); print("VIDEO_METADATA=OK"); print("VIDEO_TITLE_PRESENT="+str(bool(d.get("title")))); print("VIDEO_DURATION_PRESENT="+str(bool(d.get("duration")))); print("VIDEO_FORMAT_COUNT="+str(len(d.get("formats") or []))); print("VIDEO_EXTRACTOR="+str(d.get("extractor_key","unknown")))
+          PY
+                else
+                  echo "VIDEO_METADATA=FAILED"
+                  grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out|no video formats' "$TMP/xh-video.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+                fi
+              fi
+              echo "--- PORNHUB SEARCH FALLBACK ---"
+              if timeout 75 yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/video/search?search=amateur" >"$TMP/ph-search.json" 2>"$TMP/ph-search.err"; then
+                python3 - "$TMP/ph-search.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1])); e=d.get("entries") if isinstance(d,dict) else None; print("PORN_SEARCH_ENTRIES="+str(sum(1 for x in (e if e is not None else [d]) if isinstance(x,dict)))); print("PORN_SEARCH_EXTRACTOR="+str(d.get("extractor_key","unknown")) if isinstance(d,dict) else "unknown")
+          PY
+              else
+                echo "PORN_SEARCH=FAILED"
+                grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out' "$TMP/ph-search.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+              fi
               echo "--- YTDLP IMPERSONATED PROBE ---"
               if timeout 100 yt-dlp --impersonate Chrome-133 --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://xhamster.com/videos?sort=popular" >"$TMP/imp.json" 2>"$TMP/imp.err"; then
                 python3 - "$TMP/imp.json" <<'PY'
