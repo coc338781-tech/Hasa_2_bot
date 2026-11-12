@@ -315,7 +315,8 @@ test("XVDL video list supports next and previous pages", async () => {
       return { stdout: '<a href="/videos/page-' + page + '-video-xhAb' + page + '23" title="Page ' + page + ' video">video</a>' };
     }
     if (args.includes("--skip-download")) {
-      const page = new URL(args.at(-1)).searchParams.get("page") || "1";
+      const pageMatch = String(args.at(-1)).match(/page-(\\d+)-video/i);
+      const page = pageMatch?.[1] || "1";
       return { stdout: JSON.stringify({ title: "Page " + page + " video", filesize_approx: 5 * 1024 * 1024, duration: 30 }) };
     }
     return state.execCommand(command, args, options);
