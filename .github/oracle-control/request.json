@@ -1,4 +1,4 @@
 {
-  "action": "merge-downloader-guard",
-  "request_id": "xvdl-guard-merge-20261112-01"
+  "action": "checkpoint-downloader",
+  "request_id": "xvdl-checkpoint-downloader-20261112-01"
 }
