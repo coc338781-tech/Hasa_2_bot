@@ -1,4 +1,4 @@
 {
-  "action": "inspect-guard-script",
-  "request_id": "xvdl-guard-20261112-01"
+  "action": "status",
+  "request_id": "xvdl-postguard-status-20261112-01"
 }
