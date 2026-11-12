@@ -116,7 +116,7 @@ async function fetchListing(url, source, execCommand) {
   const info = JSON.parse(result.stdout || "{}");
   const rawEntries = Array.isArray(info.entries) ? info.entries.filter(Boolean) : [info];
   const entries = rawEntries.slice(0, MAX_RESULTS).map(entry => ({
-    title: String(entry.title || "Untitled video").replace(/[\\r\\n]/g, " ").slice(0, 100),
+    title: String(entry.title || "Untitled video").replace(/[\r\n]/g, " ").slice(0, 100),
     url: normalizeAllowedUrl(entry.webpage_url || entry.original_url || entry.url || "", source),
     size: entry.filesize_approx || entry.filesize || null,
     duration: entry.duration
