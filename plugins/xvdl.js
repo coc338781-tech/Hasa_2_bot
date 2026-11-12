@@ -5,6 +5,8 @@ import path from "node:path";
 
 const exec = promisify(execFile);
 const MAX_BYTES = 500 * 1024 * 1024;
+const MAX_CONCURRENT_DOWNLOADS = 1;
+const MIN_FREE_BYTES = 1536 * 1024 * 1024;
 const MAX_RESULTS = 20;
 const SESSION_TTL = 15 * 60 * 1000;
 const sessions = new Map();
@@ -304,8 +306,8 @@ function listingText(entries, source) {
 }
 
 async function downloadVideo({ sock, jid, message, entry, config, execCommand, fileSystem }) {
-  if (activeDownloads >= 2) {
-    return send(sock, jid, "⏳ දැනට downloads දෙකක් ක්‍රියාත්මකයි. ටික වේලාවකින් නැවත උත්සාහ කරන්න.", message);
+  if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
+    return send(sock, jid, "⏳ දැනට download එකක් ක්‍රියාත්මකයි. එය අවසන් වූ පසු නැවත උත්සාහ කරන්න.", message);
   }
   const url = normalizeAllowedUrl(entry.url, entry.source);
   if (!url) return send(sock, jid, "❌ මේ වීඩියෝ Link එක අවසර ලත් Public source එකකින් නොවේ.", message);
@@ -314,7 +316,16 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
   const name = "xvdl-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
   try {
     fileSystem.mkdirSync(dir, { recursive: true });
-    await send(sock, jid, "⏳ *Video එක Download කරමින්...*\n📦 උපරිමය 500 MB", message);
+    if (typeof fileSystem.statfsSync !== "function") {
+      throw new Error("Disk free-space check is unavailable.");
+    }
+    const disk = fileSystem.statfsSync(dir);
+    const freeBytes = Number(disk.bavail) * Number(disk.bsize);
+    if (!Number.isFinite(freeBytes) || freeBytes < MIN_FREE_BYTES) {
+      await send(sock, jid, "⚠️ Server එකේ free disk space ප්‍රමාණවත් නැහැ. අවම 1.5 GB ඉඩක් ලැබුණු පසු නැවත උත්සාහ කරන්න.", message);
+      return;
+    }
+    await send(sock, jid, "⏳ *Video එක Download කරමින්...*\n📦 උපරිමය 500 MB | එකවර download 1ක්", message);
     await execCommand("yt-dlp", ["--version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     await execCommand("yt-dlp", [
