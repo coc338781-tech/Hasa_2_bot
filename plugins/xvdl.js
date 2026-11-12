@@ -111,7 +111,7 @@ function normalizeAllowedUrl(value, source) {
 async function fetchListing(url, execCommand) {
   const result = await execCommand("yt-dlp", [
     "--flat-playlist", "--dump-single-json", "--no-warnings",
-    "--no-playlist", "--playlist-end", String(MAX_RESULTS), url
+    "--playlist-end", String(MAX_RESULTS), url
   ], { timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
   const info = JSON.parse(result.stdout || "{}");
   const entries = Array.isArray(info.entries) ? info.entries.filter(Boolean) : [info];
