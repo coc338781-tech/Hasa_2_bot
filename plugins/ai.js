@@ -10,7 +10,13 @@ const RETIRED_MODELS = new Set([
 ]);
 const DEFAULT_MODEL = "gemini-3.8-flash";
 const FALLBACK_MODEL = "gemini-3.5-flash-lite";
-const RETRYABLE_STATUS = new Set([408, 500, 502, 503, 504]);
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+function isTransientError(error) {
+  const status = errorStatus(error);
+  if (RETRYABLE_STATUS.has(status)) return true;
+  return /timeout|timed out|aborted|econnreset|econnrefused|ehostunreach|enetunreach|socket hang up|network error/i.test(String(error?.message || error));
+}
 
 function errorStatus(error) {
   const direct = Number(error?.status || error?.statusCode || error?.response?.status);
@@ -33,7 +39,7 @@ async function generateWithRetry(client, modelName, prompt) {
     } catch (error) {
       lastError = error;
       const status = errorStatus(error);
-      if (!RETRYABLE_STATUS.has(status) || attempt === 2) break;
+      if (!isTransientError(error) || attempt === 2) break;
       await sleep(2000 * (2 ** attempt) + Math.floor(Math.random() * 500));
     }
   }
@@ -62,7 +68,7 @@ export default async function ai({ sock, message, config }) {
       answer = await generateWithRetry(client, primaryModel, prompt);
     } catch (primaryError) {
       const status = errorStatus(primaryError);
-      if (primaryModel === FALLBACK_MODEL || ![408, 500, 502, 503, 504].includes(status)) throw primaryError;
+      if (primaryModel === FALLBACK_MODEL || !isTransientError(primaryError)) throw primaryError;
       answer = await generateWithRetry(client, FALLBACK_MODEL, prompt);
     }
     await sock.sendMessage(jid, { text: answer }, { quoted: message });
