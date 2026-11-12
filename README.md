@@ -10,7 +10,8 @@ A separate WhatsApp MD bot project. It does not overwrite or share the existing 
 - Configurable auto replies with add/replace/list/remove/reset commands.
 - Group commands: tagall, hidetag, promote, demote, kick, groupinfo, anti-link moderation, and member warnings (admin checks included).
 - AI chat using Gemini when an API key is configured, including image questions and voice transcription.
-- Video downloader for supported public URLs via yt-dlp (.dl and .fb).
+- Video downloader for supported public URLs via yt-dlp (.dl and .fb), with disk-backed WhatsApp media delivery and a 200 MiB video cap.
+- 18+ self-attested public video browser (.xvdl): Pornhub public category/search listings and xHamster public video/creator-page listings; owner bypasses the bot's age prompt.
 - Media tools: create static/animated stickers (.sticker / .s), extract audio from video (.toaudio), compress video (.compress), and convert photos to PDF (.topdf).
 - AI and utility tools: live web search (.search), text-to-speech (.tts), PDF text extraction/summarization (.pdf), image OCR (.ocr), QR codes (.qr), and downloadable contact cards (.vcard).
 - Owner tools: Gemini/Groq usage counters (.aiusage) and persistent scheduled private messages (.schedule / .schedules / .cancelschedule).
