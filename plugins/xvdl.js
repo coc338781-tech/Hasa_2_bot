@@ -5,7 +5,7 @@ import path from "node:path";
 
 const exec = promisify(execFile);
 const MAX_BYTES = 200 * 1024 * 1024;
-const MAX_RESULTS = 10;
+const MAX_RESULTS = 20;
 const SESSION_TTL = 15 * 60 * 1000;
 const sessions = new Map();
 const ageConfirmed = new Set();
@@ -297,7 +297,8 @@ function listingText(entries, source) {
     ),
     "╰━━━━━━━━━━━━━━━━━━━━",
     "",
-    "Download කිරීමට වීඩියෝ අංකය Reply කරන්න.",
+    "Download කිරීමට 1-" + entries.length + " අතර අංකය Reply කරන්න.",
+    "➡️ තවත් වීඩියෝ සඳහා *N* | කලින් පිටුවට *P*",
     "📦 උපරිම ගොනු ප්‍රමාණය: *200 MB*"
   ].join("\n");
 }
@@ -463,6 +464,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     }
     try {
       let entries;
+      let activeListingUrl = url;
       let listLabel = categoryLabel ? "Pornhub · " + categoryLabel : "Pornhub";
       try {
         entries = await fetchListing(url, state.source, execCommand);
@@ -471,9 +473,10 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
         if (!fallbackUrl) throw primaryError;
         entries = await fetchListing(fallbackUrl, state.source, execCommand);
         if (!entries.length) throw primaryError;
+        activeListingUrl = fallbackUrl;
         listLabel += " (search fallback)";
       }
-      setSession(senderKey, { step: "video", source: "pornhub", entries });
+      setSession(senderKey, { step: "video", source: "pornhub", entries, listingUrl: activeListingUrl, page: 1 });
       return send(sock, jid, listingText(entries, listLabel), message);
     } catch (error) {
       setSession(senderKey, { step: "category", source: "pornhub", retryUrl: url, fallbackUrl, categoryLabel });
@@ -486,7 +489,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     try {
       const entries = await fetchListing(url, state.source, execCommand);
       if (!entries.length) throw new Error("No public entries found.");
-      setSession(senderKey, { step: "video", source: "pornhub", entries });
+      setSession(senderKey, { step: "video", source: "pornhub", entries, listingUrl: url, page: 1 });
       return send(sock, jid, listingText(entries, "Pornhub"), message);
     } catch {
       return send(sock, jid, "❌ Public search results ලබාගත නොහැකි වුණා. පසුව උත්සාහ කරන්න.", message);
@@ -498,14 +501,41 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     try {
       const entries = await fetchListing(url, state.source, execCommand);
       if (!entries.length) throw new Error("No public entries found.");
-      setSession(senderKey, { step: "video", source: "xhamster", entries });
+      setSession(senderKey, { step: "video", source: "xhamster", entries, listingUrl: url, page: 1 });
       return send(sock, jid, listingText(entries, "xHamster"), message);
     } catch {
       return send(sock, jid, "❌ මේ Public page එකෙන් වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා.", message);
     }
   }
   if (state.step === "video") {
-    if (!/^[1-8]$/.test(body)) return send(sock, jid, "ලැයිස්තුවේ 1-" + state.entries.length + " අතර වීඩියෝ අංකයක් යවන්න.", message);
+    if (["n", "next", "ඊළඟ"].includes(body.toLowerCase())) {
+      const nextPage = (state.page || 1) + 1;
+      const nextUrl = new URL(state.listingUrl);
+      nextUrl.searchParams.set("page", String(nextPage));
+      try {
+        const entries = await fetchListing(nextUrl.toString(), state.source, execCommand);
+        if (!entries.length) return send(sock, jid, "තවත් වීඩියෝ නැහැ. කලින් පිටුවට *P* යවන්න.", message);
+        setSession(senderKey, { ...state, entries, page: nextPage });
+        return send(sock, jid, listingText(entries, state.source === "xhamster" ? "xHamster · Page " + nextPage : "Pornhub · Page " + nextPage), message);
+      } catch {
+        return send(sock, jid, "ඊළඟ පිටුව ලබාගත නොහැකි වුණා. නැවත *N* යවන්න.", message);
+      }
+    }
+    if (["p", "prev", "previous"].includes(body.toLowerCase())) {
+      const previousPage = Math.max(1, (state.page || 1) - 1);
+      if (previousPage === (state.page || 1)) return send(sock, jid, "ඔබ දැනට පළමු පිටුවේ ඉන්නේ.", message);
+      const previousUrl = new URL(state.listingUrl);
+      if (previousPage === 1) previousUrl.searchParams.delete("page");
+      else previousUrl.searchParams.set("page", String(previousPage));
+      try {
+        const entries = await fetchListing(previousUrl.toString(), state.source, execCommand);
+        setSession(senderKey, { ...state, entries, page: previousPage });
+        return send(sock, jid, listingText(entries, state.source === "xhamster" ? "xHamster · Page " + previousPage : "Pornhub · Page " + previousPage), message);
+      } catch {
+        return send(sock, jid, "කලින් පිටුව ලබාගත නොහැකි වුණා.", message);
+      }
+    }
+    if (!/^(?:[1-9]|1\d|20)$/.test(body)) return send(sock, jid, "1-" + state.entries.length + " අංකයක් තෝරන්න. තවත් වීඩියෝ සඳහා N යවන්න.", message);
     const entry = state.entries[Number(body) - 1];
     if (!entry) return send(sock, jid, "වැරදි වීඩියෝ අංකයක්.", message);
     sessions.delete(senderKey);

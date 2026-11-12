@@ -241,7 +241,7 @@ test("video listing uses bounded metadata output", async () => {
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     assert.ok(metadataArgs.includes("--playlist-end"));
-    assert.ok(metadataArgs.includes("10"));
+    assert.ok(metadataArgs.includes("20"));
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
@@ -296,6 +296,41 @@ test("xHamster estimates a missing size from the selected format bitrate", async
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     assert.match(state.sent.at(-1).payload.text, /≈ 13\.6 MB/);
     assert.doesNotMatch(state.sent.at(-1).payload.text, /Size නොදනී/);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
+
+test("XVDL video list supports next and previous pages", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  const requested = [];
+  const execCommand = async (command, args, options) => {
+    if (command === "curl") {
+      const url = args.at(-1);
+      requested.push(url);
+      const page = new URL(url).searchParams.get("page") || "1";
+      return { stdout: '<a href="/videos/page-' + page + '-video-xhAb' + page + '23" title="Page ' + page + ' video">video</a>' };
+    }
+    if (args.includes("--skip-download")) {
+      const pageMatch = String(args.at(-1)).match(/page-([0-9]+)-video/i);
+      const page = pageMatch?.[1] || "1";
+      return { stdout: JSON.stringify({ title: "Page " + page + " video", filesize_approx: 5 * 1024 * 1024, duration: 30 }) };
+    }
+    return state.execCommand(command, args, options);
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("2", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("3", true) });
+    assert.match(state.sent.at(-1).payload.text, /Page 1 video/);
+    await xvdl({ ...state, execCommand, message: state.makeMessage("n", true) });
+    assert.ok(requested.at(-1).includes("page=2"));
+    assert.match(state.sent.at(-1).payload.text, /Page 2 video/);
+    await xvdl({ ...state, execCommand, message: state.makeMessage("p", true) });
+    assert.match(state.sent.at(-1).payload.text, /Page 1 video/);
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
