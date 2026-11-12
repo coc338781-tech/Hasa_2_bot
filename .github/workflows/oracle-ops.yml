@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/oracle-ops.yml"
+      - "plugins/ai.js"
+      - "config.example.json"
   workflow_dispatch:
     inputs:
       scope:
@@ -99,7 +101,9 @@ jobs:
           const key=process.env.GEMINI_API_KEY;
           const fs=await import('node:fs');
           const botConfig=JSON.parse(fs.readFileSync('config.json','utf8'));
-          const model=botConfig.aiModel||'gemini-2.0-flash';
+          const configuredModel=botConfig.aiModel||'gemini-3.8-flash';
+          const retired=new Set(['gemini-2.0-flash','gemini-2.0-flash-001','gemini-2.0-flash-lite','gemini-2.0-flash-lite-001','gemini-2.5-flash','gemini-2.5-flash-lite']);
+          const model=retired.has(configuredModel)?'gemini-3.8-flash':configuredModel;
           if (!key) add('Gemini generateContent',false,'GEMINI_API_KEY not available in Oracle environment');
           else {
             try {
