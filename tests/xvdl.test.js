@@ -115,7 +115,6 @@ test("failed Pornhub category listing keeps a retry action", async () => {
   try {
     await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
     await xvdl({ ...state, message: state.makeMessage("1", true) });
-    await xvdl({ ...state, message: state.makeMessage("1", true) });
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     assert.match(state.sent.at(-1).payload.text, /connection එක.*reset/i);
     assert.match(state.sent.at(-1).payload.text, /0.*නැවත උත්සාහ/);
