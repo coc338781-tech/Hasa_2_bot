@@ -464,6 +464,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     }
     try {
       let entries;
+      let activeListingUrl = url;
       let listLabel = categoryLabel ? "Pornhub · " + categoryLabel : "Pornhub";
       try {
         entries = await fetchListing(url, state.source, execCommand);
@@ -472,9 +473,10 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
         if (!fallbackUrl) throw primaryError;
         entries = await fetchListing(fallbackUrl, state.source, execCommand);
         if (!entries.length) throw primaryError;
+        activeListingUrl = fallbackUrl;
         listLabel += " (search fallback)";
       }
-      setSession(senderKey, { step: "video", source: "pornhub", entries, listingUrl: url, page: 1 });
+      setSession(senderKey, { step: "video", source: "pornhub", entries, listingUrl: activeListingUrl, page: 1 });
       return send(sock, jid, listingText(entries, listLabel), message);
     } catch (error) {
       setSession(senderKey, { step: "category", source: "pornhub", retryUrl: url, fallbackUrl, categoryLabel });
