@@ -5,7 +5,7 @@ import path from "node:path";
 
 const exec = promisify(execFile);
 const MAX_BYTES = 200 * 1024 * 1024;
-const MAX_RESULTS = 8;
+const MAX_RESULTS = 6;
 const SESSION_TTL = 15 * 60 * 1000;
 const sessions = new Map();
 const ageConfirmed = new Set();
@@ -108,21 +108,44 @@ function normalizeAllowedUrl(value, source) {
   return url.toString();
 }
 
-async function fetchListing(url, execCommand) {
+async function fetchListing(url, source, execCommand) {
   const result = await execCommand("yt-dlp", [
     "--flat-playlist", "--dump-single-json", "--no-warnings",
     "--playlist-end", String(MAX_RESULTS), url
   ], { timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
   const info = JSON.parse(result.stdout || "{}");
-  const entries = Array.isArray(info.entries) ? info.entries.filter(Boolean) : [info];
-  return entries.slice(0, MAX_RESULTS).map(entry => ({
-    title: String(entry.title || "Untitled video").replace(/[\r\n]/g, " ").slice(0, 100),
-    url: entry.webpage_url || entry.original_url || entry.url || "",
+  const rawEntries = Array.isArray(info.entries) ? info.entries.filter(Boolean) : [info];
+  const entries = rawEntries.slice(0, MAX_RESULTS).map(entry => ({
+    title: String(entry.title || "Untitled video").replace(/[\\r\\n]/g, " ").slice(0, 100),
+    url: normalizeAllowedUrl(entry.webpage_url || entry.original_url || entry.url || "", source),
     size: entry.filesize_approx || entry.filesize || null,
     duration: entry.duration
   })).filter(entry => entry.url);
+  // Flat playlists often omit sizes. Resolve per-video metadata in small batches,
+  // without downloading media or creating large memory buffers.
+  for (let index = 0; index < entries.length; index += 3) {
+    await Promise.all(entries.slice(index, index + 3).map(async entry => {
+      if (entry.size) return;
+      try {
+        const metadata = await execCommand("yt-dlp", [
+          "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", entry.url
+        ], { timeout: 30000, maxBuffer: 2 * 1024 * 1024 });
+        const details = JSON.parse(metadata.stdout || "{}");
+        const formats = Array.isArray(details.formats) ? details.formats : [];
+        const videoFormats = formats.filter(format => format.vcodec && format.vcodec !== "none" &&
+          (!format.height || format.height <= 720));
+        videoFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
+        const selected = videoFormats[0] || {};
+        entry.size = details.filesize_approx || details.filesize ||
+          selected.filesize_approx || selected.filesize || null;
+        entry.duration = details.duration || entry.duration;
+      } catch {
+        // Keep the entry visible and mark its size/duration as unavailable.
+      }
+    }));
+  }
+  return entries;
 }
-
 function listingText(entries, source) {
   return [
     "╭━━〔 📺 *" + source + " VIDEO LIST* 〕━━",
@@ -240,7 +263,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       return send(sock, jid, "ලැයිස්තුවෙන් 1-6 අතර අංකයක් තෝරන්න.", message);
     }
     try {
-      const entries = await fetchListing(url, execCommand);
+      const entries = await fetchListing(url, state.source, execCommand);
       if (!entries.length) throw new Error("No public entries found.");
       setSession(senderKey, { step: "video", source: "pornhub", entries });
       return send(sock, jid, listingText(entries, "Pornhub"), message);
@@ -252,7 +275,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     if (!body || body.length > 80) return send(sock, jid, "කෙටි Search keyword එකක් යවන්න.", message);
     const url = "https://www.pornhub.com/video/search?search=" + encodeURIComponent(body);
     try {
-      const entries = await fetchListing(url, execCommand);
+      const entries = await fetchListing(url, state.source, execCommand);
       if (!entries.length) throw new Error("No public entries found.");
       setSession(senderKey, { step: "video", source: "pornhub", entries });
       return send(sock, jid, listingText(entries, "Pornhub"), message);
@@ -264,7 +287,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     const url = normalizeAllowedUrl(body, "xhamster");
     if (!url) return send(sock, jid, "නිවැරදි Public xHamster video හෝ creator profile URL එකක් යවන්න.", message);
     try {
-      const entries = await fetchListing(url, execCommand);
+      const entries = await fetchListing(url, state.source, execCommand);
       if (!entries.length) throw new Error("No public entries found.");
       setSession(senderKey, { step: "video", source: "xhamster", entries });
       return send(sock, jid, listingText(entries, "xHamster"), message);
