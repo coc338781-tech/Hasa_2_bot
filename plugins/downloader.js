@@ -52,7 +52,7 @@ export function explainDownloadError(error) {
 function youtubeOptions(target, fileSystem = fs) {
   const value = String(target);
   const isYoutube = value.startsWith("ytsearch") ||
-    /^https?:\\/\\/(?:www\\.)?(?:youtube\\.com|youtu\\.be)\\//i.test(value);
+    /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\//i.test(value);
   const cookieFile = process.env.YOUTUBE_COOKIES_FILE;
   const cookies = cookieFile && fileSystem.existsSync(cookieFile) ? ["--cookies", cookieFile] : [];
   return [...(isYoutube ? ["--extractor-args", "youtube:player_client=tv,web_safari"] : []), ...cookies];
