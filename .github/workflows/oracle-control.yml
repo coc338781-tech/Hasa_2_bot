@@ -524,8 +524,10 @@ jobs:
           import pathlib, sys
           p = pathlib.Path(sys.argv[1])
           s = p.read_text()
-          old = """OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" {print}')""""
-          new = """OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" && $2 != "plugins/downloader.js" {print}')""""
+          old = 'OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk \'$2 != "plugins/ai.js" {print}\')"'
+
+          new = 'OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk \'$2 != "plugins/ai.js" && $2 != "plugins/downloader.js" {print}\')"'
+
           if old in s:
               s = s.replace(old, new, 1)
           elif new not in s:
