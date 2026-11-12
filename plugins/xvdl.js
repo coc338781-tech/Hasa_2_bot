@@ -92,8 +92,8 @@ function categoryMenu() {
 function xhamsterMenu() {
   return [
     "╭━━〔 🎬 *xHAMSTER BROWSER* 〕━━",
-    "┃ 1️⃣ Latest uploads",
-    "┃ 2️⃣ Trending / Popular",
+    "┃ 1️⃣ Latest uploads (Amateur feed)",
+    "┃ 2️⃣ Trending / Popular (Amateur feed)",
     "┃ 3️⃣ Amateur",
     "┃ 4️⃣ Lesbian",
     "┃ 5️⃣ MILF",
@@ -127,7 +127,93 @@ function normalizeAllowedUrl(value, source) {
   return url.toString();
 }
 
+function decodeHtml(value) {
+  return String(value || "").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">");
+}
+
+function htmlAttribute(attributes, name) {
+  const match = String(attributes || "").match(new RegExp("\\b" + name + "\\s*=\\s*([\"'])(.*?)\\1", "i"));
+  return match ? decodeHtml(match[2]).trim() : "";
+}
+
+function titleFromVideoUrl(url) {
+  const slug = new URL(url).pathname.split("/").filter(Boolean).pop() || "Public video";
+  return slug.replace(/-xh[a-z0-9]+$/i, "").replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ").trim().replace(/\b\w/g, letter => letter.toUpperCase()).slice(0, 100) || "Public video";
+}
+
+async function fetchXHamsterListing(url, execCommand) {
+  const page = await execCommand("curl", [
+    "-4", "-L", "-sS", "--fail", "--compressed", "--max-time", "25",
+    "-A", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/133.0.0.0 Safari/537.36",
+    url
+  ], { timeout: 30000, maxBuffer: 6 * 1024 * 1024 });
+  const html = String(page.stdout || "");
+  const found = new Map();
+  const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  for (const match of html.matchAll(anchorPattern)) {
+    const href = htmlAttribute(match[1], "href");
+    if (!href) continue;
+    let candidate;
+    try { candidate = new URL(href.replace(/\\\//g, "/"), url).toString(); } catch { continue; }
+    const safeUrl = normalizeAllowedUrl(candidate, "xhamster");
+    if (!safeUrl || !/^https:\/\/(?:www\.)?xhamster\.com\/videos\/[^/?#]+/i.test(safeUrl)) continue;
+    if (found.has(safeUrl)) continue;
+    const inner = match[2] || "";
+    const image = inner.match(/<img\b([^>]*)>/i);
+    const title = htmlAttribute(match[1], "title") ||
+      htmlAttribute(match[1], "aria-label") ||
+      htmlAttribute(match[1], "data-title") ||
+      (image ? htmlAttribute(image[1], "alt") : "") ||
+      decodeHtml(inner.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()) ||
+      titleFromVideoUrl(safeUrl);
+    found.set(safeUrl, { title: String(title).replace(/[\r\n]/g, " ").slice(0, 100), url: safeUrl, size: null, duration: null });
+    if (found.size >= MAX_RESULTS) break;
+  }
+  if (!found.size) {
+    const fallbackPattern = /(?:https?:\\?\/\\?\/(?:www\\?\.)?xhamster\\?\.com)?\\?\/videos\\?\/[a-z0-9-]+-xh[a-z0-9]+/gi;
+    for (const match of html.matchAll(fallbackPattern)) {
+      const candidate = match[0].replace(/\\\//g, "/");
+      const safeUrl = normalizeAllowedUrl(candidate.startsWith("http") ? candidate : "https://xhamster.com" + candidate, "xhamster");
+      if (safeUrl && !found.has(safeUrl)) found.set(safeUrl, {
+        title: titleFromVideoUrl(safeUrl), url: safeUrl, size: null, duration: null
+      });
+      if (found.size >= MAX_RESULTS) break;
+    }
+  }
+  const entries = [...found.values()].slice(0, MAX_RESULTS);
+  if (!entries.length) throw new Error("No public xHamster video links found in the listing.");
+  // Resolve metadata in small batches. A failed metadata lookup does not discard
+  // a public listing entry; the actual download is validated when selected.
+  for (let index = 0; index < entries.length; index += 3) {
+    await Promise.all(entries.slice(index, index + 3).map(async entry => {
+      try {
+        const metadata = await execCommand("yt-dlp", [
+          "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", entry.url
+        ], { timeout: 45000, maxBuffer: 2 * 1024 * 1024 });
+        const details = JSON.parse(metadata.stdout || "{}");
+        entry.title = String(details.title || entry.title).replace(/[\r\n]/g, " ").slice(0, 100);
+        entry.size = details.filesize_approx || details.filesize || null;
+        entry.duration = details.duration || null;
+      } catch {
+        // Keep the public URL and a readable slug-derived title.
+      }
+    }));
+  }
+  return entries;
+}
+
 async function fetchListing(url, source, execCommand) {
+  if (source === "xhamster") {
+    let parsed;
+    try { parsed = new URL(url); } catch { throw new Error("Invalid xHamster URL."); }
+    // Category, search, home and creator pages are ordinary public HTML pages;
+    // yt-dlp does not provide a playlist extractor for these listing URLs.
+    if (!/^\/videos\/[^/]+/i.test(parsed.pathname)) {
+      return fetchXHamsterListing(url, execCommand);
+    }
+  }
   const result = await execCommand("yt-dlp", [
     "--flat-playlist", "--dump-single-json", "--no-warnings",
     "--playlist-end", String(MAX_RESULTS), url
@@ -140,8 +226,6 @@ async function fetchListing(url, source, execCommand) {
     size: entry.filesize_approx || entry.filesize || null,
     duration: entry.duration
   })).filter(entry => entry.url);
-  // Flat playlists often omit sizes. Resolve per-video metadata in small batches,
-  // without downloading media or creating large memory buffers.
   for (let index = 0; index < entries.length; index += 3) {
     await Promise.all(entries.slice(index, index + 3).map(async entry => {
       if (Number.isFinite(Number(entry.size)) && Number(entry.size) > 0) return;
@@ -165,6 +249,7 @@ async function fetchListing(url, source, execCommand) {
   }
   return entries;
 }
+
 function listingFailureText(error, fallback) {
   const detail = String(error?.stderr || error?.message || "");
   if (/ECONNRESET|curl:\\s*\\(35\\)|connection reset|timed? out/i.test(detail)) {
@@ -294,12 +379,12 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       return send(sock, jid, "🔎 සෙවීමට keyword එක යවන්න.", message);
     }
     const urls = state.retryUrl && body === "0" ? { "0": state.retryUrl } : {
-      "1": "https://xhamster.com/videos?sort=newest",
-      "2": "https://xhamster.com/videos?sort=popular",
-      "3": "https://xhamster.com/categories/amateur",
-      "4": "https://xhamster.com/categories/lesbian",
-      "5": "https://xhamster.com/categories/milf",
-      "6": "https://xhamster.com/categories/massage"
+      "1": "https://xhamster.com/categories/amateur?sort=newest",
+      "2": "https://xhamster.com/categories/amateur?sort=best",
+      "3": "https://xhamster.com/categories/amateur?sort=newest",
+      "4": "https://xhamster.com/categories/lesbian?sort=newest",
+      "5": "https://xhamster.com/categories/milf?sort=newest",
+      "6": "https://xhamster.com/categories/massage?sort=newest"
     };
     const url = urls[body];
     if (!url) return send(sock, jid, "1-7 අතර අංකයක් තෝරන්න.", message);
@@ -327,11 +412,16 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
   }
   if (state.step === "category") {
     let url;
+    let fallbackUrl = null;
+    let categoryLabel = state.categoryLabel || "";
     if (/^[1-5]$/.test(body)) {
       const [, slug] = PORNHUB_CATEGORIES[Number(body) - 1];
       url = "https://www.pornhub.com/categories/" + slug;
+      fallbackUrl = "https://www.pornhub.com/video/search?search=" + encodeURIComponent(slug);
+      categoryLabel = slug;
     } else if (body === "0" && state.retryUrl) {
       url = state.retryUrl;
+      fallbackUrl = state.fallbackUrl || null;
     } else if (["6", "7", "8"].includes(body)) {
       url = {
         "6": "https://www.pornhub.com/video?o=mr",
@@ -345,12 +435,21 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       return send(sock, jid, "ලැයිස්තුවෙන් 1-9 අතර අංකයක් තෝරන්න.", message);
     }
     try {
-      const entries = await fetchListing(url, state.source, execCommand);
-      if (!entries.length) throw new Error("No public entries found.");
+      let entries;
+      let listLabel = categoryLabel ? "Pornhub · " + categoryLabel : "Pornhub";
+      try {
+        entries = await fetchListing(url, state.source, execCommand);
+        if (!entries.length) throw new Error("No public entries found.");
+      } catch (primaryError) {
+        if (!fallbackUrl) throw primaryError;
+        entries = await fetchListing(fallbackUrl, state.source, execCommand);
+        if (!entries.length) throw primaryError;
+        listLabel += " (search fallback)";
+      }
       setSession(senderKey, { step: "video", source: "pornhub", entries });
-      return send(sock, jid, listingText(entries, "Pornhub"), message);
+      return send(sock, jid, listingText(entries, listLabel), message);
     } catch (error) {
-      setSession(senderKey, { step: "category", source: "pornhub", retryUrl: url });
+      setSession(senderKey, { step: "category", source: "pornhub", retryUrl: url, fallbackUrl, categoryLabel });
       return send(sock, jid, "❌ " + listingFailureText(error, "Public category එකේ වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා.") + "\n\n0️⃣ Retry | 6️⃣ Search", message);
     }
   }
