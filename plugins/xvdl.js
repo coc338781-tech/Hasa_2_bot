@@ -79,10 +79,29 @@ function categoryMenu() {
   return [
     "╭━━〔 🎬 *PORNHub CATEGORIES* 〕━━",
     ...PORNHUB_CATEGORIES.map(([label], index) => "┃ " + (index + 1) + "️⃣ " + label),
-    "┃ 6️⃣ Search keyword",
+    "┃ 6️⃣ Latest uploads",
+    "┃ 7️⃣ Most viewed",
+    "┃ 8️⃣ Top rated",
+    "┃ 9️⃣ Search keyword",
     "╰━━━━━━━━━━━━━━━━━━━━",
     "",
     "Category අංකය Reply කරන්න."
+  ].join("\n");
+}
+
+function xhamsterMenu() {
+  return [
+    "╭━━〔 🎬 *xHAMSTER BROWSER* 〕━━",
+    "┃ 1️⃣ Latest uploads",
+    "┃ 2️⃣ Trending / Popular",
+    "┃ 3️⃣ Amateur",
+    "┃ 4️⃣ Lesbian",
+    "┃ 5️⃣ MILF",
+    "┃ 6️⃣ Massage",
+    "┃ 7️⃣ Search keyword",
+    "╰━━━━━━━━━━━━━━━━━━━━",
+    "",
+    "අංකය Reply කරන්න."
   ].join("\n");
 }
 
@@ -104,7 +123,7 @@ function normalizeAllowedUrl(value, source) {
   const host = url.hostname.toLowerCase().replace(/^www\./, "");
   if (source === "pornhub" && host !== "pornhub.com") return null;
   if (source === "xhamster" && host !== "xhamster.com") return null;
-  if (source === "xhamster" && !/^\/(videos\/|users\/[^/]+\/videos|creators\/)/i.test(url.pathname)) return null;
+  if (source === "xhamster" && !/^\/(videos(?:\/|$)|categories\/|search\/|users\/[^/]+\/videos|creators\/)/i.test(url.pathname)) return null;
   return url.toString();
 }
 
@@ -264,11 +283,47 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       return send(sock, jid, categoryMenu(), message);
     }
     if (body === "2") {
-      setSession(senderKey, { step: "xhamster-url", source: "xhamster" });
-      return send(sock, jid,
-        "🔗 xHamster හි Public video URL එකක් හෝ creator profile videos URL එකක් යවන්න.\n\nCategory browser එක මෙහි සහාය නොදක්වයි.", message);
+      setSession(senderKey, { step: "xhamster-browse", source: "xhamster" });
+      return send(sock, jid, xhamsterMenu(), message);
     }
     return send(sock, jid, "1 හෝ 2 තෝරන්න.", message);
+  }
+  if (state.step === "xhamster-browse") {
+    if (body === "7") {
+      setSession(senderKey, { step: "xhamster-search", source: "xhamster" });
+      return send(sock, jid, "🔎 සෙවීමට keyword එක යවන්න.", message);
+    }
+    const urls = state.retryUrl && body === "0" ? { "0": state.retryUrl } : {
+      "1": "https://xhamster.com/videos?sort=newest",
+      "2": "https://xhamster.com/videos?sort=popular",
+      "3": "https://xhamster.com/categories/amateur",
+      "4": "https://xhamster.com/categories/lesbian",
+      "5": "https://xhamster.com/categories/milf",
+      "6": "https://xhamster.com/categories/massage"
+    };
+    const url = urls[body];
+    if (!url) return send(sock, jid, "1-7 අතර අංකයක් තෝරන්න.", message);
+    try {
+      const entries = await fetchListing(url, "xhamster", execCommand);
+      if (!entries.length) throw new Error("No public entries found.");
+      setSession(senderKey, { step: "video", source: "xhamster", entries, listingUrl: url, page: 1 });
+      return send(sock, jid, listingText(entries, "xHamster"), message);
+    } catch (error) {
+      setSession(senderKey, { step: "xhamster-browse", source: "xhamster", retryUrl: url });
+      return send(sock, jid, "❌ " + listingFailureText(error, "xHamster public ලැයිස්තුව ලබාගත නොහැකි වුණා.") + "\\n\\n0️⃣ Retry", message);
+    }
+  }
+  if (state.step === "xhamster-search") {
+    if (!body || body.length > 80) return send(sock, jid, "කෙටි Search keyword එකක් යවන්න.", message);
+    const url = "https://xhamster.com/search/" + encodeURIComponent(body);
+    try {
+      const entries = await fetchListing(url, "xhamster", execCommand);
+      if (!entries.length) throw new Error("No public entries found.");
+      setSession(senderKey, { step: "video", source: "xhamster", entries, listingUrl: url, page: 1 });
+      return send(sock, jid, listingText(entries, "xHamster"), message);
+    } catch (error) {
+      return send(sock, jid, "❌ xHamster public search ලැයිස්තුව ලබාගත නොහැකි වුණා. " + listingFailureText(error, "පසුව නැවත උත්සාහ කරන්න."), message);
+    }
   }
   if (state.step === "category") {
     let url;
@@ -277,11 +332,17 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       url = "https://www.pornhub.com/categories/" + slug;
     } else if (body === "0" && state.retryUrl) {
       url = state.retryUrl;
-    } else if (body === "6") {
+    } else if (["6", "7", "8"].includes(body)) {
+      url = {
+        "6": "https://www.pornhub.com/video?o=mr",
+        "7": "https://www.pornhub.com/video?o=mv",
+        "8": "https://www.pornhub.com/video?o=tr"
+      }[body];
+    } else if (body === "9") {
       setSession(senderKey, { step: "pornhub-search", source: "pornhub" });
-      return send(sock, jid, "🔎 සෙවීමට අවශ්‍ය category එක හෝ keyword එක යවන්න.", message);
+      return send(sock, jid, "🔎 සෙවීමට keyword එක යවන්න.", message);
     } else {
-      return send(sock, jid, "ලැයිස්තුවෙන් 1-6 අතර අංකයක් තෝරන්න.", message);
+      return send(sock, jid, "ලැයිස්තුවෙන් 1-9 අතර අංකයක් තෝරන්න.", message);
     }
     try {
       const entries = await fetchListing(url, state.source, execCommand);
