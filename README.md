@@ -45,7 +45,7 @@ For AI text, image questions, and voice transcription, add `GEMINI_API_KEY=your_
 - `.sticker` / `.s` (reply to image/video), `.toaudio` (reply to video), `.compress` (reply to video), `.topdf` (reply to photo)
 - `.search query`, `.tts [si|en|ta] text`, `.pdf` (reply to PDF), `.ocr` (reply to photo), `.qr text`, `.vcard Name | Number | Company`
 - Owner: `.aiusage`, `.schedule 10m 9477XXXXXXX | Message`, `.schedules`, `.cancelschedule ID
-- `.dl url`, `.fb url`
+- `.dl url`, `.fb url`, `.xvdl` (18+ public video browser)
 - `.subbot phone-number`, `.subcheck`, `.stopsubbot`, `.restartsubbot`, `.delsubbot`, `.helpsubbot`
 
 ## Important notes
