@@ -372,8 +372,11 @@ jobs:
               echo "YTDLP_VERSION=$(yt-dlp --version 2>/dev/null | head -n 1)"
               TMP_OUT="$(mktemp)"
               TMP_ERR="$(mktemp)"
-              yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/categories/amateur" >"$TMP_OUT" 2>"$TMP_ERR"
-              RC=$?
+              if yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/categories/amateur" >"$TMP_OUT" 2>"$TMP_ERR"; then
+                RC=0
+              else
+                RC=$?
+              fi
               echo "YTDLP_EXIT=$RC"
               python3 - "$TMP_OUT" "$TMP_ERR" <<'PY'
           import json, pathlib, re, sys
