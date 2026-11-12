@@ -1,4 +1,4 @@
 {
-  "action": "xvdl-diagnose",
-  "request_id": "xvdl-impersonation-test-20261112-01"
+  "action": "install-ytdlp-impersonation",
+  "request_id": "xvdl-install-curl-cffi-20261112-01"
 }
