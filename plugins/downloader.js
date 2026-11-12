@@ -5,7 +5,7 @@ import path from "node:path";
 import { checkDownloaderTools } from "../lib/downloader-check.js";
 
 const exec = promisify(execFile);
-const MAX_BYTES = 96 * 1024 * 1024;
+const MAX_BYTES = 200 * 1024 * 1024;
 
 export function safeDownloadDiagnostic(error) {
   const candidates = [error?.stderr, error?.stdout, error?.message]
@@ -42,7 +42,7 @@ export function explainDownloadError(error) {
   if (/unsupported url|not a valid url|no suitable extractor/i.test(details)) return "මේ Link එක හඳුනාගන්න බැහැ. නිවැරදි Public වීඩියෝ Link එකක් යවන්න.";
   if (/private|login required|sign in|authentication|cookies/i.test(details)) return "මේ වීඩියෝ එක Private හෝ Login අවශ්‍ය එකක්. Public Link එකක් යවන්න.";
   if (/geo.?restricted|not available in your country/i.test(details)) return "මේ වීඩියෝ එක ඔබේ ප්‍රදේශයෙන් ලබාගත නොහැක.";
-  if (/max-filesize|file is larger|larger than/i.test(details)) return "ගොනුවේ ප්‍රමාණය අවසර ලත් සීමාව ඉක්මවා ඇත (Video 96 MB / Audio 32 MB).";
+  if (/max-filesize|file is larger|larger than/i.test(details)) return "ගොනුවේ ප්‍රමාණය අවසර ලත් සීමාව ඉක්මවා ඇත (Video 200 MB / Audio 32 MB).";
   if (/429|too many requests|rate.?limit/i.test(details)) return "වෙබ් අඩවියෙන් තාවකාලික සීමාවක් දමා තිබෙනවා. ටික වේලාවකින් නැවත උත්සාහ කරන්න.";
   return "වීඩියෝ එක ලබාගැනීමේදී දෝෂයක් ඇති වුණා. Link එක Public ද කියලා පරීක්ෂා කර නැවත උත්සාහ කරන්න.";
 }
@@ -119,13 +119,12 @@ export default async function downloader({ sock, message, config, execCommand = 
     const file = files[0];
     const size = fileSystem.statSync(file).size;
     if (size <= 0) throw new Error("Downloaded file is empty.");
-    if (size > sizeLimit) throw new Error(isAudio ? "Audio is larger than 32 MB." : "Video is larger than 96 MB.");
-    const data = fileSystem.readFileSync(file);
+    if (size > sizeLimit) throw new Error(isAudio ? "Audio is larger than 32 MB." : "Video is larger than 200 MB.");
     if (isAudio) {
-      await sock.sendMessage(jid, { audio: data, mimetype: "audio/mpeg", fileName: path.basename(file) }, { quoted: message });
+      await sock.sendMessage(jid, { audio: { url: file }, mimetype: "audio/mpeg", fileName: path.basename(file) }, { quoted: message });
     } else {
       await sock.sendMessage(jid, {
-        video: data,
+        video: { url: file },
         caption: "✅ *DOWNLOAD COMPLETED*\n\n🎬 " + path.basename(file) + "\n📦 " + (size / (1024 * 1024)).toFixed(1) + " MB\n❤️ *POWERED BY HASA*"
       }, { quoted: message });
     }
