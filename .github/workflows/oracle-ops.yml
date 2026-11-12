@@ -77,47 +77,57 @@ jobs:
           node --input-type=module <<'NODE'
           import 'dotenv/config';
           const checks = [];
-          const add = (name, ok, detail) => checks.push({name,ok,detail});
+          const importance = {
+            'Dictionary API':'LOW — dictionary command only; bot core is unaffected.',
+            'MyMemory Translation API':'MEDIUM — translation command may fail while provider is unavailable.',
+            'Gemini generateContent':'HIGH — AI chat and AI Studio replies depend on Gemini.',
+            'yt-dlp':'HIGH — video/audio download commands depend on this executable.',
+            'FFmpeg':'MEDIUM — media conversion, trimming and audio processing depend on FFmpeg.',
+            'YouTube search metadata':'MEDIUM — YouTube search/discovery may fail; direct supported links may still work.'
+          };
+          const add = (name, ok, detail) => checks.push({name,ok,detail,importance:importance[name]||'LOW'});
           async function request(name, url) {
-            try {
-              const r = await fetch(url, {signal: AbortSignal.timeout(12000)});
-              await r.arrayBuffer();
-              add(name, r.ok, 'HTTP '+r.status);
-            } catch (e) { add(name,false,(e.name||'Error')+': '+String(e.message||e).slice(0,140)); }
+            try { const r = await fetch(url, {signal:AbortSignal.timeout(15000)}); await r.arrayBuffer(); add(name,r.ok,'HTTP '+r.status); }
+            catch(e) { add(name,false,(e.name||'Error')+': '+String(e.message||e).slice(0,120)); }
           }
-          await request('Dictionary API', 'https://api.dictionaryapi.dev/api/v2/entries/en/hello');
-          await request('MyMemory Translation API', 'https://api.mymemory.translated.net/get?q=hello&langpair=en%7Csi');
-          const key = process.env.GEMINI_API_KEY;
-          const fs = await import('node:fs');
-          const botConfig = JSON.parse(fs.readFileSync('config.json','utf8'));
-          const model = botConfig.aiModel || 'gemini-2.0-flash';
-          if (!key) add('Gemini API',false,'GEMINI_API_KEY not available in Oracle app environment');
+          await request('Dictionary API','https://api.dictionaryapi.dev/api/v2/entries/en/hello');
+          await request('MyMemory Translation API','https://api.mymemory.translated.net/get?q=hello&langpair=en%7Csi');
+          const key=process.env.GEMINI_API_KEY;
+          const fs=await import('node:fs');
+          const botConfig=JSON.parse(fs.readFileSync('config.json','utf8'));
+          const model=botConfig.aiModel||'gemini-2.0-flash';
+          if (!key) add('Gemini generateContent',false,'GEMINI_API_KEY not available in Oracle environment');
           else {
             try {
-              const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key), {
-                method:'POST', headers:{'content-type':'application/json'},
-                body:JSON.stringify({contents:[{parts:[{text:'Reply with exactly OK'}]}]}),
-                signal:AbortSignal.timeout(20000)
-              });
+              const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'Reply with exactly OK'}]}]}),signal:AbortSignal.timeout(45000)});
               const data=await r.json();
-              add('Gemini generateContent',r.ok && Boolean(data?.candidates?.[0]?.content?.parts?.[0]?.text),'HTTP '+r.status);
-            } catch(e) { add('Gemini generateContent',false,(e.name||'Error')+': '+String(e.message||e).slice(0,140)); }
+              const ok=r.ok&&Boolean(data?.candidates?.[0]?.content?.parts?.[0]?.text);
+              add('Gemini generateContent',ok,ok?'HTTP '+r.status:'HTTP '+r.status+' '+String(data?.error?.status||data?.error?.message||'No generated text').slice(0,100));
+            } catch(e) { add('Gemini generateContent',false,(e.name||'Error')+': '+String(e.message||e).slice(0,120)); }
           }
-          const {execFile} = await import('node:child_process');
-          const {promisify} = await import('node:util');
-          const exec = promisify(execFile);
+          const {execFile}=await import('node:child_process');
+          const {promisify}=await import('node:util');
+          const exec=promisify(execFile);
           for (const [name,bin,args] of [['yt-dlp','yt-dlp',['--version']],['FFmpeg','ffmpeg',['-version']]]) {
             try { const {stdout,stderr}=await exec(bin,args,{timeout:10000,maxBuffer:1024*1024}); add(name,true,(stdout||stderr).split('\n')[0].slice(0,100)); }
-            catch(e) { add(name,false,String(e.code||e.message||'unavailable').slice(0,140)); }
+            catch(e) { add(name,false,String(e.code||e.message||'unavailable').slice(0,120)); }
           }
-          try {
-            const {stdout}=await exec('yt-dlp',['--dump-single-json','--skip-download','--no-warnings','--no-playlist','ytsearch1:lofi music'],{timeout:30000,maxBuffer:2*1024*1024});
-            const meta=JSON.parse(stdout);
-            add('YouTube search metadata',Boolean(meta?.entries?.[0]?.id),'Search metadata received');
-          } catch(e) { add('YouTube search metadata',false,String(e.code||e.message||'failed').slice(0,140)); }
-          for (const c of checks) console.log((c.ok?'PASS':'FAIL')+' | '+c.name+' | '+c.detail);
-          console.log('RESULT '+checks.filter(x=>x.ok).length+'/'+checks.length+' passed');
-          if (checks.some(x=>!x.ok)) process.exitCode=2;
+          let ytOk=false, ytDetail='No metadata returned';
+          for (const [label,url] of [['YouTube public video','https://www.youtube.com/watch?v=jfKfPfyJRdk'],['YouTube search','ytsearch1:lofi music']]) {
+            try {
+              const {stdout}=await exec('yt-dlp',['--dump-single-json','--skip-download','--no-warnings','--no-playlist',url],{timeout:45000,maxBuffer:2*1024*1024});
+              const meta=JSON.parse(stdout), entry=meta?.entries?.[0]||meta;
+              if(entry?.id){ytOk=true;ytDetail=label+' metadata received';break;}
+              ytDetail=label+': JSON had no video ID';
+            } catch(e) {
+              const msg=String(e.stderr||e.message||e.code||'failed').split(/\r?\n/).filter(Boolean).slice(-1)[0]||'failed';
+              ytDetail=label+': '+msg.replace(/https?:\/\/\S+/g,'[URL]').replace(/\b\d{8,}\b/g,'[ID]').slice(0,120);
+            }
+          }
+          add('YouTube search metadata',ytOk,ytDetail);
+          for(const c of checks) console.log((c.ok?'PASS':'WARN')+' | '+c.name+' | '+c.detail+' | Importance: '+c.importance);
+          console.log('RESULT '+checks.filter(x=>x.ok).length+'/'+checks.length+' passed; '+checks.filter(x=>!x.ok).length+' warning(s).');
+          // Third-party provider outages are warnings, not Oracle/WhatsApp infrastructure failures.
           NODE
           REMOTE
           ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" 'bash -s' < provider-smoke.sh | tee provider-smoke.txt
