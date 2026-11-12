@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|merge-downloader-guard|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -388,6 +388,25 @@ jobs:
                 printf 'working_tree_lines: '; wc -l < plugins/downloader.js
               fi
               ;;
+            checkpoint-downloader)
+              echo "Checkpoint only if Oracle downloader exactly matches incoming GitHub code."
+              git fetch origin assistant-workflow
+              TARGET="$(git rev-parse origin/assistant-workflow)"
+              if ! git diff --quiet "$TARGET" -- plugins/downloader.js; then
+                echo "STOP: Oracle downloader does not exactly match GitHub target; no local commit made."
+                exit 2
+              fi
+              if ! git diff --quiet HEAD -- plugins/downloader.js; then
+                git -c user.name="Hasa Deployment Checkpoint" -c user.email="deployment-checkpoint@users.noreply.github.com" add plugins/downloader.js
+                git -c user.name="Hasa Deployment Checkpoint" -c user.email="deployment-checkpoint@users.noreply.github.com" commit -m "Checkpoint validated Oracle downloader before deploy"
+                echo "DOWNLOADER_CHECKPOINT=CREATED"
+              else
+                echo "DOWNLOADER_CHECKPOINT=NOT_NEEDED"
+              fi
+              echo "Current local commit: $(git rev-parse --short HEAD)"
+              echo "Working tree:"
+              git status --short
+              ;;
             patch-deploy-guard)
               GUARD=/home/opc/bin/hasa2-deploy
               BACKUP="${GUARD}.bak-$(date +%Y%m%d-%H%M%S)"
@@ -514,67 +533,6 @@ jobs:
               bash -n "$GUARD"
               echo "Deploy guard updated; original backup: $BACKUP"
               sed -n "14,52p" "$GUARD"
-              ;;
-            merge-downloader-guard)
-              echo "Safely extend deploy guard: allow downloader only when Oracle's local file exactly matches the incoming GitHub version."
-              GUARD=/home/opc/bin/hasa2-deploy
-              BACKUP="${GUARD}.bak-downloader-$(date +%Y%m%d-%H%M%S)"
-              cp -p "$GUARD" "$BACKUP"
-              python3 - "$GUARD" <<'PY'
-          import pathlib, sys
-          p = pathlib.Path(sys.argv[1])
-          s = p.read_text()
-          old = 'OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk \'$2 != "plugins/ai.js" {print}\')"'
-
-          new = 'OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk \'$2 != "plugins/ai.js" && $2 != "plugins/downloader.js" {print}\')"'
-
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif new not in s:
-              raise SystemExit("STOP: Expected local-change guard was not found; no changes made.")
-
-          ai_check = """NEW_SHA="$(git rev-parse "origin/$BRANCH")"
-          if ! git diff --quiet "$OLD_SHA" "$NEW_SHA" -- plugins/ai.js; then
-            echo "STOP: Remote AI implementation changed; refusing to overwrite the local production AI file."
-            exit 1
-          fi"""
-          downloader_check = ai_check + """
-          LOCAL_DOWNLOADER_BACKUP=""
-          if ! git diff --quiet "$NEW_SHA" -- plugins/downloader.js; then
-            echo "STOP: Local downloader differs from incoming GitHub version; preserving production file."
-            exit 1
-          fi
-          if ! git diff --quiet HEAD -- plugins/downloader.js; then
-            mkdir -p "$BACKUP_DIR"
-            chmod 700 "$BACKUP_DIR"
-            LOCAL_DOWNLOADER_BACKUP="$BACKUP_DIR/local-downloader-$(date +%Y%m%d-%H%M%S).js"
-            cp -p "$APP_DIR/plugins/downloader.js" "$LOCAL_DOWNLOADER_BACKUP"
-            echo "Incoming downloader exactly matches local code; rollback copy saved: $LOCAL_DOWNLOADER_BACKUP"
-          fi"""
-          if ai_check in s:
-              s = s.replace(ai_check, downloader_check, 1)
-          elif 'LOCAL_DOWNLOADER_BACKUP=""' not in s:
-              raise SystemExit("STOP: Remote SHA/AI safety check insertion point missing.")
-
-          rollback_anchor = """      cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
-      echo "Restoring preserved local AI after rollback."
-    fi"""
-          rollback_new = rollback_anchor + """
-    if [ -n "$LOCAL_DOWNLOADER_BACKUP" ] && [ -f "$LOCAL_DOWNLOADER_BACKUP" ]; then
-      cp -p "$LOCAL_DOWNLOADER_BACKUP" "$APP_DIR/plugins/downloader.js"
-      echo "Restored local downloader after rollback."
-    fi"""
-          if rollback_anchor in s:
-              s = s.replace(rollback_anchor, rollback_new, 1)
-          elif 'Restored local downloader after rollback.' not in s:
-              raise SystemExit("STOP: Rollback restore insertion point missing.")
-
-          p.write_text(s)
-          PY
-              bash -n "$GUARD"
-              grep -n -A 15 -B 3 'LOCAL_DOWNLOADER_BACKUP' "$GUARD"
-              echo "Guard backup: $BACKUP"
-              echo "GUARD_SYNTAX=PASS"
               ;;
             deploy)
               echo "Starting guarded Oracle deployment; local AI code will be preserved."
