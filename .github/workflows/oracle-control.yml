@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -378,6 +378,15 @@ jobs:
             inspect-guard-script)
               echo "Read-only inspection of deploy guard script."
               sed -n "1,240p" /home/opc/bin/hasa2-deploy
+              ;;
+            inspect-downloader-diff)
+              echo "Read-only diff for plugins/downloader.js only; no app/session/config changes."
+              git diff --no-ext-diff --unified=5 -- plugins/downloader.js | sed -E 's/(api[_-]?key|token|password|secret)([=:][[:space:]]*)[^[:space:]]+/\\1\\2[REDACTED]/Ig; s/[0-9]{8,}/[REDACTED_NUMBER]/g'
+              echo "--- File metadata ---"
+              if [ -f plugins/downloader.js ]; then
+                printf 'working_tree_sha256: '; sha256sum plugins/downloader.js | awk '{print $1}'
+                printf 'working_tree_lines: '; wc -l < plugins/downloader.js
+              fi
               ;;
             patch-deploy-guard)
               GUARD=/home/opc/bin/hasa2-deploy
