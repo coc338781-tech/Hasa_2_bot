@@ -1,4 +1,4 @@
 {
-  "action": "connection-audit",
-  "request_id": "xvdl-connection-audit-20261112-01"
+  "action": "xvdl-diagnose",
+  "request_id": "xvdl-category-diagnose-20261112-01"
 }
