@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -361,6 +361,16 @@ jobs:
                 fi
               done
               [ "$FOUND" -eq 1 ] || echo "No matching diagnostic lines found."
+              print_status
+              ;;
+            connection-audit)
+              echo "Read-only WhatsApp connection timeline; message content and identifiers excluded."
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  echo "--- $(basename "$f") ---"
+                  tail -n 250 "$f" | grep -Ei 'connected|connection open|connection closed|reconnect|Bad MAC|logged out|401|403|408|428|disconnect|stream:error|connection.update' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\\.whatsapp\\.net|@g\\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 60 || true
+                fi
+              done
               print_status
               ;;
             inspect-changes)
