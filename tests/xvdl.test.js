@@ -119,3 +119,33 @@ test("video listing uses bounded metadata output", async () => {
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
 });
+
+test("xHamster creator profile keeps playlist mode enabled", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  let listingArgs;
+  const execCommand = async (command, args) => {
+    if (args.includes("--flat-playlist")) {
+      listingArgs = args;
+      return { stdout: JSON.stringify({ entries: [{
+        title: "Creator public video",
+        webpage_url: "https://xhamster.com/videos/creator-public-video-123",
+        filesize_approx: 12 * 1024 * 1024,
+        duration: 90
+      }] }) };
+    }
+    return state.execCommand(command, args);
+  };
+  try {
+    await xvdl({ ...state, execCommand, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("2", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("https://xhamster.com/users/demo/videos", true) });
+    assert.ok(listingArgs.includes("--flat-playlist"));
+    assert.ok(!listingArgs.includes("--no-playlist"));
+    assert.match(state.sent.at(-1).payload.text, /Creator public video/);
+    assert.match(state.sent.at(-1).payload.text, /12.0 MB/);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
