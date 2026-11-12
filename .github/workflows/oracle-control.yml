@@ -370,6 +370,13 @@ jobs:
                 exit 0
               fi
               echo "YTDLP_VERSION=$(yt-dlp --version 2>/dev/null | head -n 1)"
+              for HOST in www.pornhub.com xhamster.com; do
+                if curl -sS -I -L --max-time 12 -o /dev/null -w "HOST=$HOST HTTP=%{http_code} REMOTE=%{remote_ip}\\n" "https://$HOST/"; then
+                  :
+                else
+                  echo "HOST=$HOST CONNECTIVITY=FAILED"
+                fi
+              done
               TMP_OUT="$(mktemp)"
               TMP_ERR="$(mktemp)"
               if yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/categories/amateur" >"$TMP_OUT" 2>"$TMP_ERR"; then
