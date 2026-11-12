@@ -241,7 +241,7 @@ test("video listing uses bounded metadata output", async () => {
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     assert.ok(metadataArgs.includes("--playlist-end"));
-    assert.ok(metadataArgs.includes("6"));
+    assert.ok(metadataArgs.includes("10"));
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
@@ -267,6 +267,35 @@ test("Xvdl rejects files above 200 MiB and removes the temporary file", async ()
     assert.match(state.sent.at(-1).payload.text, /200 MB/);
     assert.equal(state.sent.some(item => item.payload.video), false);
     assert.equal(fs.readdirSync(state.dir).length, 0);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
+
+test("xHamster estimates a missing size from the selected format bitrate", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  const execCommand = async (command, args, options) => {
+    if (command === "curl") {
+      return { stdout: '<a href="/videos/estimated-size-xhAb789" title="Estimated size video">video</a>' };
+    }
+    if (args.includes("--skip-download")) {
+      return { stdout: JSON.stringify({
+        title: "Estimated size video",
+        duration: 95,
+        formats: [{ vcodec: "avc1", height: 480, tbr: 1200 }]
+      }) };
+    }
+    return state.execCommand(command, args, options);
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("2", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
+    assert.match(state.sent.at(-1).payload.text, /≈ 13\.6 MB/);
+    assert.doesNotMatch(state.sent.at(-1).payload.text, /Size නොදනී/);
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
