@@ -86,6 +86,22 @@ function categoryMenu() {
   ].join("\n");
 }
 
+function xhamsterMenu() {
+  return [
+    "╭━━〔 🎬 *xHAMSTER BROWSER* 〕━━",
+    "┃ 1️⃣ Latest uploads",
+    "┃ 2️⃣ Trending / Popular",
+    "┃ 3️⃣ Amateur",
+    "┃ 4️⃣ Lesbian",
+    "┃ 5️⃣ MILF",
+    "┃ 6️⃣ Massage",
+    "┃ 7️⃣ Search keyword",
+    "╰━━━━━━━━━━━━━━━━━━━━",
+    "",
+    "අංකය Reply කරන්න."
+  ].join("\n");
+}
+
 function formatSize(bytes) {
   if (!Number.isFinite(Number(bytes)) || Number(bytes) <= 0) return "Size නොදනී";
   return (Number(bytes) / (1024 * 1024)).toFixed(1) + " MB";
@@ -104,7 +120,7 @@ function normalizeAllowedUrl(value, source) {
   const host = url.hostname.toLowerCase().replace(/^www\./, "");
   if (source === "pornhub" && host !== "pornhub.com") return null;
   if (source === "xhamster" && host !== "xhamster.com") return null;
-  if (source === "xhamster" && !/^\/(videos\/|users\/[^/]+\/videos|creators\/)/i.test(url.pathname)) return null;
+  if (source === "xhamster" && !/^\/(videos(?:\/|$)|categories\/|search\/|users\/[^/]+\/videos|creators\/)/i.test(url.pathname)) return null;
   return url.toString();
 }
 
@@ -269,6 +285,43 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
         "🔗 xHamster හි Public video URL එකක් හෝ creator profile videos URL එකක් යවන්න.\n\nCategory browser එක මෙහි සහාය නොදක්වයි.", message);
     }
     return send(sock, jid, "1 හෝ 2 තෝරන්න.", message);
+  }
+  if (state.step === "xhamster-browse") {
+    if (body === "7") {
+      setSession(senderKey, { step: "xhamster-search", source: "xhamster" });
+      return send(sock, jid, "🔎 සෙවීමට keyword එක යවන්න.", message);
+    }
+    const urls = {
+      "1": "https://xhamster.com/videos?sort=newest",
+      "2": "https://xhamster.com/videos?sort=popular",
+      "3": "https://xhamster.com/categories/amateur",
+      "4": "https://xhamster.com/categories/lesbian",
+      "5": "https://xhamster.com/categories/milf",
+      "6": "https://xhamster.com/categories/massage"
+    };
+    const url = urls[body];
+    if (!url) return send(sock, jid, "1-7 අතර අංකයක් තෝරන්න.", message);
+    try {
+      const entries = await fetchListing(url, "xhamster", execCommand);
+      if (!entries.length) throw new Error("No public entries found.");
+      setSession(senderKey, { step: "video", source: "xhamster", entries, listingUrl: url, page: 1 });
+      return send(sock, jid, listingText(entries, "xHamster"), message);
+    } catch (error) {
+      setSession(senderKey, { step: "xhamster-browse", source: "xhamster", retryUrl: url });
+      return send(sock, jid, "❌ " + listingFailureText(error, "xHamster public ලැයිස්තුව ලබාගත නොහැකි වුණා.") + "\\n\\n0️⃣ Retry", message);
+    }
+  }
+  if (state.step === "xhamster-search") {
+    if (!body || body.length > 80) return send(sock, jid, "කෙටි Search keyword එකක් යවන්න.", message);
+    const url = "https://xhamster.com/search/" + encodeURIComponent(body);
+    try {
+      const entries = await fetchListing(url, "xhamster", execCommand);
+      if (!entries.length) throw new Error("No public entries found.");
+      setSession(senderKey, { step: "video", source: "xhamster", entries, listingUrl: url, page: 1 });
+      return send(sock, jid, listingText(entries, "xHamster"), message);
+    } catch (error) {
+      return send(sock, jid, "❌ xHamster public search ලැයිස්තුව ලබාගත නොහැකි වුණා. " + listingFailureText(error, "පසුව නැවත උත්සාහ කරන්න."), message);
+    }
   }
   if (state.step === "category") {
     let url;
