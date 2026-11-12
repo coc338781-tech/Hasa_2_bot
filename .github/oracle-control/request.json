@@ -1,14 +1,1 @@
-{
-  "action": "xvdl-diagnose",
-  "request_id": "xvdl-live-sites-diagnose-20261112-01",
-  "targets": [
-    "pornhub.com",
-    "xhamster.com"
-  ],
-  "checks": [
-    "site-root",
-    "category-listing",
-    "popular-listing",
-    "yt-dlp-extractor"
-  ]
-}
+{"action":"xvdl-diagnose","request_id":"xvdl-live-sites-diagnose-20261112-02"}
