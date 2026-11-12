@@ -27,7 +27,8 @@ test("downloader checks tools, sends the video, and removes its temporary file",
     await downloader({ ...state, execCommand });
     assert.deepEqual(calls.map(call => call[0]), ["yt-dlp", "ffmpeg", "yt-dlp"]);
     assert.match(state.sent[0].payload.text, /VIDEO DOWNLOADING/);
-    assert.equal(state.sent[1].payload.video.toString(), "video-data");
+    assert.ok(state.sent[1].payload.video.url.startsWith(state.dir));
+    assert.match(state.sent[1].payload.video.url, /\.mp4$/);
     assert.match(state.sent[1].payload.caption, /DOWNLOAD COMPLETED/);
     assert.equal(fs.readdirSync(state.dir).length, 0);
   } finally {
@@ -69,7 +70,7 @@ test("downloader rejects invalid links without starting external tools", async (
 });
 
 test("download errors provide useful size and timeout explanations", () => {
-  assert.match(explainDownloadError(new Error("File is larger than max-filesize")), /96 MB/);
+  assert.match(explainDownloadError(new Error("File is larger than max-filesize")), /200 MB/);
   const timeout = new Error("timed out");
   timeout.killed = true;
   assert.match(explainDownloadError(timeout), /වැඩි වෙලාවක්/);
@@ -91,7 +92,8 @@ test("song command searches one result, extracts mp3, and sends audio", async ()
     assert.equal(downloadArgs.at(-1), "ytsearch1:coldplay yellow");
     assert.ok(downloadArgs.includes("-x"));
     assert.ok(downloadArgs.includes("32M"));
-    assert.equal(state.sent[1].payload.audio.toString(), "audio-data");
+    assert.ok(state.sent[1].payload.audio.url.startsWith(state.dir));
+    assert.match(state.sent[1].payload.audio.url, /\.mp3$/);
     assert.equal(state.sent[1].payload.mimetype, "audio/mpeg");
     assert.equal(fs.readdirSync(state.dir).length, 0);
   } finally {
@@ -116,7 +118,8 @@ test("video command searches one result and sends video", async () => {
     assert.ok(!downloadArgs.includes("--max-filesize"), "video downloads must not be rejected by yt-dlp's early filesize estimate");
     assert.ok(downloadArgs.some(value => String(value).includes("height<=480")));
     assert.ok(downloadArgs.some(value => String(value).includes("height<=720")));
-    assert.equal(state.sent[1].payload.video.toString(), "video-data");
+    assert.ok(state.sent[1].payload.video.url.startsWith(state.dir));
+    assert.match(state.sent[1].payload.video.url, /\.mp4$/);
   } finally {
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
@@ -155,7 +158,8 @@ test("Facebook downloads do not force unsupported browser impersonation", async 
     assert.ok(!downloadArgs.includes("--max-downloads"), "single-video downloads must not use yt-dlp max-downloads (it exits 101 even after success)");
     assert.ok(!downloadArgs.includes("--impersonate"));
     assert.ok(!downloadArgs.includes("--list-impersonate-targets"));
-    assert.equal(state.sent[1].payload.video.toString(), "video-data");
+    assert.ok(state.sent[1].payload.video.url.startsWith(state.dir));
+    assert.match(state.sent[1].payload.video.url, /\.mp4$/);
   } finally {
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
