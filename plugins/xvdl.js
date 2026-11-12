@@ -146,6 +146,17 @@ async function fetchListing(url, source, execCommand) {
   }
   return entries;
 }
+function listingFailureText(error, fallback) {
+  const detail = String(error?.stderr || error?.message || "");
+  if (/ECONNRESET|curl:\\s*\\(35\\)|connection reset|timed? out/i.test(detail)) {
+    return "🌐 Website එකට යන connection එක අතරමඟදී reset වුණා.\\n\\n0️⃣ නැවත උත්සාහ කරන්න.\\n6️⃣ Keyword search එකක් භාවිතා කරන්න.";
+  }
+  if (/HTTP Error 403|403 Forbidden|HTTP Error 429|Too Many Requests/i.test(detail)) {
+    return "🌐 Website එක මේ request එක තාවකාලිකව ප්‍රතික්ෂේප කළා.\\n\\n0️⃣ නැවත උත්සාහ කරන්න.\\n6️⃣ Keyword search එකක් භාවිතා කරන්න.";
+  }
+  return fallback;
+}
+
 function listingText(entries, source) {
   return [
     "╭━━〔 📺 *" + source + " VIDEO LIST* 〕━━",
@@ -264,6 +275,8 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     if (/^[1-5]$/.test(body)) {
       const [, slug] = PORNHUB_CATEGORIES[Number(body) - 1];
       url = "https://www.pornhub.com/categories/" + slug;
+    } else if (body === "0" && state.retryUrl) {
+      url = state.retryUrl;
     } else if (body === "6") {
       setSession(senderKey, { step: "pornhub-search", source: "pornhub" });
       return send(sock, jid, "🔎 සෙවීමට අවශ්‍ය category එක හෝ keyword එක යවන්න.", message);
@@ -275,8 +288,9 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       if (!entries.length) throw new Error("No public entries found.");
       setSession(senderKey, { step: "video", source: "pornhub", entries });
       return send(sock, jid, listingText(entries, "Pornhub"), message);
-    } catch {
-      return send(sock, jid, "❌ Public category එකේ වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා. පසුව උත්සාහ කරන්න.", message);
+    } catch (error) {
+      setSession(senderKey, { step: "category", source: "pornhub", retryUrl: url });
+      return send(sock, jid, "❌ " + listingFailureText(error, "Public category එකේ වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා.") + "\\n\\n0️⃣ Retry | 6️⃣ Search", message);
     }
   }
   if (state.step === "pornhub-search") {
