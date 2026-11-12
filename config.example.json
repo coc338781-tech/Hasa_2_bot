@@ -8,7 +8,7 @@
   "antiDeleteToInbox": false,
   "viewOnce": true,
   "aiChat": false,
-  "aiModel": "gemini-2.0-flash",
+  "aiModel": "gemini-3.8-flash",
   "groupCommands": true,
   "publicMode": true,
   "autoReadMessages": false,
