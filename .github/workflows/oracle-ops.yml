@@ -1,6 +1,10 @@
 name: Oracle Full Auto Diagnostics
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/oracle-ops.yml"
   workflow_dispatch:
     inputs:
       scope:
