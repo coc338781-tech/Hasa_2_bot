@@ -83,14 +83,59 @@ test("Pornhub category selection lists metadata and sends selected file from dis
   }
 });
 
-test("xHamster rejects non-xHamster URLs", async () => {
+test("xHamster browser lists public category videos without asking for a URL", async () => {
   resetXvdlStateForTests();
   const state = fixture({ owner: true });
+  let requestedUrl;
+  const execCommand = async (command, args, options) => {
+    if (args.includes("--dump-single-json")) {
+      requestedUrl = args.at(-1);
+      return { stdout: JSON.stringify({ entries: [{
+        title: "Public xHamster category video",
+        webpage_url: "https://xhamster.com/videos/public-category-video-123",
+        filesize_approx: 18 * 1024 * 1024,
+        duration: 95
+      }] }) };
+    }
+    return state.execCommand(command, args, options);
+  };
   try {
     await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
     await xvdl({ ...state, message: state.makeMessage("2", true) });
-    await xvdl({ ...state, message: state.makeMessage("https://example.com/videos/sample", true) });
-    assert.match(state.sent.at(-1).payload.text, /Public xHamster/);
+    assert.match(state.sent.at(-1).payload.text, /xHAMSTER BROWSER/);
+    await xvdl({ ...state, execCommand, message: state.makeMessage("3", true) });
+    assert.equal(requestedUrl, "https://xhamster.com/categories/amateur");
+    assert.match(state.sent.at(-1).payload.text, /Public xHamster category video/);
+    assert.match(state.sent.at(-1).payload.text, /18.0 MB/);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
+test("xHamster browser offers public keyword search", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  let requestedUrl;
+  const execCommand = async (command, args, options) => {
+    if (args.includes("--dump-single-json")) {
+      requestedUrl = args.at(-1);
+      return { stdout: JSON.stringify({ entries: [{
+        title: "Search result video",
+        webpage_url: "https://xhamster.com/videos/search-result-123",
+        filesize_approx: 9 * 1024 * 1024,
+        duration: 60
+      }] }) };
+    }
+    return state.execCommand(command, args, options);
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("2", true) });
+    await xvdl({ ...state, message: state.makeMessage("7", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("amateur", true) });
+    assert.equal(requestedUrl, "https://xhamster.com/search/amateur");
+    assert.match(state.sent.at(-1).payload.text, /Search result video/);
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
@@ -144,36 +189,6 @@ test("video listing uses bounded metadata output", async () => {
     await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
     assert.ok(metadataArgs.includes("--playlist-end"));
     assert.ok(metadataArgs.includes("6"));
-  } finally {
-    resetXvdlStateForTests();
-    fs.rmSync(state.dir, { recursive: true, force: true });
-  }
-});
-
-test("xHamster creator profile keeps playlist mode enabled", async () => {
-  resetXvdlStateForTests();
-  const state = fixture({ owner: true });
-  let listingArgs;
-  const execCommand = async (command, args) => {
-    if (args.includes("--flat-playlist")) {
-      listingArgs = args;
-      return { stdout: JSON.stringify({ entries: [{
-        title: "Creator public video",
-        webpage_url: "https://xhamster.com/videos/creator-public-video-123",
-        filesize_approx: 12 * 1024 * 1024,
-        duration: 90
-      }] }) };
-    }
-    return state.execCommand(command, args);
-  };
-  try {
-    await xvdl({ ...state, execCommand, message: state.makeMessage(".xvdl", true) });
-    await xvdl({ ...state, execCommand, message: state.makeMessage("2", true) });
-    await xvdl({ ...state, execCommand, message: state.makeMessage("https://xhamster.com/users/demo/videos", true) });
-    assert.ok(listingArgs.includes("--flat-playlist"));
-    assert.ok(!listingArgs.includes("--no-playlist"));
-    assert.match(state.sent.at(-1).payload.text, /Creator public video/);
-    assert.match(state.sent.at(-1).payload.text, /12.0 MB/);
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
