@@ -11,7 +11,7 @@ function fixture({ owner = false } = {}) {
   const sock = { async sendMessage(jid, payload) { sent.push({ jid, payload }); } };
   const config = { prefix: ".", owner: ["94770000000"], downloadDir: dir };
   const makeMessage = (text, fromMe = owner) => ({
-    key: { remoteJid: "94770000000@s.whatsapp.net", fromMe },
+    key: { remoteJid: (fromMe ? "94770000000" : "94771111111") + "@s.whatsapp.net", fromMe },
     message: { conversation: text }
   });
   const execCommand = async (command, args) => {
