@@ -79,7 +79,10 @@ function categoryMenu() {
   return [
     "╭━━〔 🎬 *PORNHub CATEGORIES* 〕━━",
     ...PORNHUB_CATEGORIES.map(([label], index) => "┃ " + (index + 1) + "️⃣ " + label),
-    "┃ 6️⃣ Search keyword",
+    "┃ 6️⃣ Latest uploads",
+    "┃ 7️⃣ Most viewed",
+    "┃ 8️⃣ Top rated",
+    "┃ 9️⃣ Search keyword",
     "╰━━━━━━━━━━━━━━━━━━━━",
     "",
     "Category අංකය Reply කරන්න."
@@ -329,11 +332,17 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       url = "https://www.pornhub.com/categories/" + slug;
     } else if (body === "0" && state.retryUrl) {
       url = state.retryUrl;
-    } else if (body === "6") {
+    } else if (["6", "7", "8"].includes(body)) {
+      url = {
+        "6": "https://www.pornhub.com/video?o=mr",
+        "7": "https://www.pornhub.com/video?o=mv",
+        "8": "https://www.pornhub.com/video?o=tr"
+      }[body];
+    } else if (body === "9") {
       setSession(senderKey, { step: "pornhub-search", source: "pornhub" });
-      return send(sock, jid, "🔎 සෙවීමට අවශ්‍ය category එක හෝ keyword එක යවන්න.", message);
+      return send(sock, jid, "🔎 සෙවීමට keyword එක යවන්න.", message);
     } else {
-      return send(sock, jid, "ලැයිස්තුවෙන් 1-6 අතර අංකයක් තෝරන්න.", message);
+      return send(sock, jid, "ලැයිස්තුවෙන් 1-9 අතර අංකයක් තෝරන්න.", message);
     }
     try {
       const entries = await fetchListing(url, state.source, execCommand);
