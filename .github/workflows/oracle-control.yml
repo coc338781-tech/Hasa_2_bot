@@ -392,22 +392,27 @@ jobs:
               fi
               ;;
             checkpoint-downloader)
-              echo "Checkpoint only if Oracle downloader exactly matches incoming GitHub code."
+              echo "Verify merged target, then checkpoint only Oracle's local downloader patch for rollback safety."
               git fetch origin assistant-workflow
               TARGET="$(git rev-parse origin/assistant-workflow)"
-              if ! git diff --quiet "$TARGET" -- plugins/downloader.js; then
-                echo "STOP: Oracle downloader does not exactly match GitHub target; no local commit made."
+              git show "$TARGET:plugins/downloader.js" | grep -Fq 'const MAX_BYTES = 200 * 1024 * 1024;'
+              git show "$TARGET:plugins/downloader.js" | grep -Fq 'video: { url: file }'
+              git show "$TARGET:plugins/downloader.js" | grep -Fq 'YOUTUBE_COOKIES_FILE'
+              UNEXPECTED="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" && $2 != "plugins/downloader.js" {print}')"
+              if [ -n "$UNEXPECTED" ]; then
+                echo "STOP: Other tracked local changes exist; no checkpoint made."
+                printf '%s\\n' "$UNEXPECTED"
                 exit 2
               fi
               if ! git diff --quiet HEAD -- plugins/downloader.js; then
                 git -c user.name="Hasa Deployment Checkpoint" -c user.email="deployment-checkpoint@users.noreply.github.com" add plugins/downloader.js
-                git -c user.name="Hasa Deployment Checkpoint" -c user.email="deployment-checkpoint@users.noreply.github.com" commit -m "Checkpoint validated Oracle downloader before deploy"
+                git -c user.name="Hasa Deployment Checkpoint" -c user.email="deployment-checkpoint@users.noreply.github.com" commit --only plugins/downloader.js -m "Checkpoint Oracle downloader before merged deployment"
                 echo "DOWNLOADER_CHECKPOINT=CREATED"
               else
                 echo "DOWNLOADER_CHECKPOINT=NOT_NEEDED"
               fi
-              echo "Current local commit: $(git rev-parse --short HEAD)"
-              echo "Working tree:"
+              echo "Incoming target: $(git rev-parse --short "$TARGET")"
+              echo "Local checkpoint: $(git rev-parse --short HEAD)"
               git status --short
               ;;
             patch-deploy-guard)
