@@ -1,1 +1,4 @@
-{"action":"deploy","request_id":"xvdl-500mb-safety-deploy-20261112-02"}
+{
+  "action": "deploy",
+  "request_id": "ping-real-ack-deploy-20261112-01"
+}
