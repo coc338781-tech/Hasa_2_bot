@@ -404,8 +404,39 @@ function makeSettingsMenu(config, prefix) {
   ].join("\n");
 }
 
+export async function sendPing(sock, jid, message) {
+  const startedAt = process.hrtime.bigint();
+  let pending;
+  try {
+    // Wait for WhatsApp to acknowledge the first send, then edit that same
+    // message so the user sees one final ping result rather than two messages.
+    pending = await sock.sendMessage(
+      jid,
+      { text: "⏱️ Measuring WhatsApp response..." },
+      { quoted: message }
+    );
+    const elapsedNs = process.hrtime.bigint() - startedAt;
+    const responseMs = Math.max(1, Math.round(Number(elapsedNs) / 1e6));
+    const resultText = "⚡ *Ping: " + responseMs + " ms*";
+    try {
+      return await sock.sendMessage(jid, { text: resultText, edit: pending.key });
+    } catch (editError) {
+      // Older/limited servers may reject message edits; still return the
+      // measured result as a normal reply instead of leaving a placeholder.
+      console.error("Ping result edit failed:", editError.message);
+      return sock.sendMessage(jid, { text: resultText }, { quoted: message });
+    }
+  } catch (error) {
+    console.error("Ping request failed:", error.message);
+    return sock.sendMessage(
+      jid,
+      { text: "❌ Ping check failed. WhatsApp response could not be measured." },
+      { quoted: message }
+    );
+  }
+}
+
 export default async function core({ sock, message, config }) {
-  const commandReceivedAt = process.hrtime.bigint();
   const jid = message.key?.remoteJid;
   if (!jid || jid === "status@broadcast") return;
   const sender = message.key.participant || jid;
@@ -544,10 +575,7 @@ export default async function core({ sock, message, config }) {
   }
 
   if (command === "ping") {
-    // Measure bot-side response time and keep the reply compact.
-    const elapsedNs = process.hrtime.bigint() - commandReceivedAt;
-    const responseMs = Math.max(1, Math.round(Number(elapsedNs) / 1e6));
-    return send("⚡ *Ping: " + responseMs + " ms*");
+    return sendPing(sock, jid, message);
   }
 
   if (command === "alive") {
