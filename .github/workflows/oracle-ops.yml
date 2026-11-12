@@ -145,7 +145,7 @@ jobs:
             if [ -f provider-smoke.txt ]; then
               echo
               echo "### Provider results and why each matters"
-              grep -E '^(PASS|WARN) \\|' provider-smoke.txt || true
+              grep -E '^(PASS|WARN) \|' provider-smoke.txt || true
               grep '^RESULT ' provider-smoke.txt || true
             fi
           } >> "$GITHUB_STEP_SUMMARY"
