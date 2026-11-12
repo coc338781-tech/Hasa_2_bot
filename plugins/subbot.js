@@ -21,8 +21,14 @@ export default async function subbot({ sock, message, config }) {
   if (!ownerAllowed(sender, message, config)) {
     return sock.sendMessage(chat, { text: "⛔ Subbot commands are owner only." }, { quoted: message });
   }
-  const ownerJid = sender.includes("@") ? sender : chat;
-  const ownerNumber = ownerJid.split("@")[0].split(":")[0];
+  // WhatsApp self-chat may use an @lid JID. Never treat LID digits as a
+  // phone number: use the configured owner number for fromMe commands.
+  const configuredOwners = (config.owner || []).map(item => String(item).replace(/\D/g, "")).filter(Boolean);
+  const senderNumber = String(sender || "").split("@")[0].split(":")[0].replace(/\D/g, "");
+  const ownerNumber = message.key.fromMe
+    ? (configuredOwners[0] || String(sock.user?.id || "").split("@")[0].split(":")[0].replace(/\D/g, ""))
+    : (configuredOwners.find(number => number === senderNumber) || senderNumber);
+  const ownerJid = ownerNumber + "@s.whatsapp.net";
   if (command === "helpsubbot") {
     return sock.sendMessage(chat, { text:
       "*SUBBOT COMMANDS*\n" +
