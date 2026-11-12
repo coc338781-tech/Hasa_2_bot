@@ -149,10 +149,10 @@ async function fetchListing(url, source, execCommand) {
 function listingFailureText(error, fallback) {
   const detail = String(error?.stderr || error?.message || "");
   if (/ECONNRESET|curl:\\s*\\(35\\)|connection reset|timed? out/i.test(detail)) {
-    return "🌐 Website එකට යන connection එක අතරමඟදී reset වුණා.\\n\\n0️⃣ නැවත උත්සාහ කරන්න.\\n6️⃣ Keyword search එකක් භාවිතා කරන්න.";
+    return "🌐 Website එකට යන connection එක අතරමඟදී reset වුණා.\n\n0️⃣ නැවත උත්සාහ කරන්න.\n6️⃣ Keyword search එකක් භාවිතා කරන්න.";
   }
   if (/HTTP Error 403|403 Forbidden|HTTP Error 429|Too Many Requests/i.test(detail)) {
-    return "🌐 Website එක මේ request එක තාවකාලිකව ප්‍රතික්ෂේප කළා.\\n\\n0️⃣ නැවත උත්සාහ කරන්න.\\n6️⃣ Keyword search එකක් භාවිතා කරන්න.";
+    return "🌐 Website එක මේ request එක තාවකාලිකව ප්‍රතික්ෂේප කළා.\n\n0️⃣ නැවත උත්සාහ කරන්න.\n6️⃣ Keyword search එකක් භාවිතා කරන්න.";
   }
   return fallback;
 }
@@ -290,7 +290,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       return send(sock, jid, listingText(entries, "Pornhub"), message);
     } catch (error) {
       setSession(senderKey, { step: "category", source: "pornhub", retryUrl: url });
-      return send(sock, jid, "❌ " + listingFailureText(error, "Public category එකේ වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා.") + "\\n\\n0️⃣ Retry | 6️⃣ Search", message);
+      return send(sock, jid, "❌ " + listingFailureText(error, "Public category එකේ වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා.") + "\n\n0️⃣ Retry | 6️⃣ Search", message);
     }
   }
   if (state.step === "pornhub-search") {
