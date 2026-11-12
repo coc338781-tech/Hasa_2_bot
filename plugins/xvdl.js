@@ -172,6 +172,8 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
   try {
     fileSystem.mkdirSync(dir, { recursive: true });
     await send(sock, jid, "⏳ *Video එක Download කරමින්...*\n📦 උපරිමය 200 MB", message);
+    await execCommand("yt-dlp", ["--version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
+    await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     await execCommand("yt-dlp", [
       "--no-playlist", "--no-warnings", "--max-filesize", "200M",
       "-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best",
@@ -195,7 +197,11 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
   } catch (error) {
     const reason = /larger than|max-filesize/i.test(String(error?.stderr || error?.message))
       ? "වීඩියෝ එක 200 MB සීමාව ඉක්මවයි."
-      : "Public වීඩියෝ එක ලබාගැනීමට නොහැකි වුණා. Link එක අවහිර/Private විය හැක.";
+      : error?.code === "ENOENT" && String(error?.path || "").includes("ffmpeg")
+        ? "Server එකේ ffmpeg install කර නැහැ."
+        : error?.code === "ENOENT"
+          ? "Server එකේ yt-dlp install/update කළ යුතුයි."
+          : "Public වීඩියෝ එක ලබාගැනීමට නොහැකි වුණා. Link එක අවහිර/Private විය හැක.";
     await send(sock, jid, "❌ *DOWNLOAD FAILED*\n" + reason, message).catch(() => {});
   } finally {
     try {
