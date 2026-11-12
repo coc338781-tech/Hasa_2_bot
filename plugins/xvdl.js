@@ -125,7 +125,7 @@ async function fetchListing(url, source, execCommand) {
   // without downloading media or creating large memory buffers.
   for (let index = 0; index < entries.length; index += 3) {
     await Promise.all(entries.slice(index, index + 3).map(async entry => {
-      if (entry.size) return;
+      if (Number.isFinite(Number(entry.size)) && Number(entry.size) > 0) return;
       try {
         const metadata = await execCommand("yt-dlp", [
           "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", entry.url
@@ -168,9 +168,9 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
   if (!url) return send(sock, jid, "❌ මේ වීඩියෝ Link එක අවසර ලත් Public source එකකින් නොවේ.", message);
   activeDownloads++;
   const dir = path.resolve(config.downloadDir || "downloads");
-  fileSystem.mkdirSync(dir, { recursive: true });
   const name = "xvdl-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
   try {
+    fileSystem.mkdirSync(dir, { recursive: true });
     await send(sock, jid, "⏳ *Video එක Download කරමින්...*\n📦 උපරිමය 200 MB", message);
     await execCommand("yt-dlp", [
       "--no-playlist", "--no-warnings", "--max-filesize", "200M",
@@ -198,9 +198,11 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
       : "Public වීඩියෝ එක ලබාගැනීමට නොහැකි වුණා. Link එක අවහිර/Private විය හැක.";
     await send(sock, jid, "❌ *DOWNLOAD FAILED*\n" + reason, message).catch(() => {});
   } finally {
-    for (const file of fileSystem.readdirSync(dir).filter(file => file.startsWith(name))) {
-      try { fileSystem.unlinkSync(path.join(dir, file)); } catch {}
-    }
+    try {
+      for (const file of fileSystem.readdirSync(dir).filter(file => file.startsWith(name))) {
+        try { fileSystem.unlinkSync(path.join(dir, file)); } catch {}
+      }
+    } catch {}
     activeDownloads--;
   }
 }
