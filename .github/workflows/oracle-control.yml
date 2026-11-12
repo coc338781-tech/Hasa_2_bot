@@ -385,6 +385,33 @@ jobs:
                 RC=$?
               fi
               echo "YTDLP_EXIT=$RC"
+              echo "--- IMPERSONATION TARGETS ---"
+              yt-dlp --list-impersonate-targets 2>&1 | head -n 20 || true
+              TMP_IMP_OUT="$(mktemp)"
+              TMP_IMP_ERR="$(mktemp)"
+              if yt-dlp --impersonate chrome --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/categories/amateur" >"$TMP_IMP_OUT" 2>"$TMP_IMP_ERR"; then
+                IMP_RC=0
+              else
+                IMP_RC=$?
+              fi
+              echo "YTDLP_IMPERSONATE_EXIT=$IMP_RC"
+              python3 - "$TMP_IMP_OUT" "$TMP_IMP_ERR" <<'PY'
+          import json, pathlib, re, sys
+          out = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+          err = pathlib.Path(sys.argv[2]).read_text(errors="replace")
+          try:
+              data = json.loads(out) if out.strip() else {}
+              entries = data.get("entries") if isinstance(data, dict) else None
+              print("IMPERSONATE_JSON_VALID=YES")
+              print("IMPERSONATE_ENTRIES_COUNT=" + str(len([x for x in entries if x]) if isinstance(entries, list) else (1 if data else 0)))
+          except Exception as e:
+              print("IMPERSONATE_JSON_VALID=NO")
+              print("IMPERSONATE_JSON_ERROR=" + type(e).__name__)
+          err = re.sub(r'https?://\\S+', '[URL]', err)
+          err = re.sub(r'\\b\\d{8,}\\b', '[NUMBER]', err)
+          print("IMPERSONATE_DIAGNOSTIC=" + (err.strip()[:1400] or "[no stderr]"))
+          PY
+              rm -f "$TMP_IMP_OUT" "$TMP_IMP_ERR"
               python3 - "$TMP_OUT" "$TMP_ERR" <<'PY'
           import json, pathlib, re, sys
           out = pathlib.Path(sys.argv[1]).read_text(errors="replace")
