@@ -365,7 +365,9 @@ jobs:
               ;;
             install-ytdlp-impersonation)
               echo "Install only the missing yt-dlp impersonation dependency in the opc user's Python site; no bot restart."
-              python3 -m pip install --user 'curl-cffi>=0.11'
+              YT_PY="$(head -n 1 "$(command -v yt-dlp)" | sed 's/^#!//')"
+              echo "YTDLP_PYTHON=$YT_PY"
+              "$YT_PY" -m pip install --user 'curl-cffi>=0.11'
               echo "--- Available impersonation targets ---"
               yt-dlp --list-impersonate-targets 2>&1 | head -n 20
               TMP_OUT="$(mktemp)"
