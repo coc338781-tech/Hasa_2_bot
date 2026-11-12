@@ -40,11 +40,22 @@ export function explainDownloadError(error) {
     return "Download එකට වැඩි වෙලාවක් ගත වූ නිසා නවතා දැමුවා. පසුව නැවත උත්සාහ කරන්න.";
   }
   if (/unsupported url|not a valid url|no suitable extractor/i.test(details)) return "මේ Link එක හඳුනාගන්න බැහැ. නිවැරදි Public වීඩියෝ Link එකක් යවන්න.";
-  if (/private|login required|sign in|authentication|cookies/i.test(details)) return "මේ වීඩියෝ එක Private හෝ Login අවශ්‍ය එකක්. Public Link එකක් යවන්න.";
+  if (/sign in to confirm|confirm you.re not a bot|not a bot|login_required/i.test(details)) return "YouTube එක Oracle server IP එකෙන් bot verification ඉල්ලනවා. Authorized YouTube session cookies file එකක් secureව configure කළ යුතුයි; PO Token එක පමණක් IP restriction එක ඉවත් කරන්නේ නැහැ.";
+  if (/private|login required|sign in|authentication|cookies/i.test(details)) return "මේ වීඩියෝ එක Private හෝ Login අවශ්‍ය එකක්. Public Link එකක් යවන්න."
   if (/geo.?restricted|not available in your country/i.test(details)) return "මේ වීඩියෝ එක ඔබේ ප්‍රදේශයෙන් ලබාගත නොහැක.";
   if (/max-filesize|file is larger|larger than/i.test(details)) return "ගොනුවේ ප්‍රමාණය අවසර ලත් සීමාව ඉක්මවා ඇත (Video 200 MB / Audio 32 MB).";
   if (/429|too many requests|rate.?limit/i.test(details)) return "වෙබ් අඩවියෙන් තාවකාලික සීමාවක් දමා තිබෙනවා. ටික වේලාවකින් නැවත උත්සාහ කරන්න.";
   return "වීඩියෝ එක ලබාගැනීමේදී දෝෂයක් ඇති වුණා. Link එක Public ද කියලා පරීක්ෂා කර නැවත උත්සාහ කරන්න.";
+}
+
+
+function youtubeOptions(target, fileSystem = fs) {
+  const value = String(target);
+  const isYoutube = value.startsWith("ytsearch") ||
+    /^https?:\\/\\/(?:www\\.)?(?:youtube\\.com|youtu\\.be)\\//i.test(value);
+  const cookieFile = process.env.YOUTUBE_COOKIES_FILE;
+  const cookies = cookieFile && fileSystem.existsSync(cookieFile) ? ["--cookies", cookieFile] : [];
+  return [...(isYoutube ? ["--extractor-args", "youtube:player_client=tv,web_safari"] : []), ...cookies];
 }
 
 export default async function downloader({ sock, message, config, execCommand = exec, fileSystem = fs }) {
@@ -62,7 +73,7 @@ export default async function downloader({ sock, message, config, execCommand = 
       const results = [];
       for (const link of links.slice(0, 3)) {
         try {
-          const result = await exec("yt-dlp", ["--simulate", "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", link], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+          const result = await exec("yt-dlp", ["--simulate", "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", ...youtubeOptions(link, fileSystem), link], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
           const info = JSON.parse(result.stdout || "{}");
           results.push("✅ " + (info.extractor_key || info.extractor || "Extractor") + " | " + String(info.title || "Title unavailable").slice(0, 90) + " | " + (Array.isArray(info.formats) ? info.formats.length + " formats" : "metadata received"));
         } catch (error) {
@@ -103,6 +114,8 @@ export default async function downloader({ sock, message, config, execCommand = 
     await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     const downloadArgs = [
       "--no-playlist", "--no-warnings",
+      ...youtubeOptions(target, fileSystem),
+      "--max-filesize", isAudio ? "32M" : "200M",
       ...(isAudio
         ? ["--max-filesize", "32M", "-x", "--audio-format", "mp3", "--audio-quality", "5"]
         : ["-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best", "--merge-output-format", "mp4"]),
