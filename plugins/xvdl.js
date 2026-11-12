@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const exec = promisify(execFile);
-const MAX_BYTES = 200 * 1024 * 1024;
+const MAX_BYTES = 500 * 1024 * 1024;
 const MAX_RESULTS = 20;
 const SESSION_TTL = 15 * 60 * 1000;
 const sessions = new Map();
@@ -12,7 +12,7 @@ const ageConfirmed = new Set();
 let activeDownloads = 0;
 
 export const commands = [
-  { name: "xvdl", category: "3", usage: "xvdl", description: "Public adult video browser (18+ only; 200 MB limit)" }
+  { name: "xvdl", category: "3", usage: "xvdl", description: "Public adult video browser (18+ only; 500 MB limit)" }
 ];
 
 const PORNHUB_CATEGORIES = [
@@ -115,9 +115,9 @@ function getVideoSize(details) {
   if (Number(details.filesize_approx) > 0) return { size: Number(details.filesize_approx), approximate: true };
   const formats = Array.isArray(details.formats) ? details.formats : [];
   const candidates = formats.filter(format => format.vcodec && format.vcodec !== "none" &&
-    (!format.height || format.height <= 480));
+    (!format.height || format.height <= 1080));
   const pool = candidates.length ? candidates : formats.filter(format =>
-    format.vcodec && format.vcodec !== "none" && (!format.height || format.height <= 720));
+    format.vcodec && format.vcodec !== "none" && (!format.height || format.height <= 1080));
   pool.sort((a, b) => (b.height || 0) - (a.height || 0) ||
     (b.tbr || b.vbr || 0) - (a.tbr || a.vbr || 0));
   const selected = pool.find(format => Number(format.filesize) > 0 || Number(format.filesize_approx) > 0);
@@ -299,7 +299,7 @@ function listingText(entries, source) {
     "",
     "Download කිරීමට 1-" + entries.length + " අතර අංකය Reply කරන්න.",
     "➡️ තවත් වීඩියෝ සඳහා *N* | කලින් පිටුවට *P*",
-    "📦 උපරිම ගොනු ප්‍රමාණය: *200 MB*"
+    "📦 උපරිම ගොනු ප්‍රමාණය: *500 MB*"
   ].join("\n");
 }
 
@@ -314,12 +314,12 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
   const name = "xvdl-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
   try {
     fileSystem.mkdirSync(dir, { recursive: true });
-    await send(sock, jid, "⏳ *Video එක Download කරමින්...*\n📦 උපරිමය 200 MB", message);
+    await send(sock, jid, "⏳ *Video එක Download කරමින්...*\n📦 උපරිමය 500 MB", message);
     await execCommand("yt-dlp", ["--version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     await execCommand("yt-dlp", [
-      "--no-playlist", "--no-warnings", "--max-filesize", "200M",
-      "-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best",
+      "--no-playlist", "--no-warnings", "--max-filesize", "500M",
+      "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
       "--merge-output-format", "mp4",
       "-o", path.join(dir, name + ".%(ext)s"), url
     ], { timeout: 600000, maxBuffer: 8 * 1024 * 1024 });
@@ -331,7 +331,7 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
     const file = files[0];
     const size = fileSystem.statSync(file).size;
     if (size <= 0) throw new Error("Downloaded file is empty.");
-    if (size > MAX_BYTES) throw new Error("Video is larger than 200 MB.");
+    if (size > MAX_BYTES) throw new Error("Video is larger than 500 MB.");
     await sock.sendMessage(jid, {
       video: { url: file },
       caption: "✅ *XVDL DOWNLOAD COMPLETED*\n\n🎬 " + entry.title +
@@ -339,7 +339,7 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
     }, { quoted: message });
   } catch (error) {
     const reason = /larger than|max-filesize/i.test(String(error?.stderr || error?.message))
-      ? "වීඩියෝ එක 200 MB සීමාව ඉක්මවයි."
+      ? "වීඩියෝ එක 500 MB සීමාව ඉක්මවයි."
       : error?.code === "ENOENT" && String(error?.path || "").includes("ffmpeg")
         ? "Server එකේ ffmpeg install කර නැහැ."
         : error?.code === "ENOENT"
