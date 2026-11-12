@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|connection-audit|xvdl-diagnose|install-ytdlp-impersonation|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -362,108 +362,6 @@ jobs:
               done
               [ "$FOUND" -eq 1 ] || echo "No matching diagnostic lines found."
               print_status
-              ;;
-            install-ytdlp-impersonation)
-              echo "Install only the missing yt-dlp impersonation dependency in the opc user's Python site; no bot restart."
-              YT_PY="$(head -n 1 "$(command -v yt-dlp)" | sed 's/^#!//')"
-              echo "YTDLP_PYTHON=$YT_PY"
-              "$YT_PY" -m pip install --user 'curl-cffi>=0.11'
-              echo "--- Available impersonation targets ---"
-              yt-dlp --list-impersonate-targets 2>&1 | head -n 20
-              TMP_OUT="$(mktemp)"
-              TMP_ERR="$(mktemp)"
-              if yt-dlp --impersonate chrome --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/categories/amateur" >"$TMP_OUT" 2>"$TMP_ERR"; then
-                RC=0
-              else
-                RC=$?
-              fi
-              echo "YTDLP_IMPERSONATE_EXIT=$RC"
-              python3 - "$TMP_OUT" "$TMP_ERR" <<'PY'
-          import json, pathlib, re, sys
-          out = pathlib.Path(sys.argv[1]).read_text(errors="replace")
-          err = pathlib.Path(sys.argv[2]).read_text(errors="replace")
-          try:
-              data = json.loads(out) if out.strip() else {}
-              entries = data.get("entries") if isinstance(data, dict) else None
-              print("JSON_VALID=YES")
-              print("ENTRIES_COUNT=" + str(len([x for x in entries if x]) if isinstance(entries, list) else (1 if data else 0)))
-          except Exception as e:
-              print("JSON_VALID=NO")
-              print("JSON_ERROR=" + type(e).__name__)
-          err = re.sub(r'https?://\\S+', '[URL]', err)
-          err = re.sub(r'\\b\\d{8,}\\b', '[NUMBER]', err)
-          print("DIAGNOSTIC=" + (err.strip()[:1600] or "[no stderr]"))
-          PY
-              rm -f "$TMP_OUT" "$TMP_ERR"
-              [ "$RC" -eq 0 ]
-              ;;
-            xvdl-diagnose)
-              echo "Read-only yt-dlp metadata probe for the public Pornhub category page; no media downloads."
-              if ! command -v yt-dlp >/dev/null 2>&1; then
-                echo "YTDLP_INSTALLED=NO"
-                exit 0
-              fi
-              echo "YTDLP_VERSION=$(yt-dlp --version 2>/dev/null | head -n 1)"
-              for HOST in www.pornhub.com xhamster.com; do
-                if curl -sS -I -L --max-time 12 -o /dev/null -w "HOST=$HOST HTTP=%{http_code} REMOTE=%{remote_ip}\\n" "https://$HOST/"; then
-                  :
-                else
-                  echo "HOST=$HOST CONNECTIVITY=FAILED"
-                fi
-              done
-              TMP_OUT="$(mktemp)"
-              TMP_ERR="$(mktemp)"
-              if yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/categories/amateur" >"$TMP_OUT" 2>"$TMP_ERR"; then
-                RC=0
-              else
-                RC=$?
-              fi
-              echo "YTDLP_EXIT=$RC"
-              echo "--- IMPERSONATION TARGETS ---"
-              yt-dlp --list-impersonate-targets 2>&1 | head -n 20 || true
-              TMP_IMP_OUT="$(mktemp)"
-              TMP_IMP_ERR="$(mktemp)"
-              if yt-dlp --impersonate chrome --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/categories/amateur" >"$TMP_IMP_OUT" 2>"$TMP_IMP_ERR"; then
-                IMP_RC=0
-              else
-                IMP_RC=$?
-              fi
-              echo "YTDLP_IMPERSONATE_EXIT=$IMP_RC"
-              python3 - "$TMP_IMP_OUT" "$TMP_IMP_ERR" <<'PY'
-          import json, pathlib, re, sys
-          out = pathlib.Path(sys.argv[1]).read_text(errors="replace")
-          err = pathlib.Path(sys.argv[2]).read_text(errors="replace")
-          try:
-              data = json.loads(out) if out.strip() else {}
-              entries = data.get("entries") if isinstance(data, dict) else None
-              print("IMPERSONATE_JSON_VALID=YES")
-              print("IMPERSONATE_ENTRIES_COUNT=" + str(len([x for x in entries if x]) if isinstance(entries, list) else (1 if data else 0)))
-          except Exception as e:
-              print("IMPERSONATE_JSON_VALID=NO")
-              print("IMPERSONATE_JSON_ERROR=" + type(e).__name__)
-          err = re.sub(r'https?://\\S+', '[URL]', err)
-          err = re.sub(r'\\b\\d{8,}\\b', '[NUMBER]', err)
-          print("IMPERSONATE_DIAGNOSTIC=" + (err.strip()[:1400] or "[no stderr]"))
-          PY
-              rm -f "$TMP_IMP_OUT" "$TMP_IMP_ERR"
-              python3 - "$TMP_OUT" "$TMP_ERR" <<'PY'
-          import json, pathlib, re, sys
-          out = pathlib.Path(sys.argv[1]).read_text(errors="replace")
-          err = pathlib.Path(sys.argv[2]).read_text(errors="replace")
-          try:
-              data = json.loads(out) if out.strip() else {}
-              entries = data.get("entries") if isinstance(data, dict) else None
-              print("JSON_VALID=YES")
-              print("ENTRIES_COUNT=" + str(len([x for x in entries if x]) if isinstance(entries, list) else (1 if data else 0)))
-          except Exception as e:
-              print("JSON_VALID=NO")
-              print("JSON_ERROR=" + type(e).__name__)
-          err = re.sub(r'https?://\\S+', '[URL]', err)
-          err = re.sub(r'\\b\\d{8,}\\b', '[NUMBER]', err)
-          err = re.sub(r'(?i)(cookie|token|password|authorization)(\\s*[:=]\\s*)\\S+', r'\\1\\2[REDACTED]', err)
-          print("YTDLP_DIAGNOSTIC=" + (err.strip()[:1800] or "[no stderr]"))
-          PY
-              rm -f "$TMP_OUT" "$TMP_ERR"
               ;;
             connection-audit)
               echo "Read-only WhatsApp connection timeline; message content and identifiers excluded."
