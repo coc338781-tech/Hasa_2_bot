@@ -290,7 +290,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
       setSession(senderKey, { step: "xhamster-search", source: "xhamster" });
       return send(sock, jid, "🔎 සෙවීමට keyword එක යවන්න.", message);
     }
-    const urls = {
+    const urls = state.retryUrl && body === "0" ? { "0": state.retryUrl } : {
       "1": "https://xhamster.com/videos?sort=newest",
       "2": "https://xhamster.com/videos?sort=popular",
       "3": "https://xhamster.com/categories/amateur",
