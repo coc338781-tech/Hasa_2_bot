@@ -97,6 +97,36 @@ test("xHamster rejects non-xHamster URLs", async () => {
   }
 });
 
+test("failed Pornhub category listing keeps a retry action", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  let attempts = 0;
+  const execCommand = async (command, args, options) => {
+    if (args.includes("--flat-playlist")) {
+      attempts++;
+      if (attempts === 1) {
+        const error = new Error("curl: (35) Recv failure: Connection reset by peer");
+        error.stderr = error.message;
+        throw error;
+      }
+    }
+    return state.execCommand(command, args, options);
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
+    assert.match(state.sent.at(-1).payload.text, /connection එක.*reset/i);
+    assert.match(state.sent.at(-1).payload.text, /0.*නැවත උත්සාහ/);
+    await xvdl({ ...state, execCommand, message: state.makeMessage("0", true) });
+    assert.equal(attempts, 2);
+    assert.match(state.sent.at(-1).payload.text, /Public sample video/);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
 test("video listing uses bounded metadata output", async () => {
   resetXvdlStateForTests();
   const state = fixture({ owner: true });
