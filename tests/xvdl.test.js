@@ -83,19 +83,24 @@ test("Pornhub category selection lists metadata and sends selected file from dis
   }
 });
 
-test("xHamster browser lists public category videos without asking for a URL", async () => {
+test("xHamster browser scrapes public category HTML and lists downloadable videos", async () => {
   resetXvdlStateForTests();
   const state = fixture({ owner: true });
   let requestedUrl;
+  const html = '<a class="video-thumb" href="/videos/public-category-video-xhAb123" title="Public xHamster category video"><img alt="Public xHamster category video"></a>';
   const execCommand = async (command, args, options) => {
-    if (args.includes("--dump-single-json")) {
+    if (command === "curl") {
       requestedUrl = args.at(-1);
-      return { stdout: JSON.stringify({ entries: [{
+      return { stdout: html };
+    }
+    if (args.includes("--skip-download")) {
+      return { stdout: JSON.stringify({
         title: "Public xHamster category video",
-        webpage_url: "https://xhamster.com/videos/public-category-video-123",
+        webpage_url: "https://xhamster.com/videos/public-category-video-xhAb123",
         filesize_approx: 18 * 1024 * 1024,
-        duration: 95
-      }] }) };
+        duration: 95,
+        formats: [{ vcodec: "avc1", height: 480 }]
+      }) };
     }
     return state.execCommand(command, args, options);
   };
@@ -104,28 +109,33 @@ test("xHamster browser lists public category videos without asking for a URL", a
     await xvdl({ ...state, message: state.makeMessage("2", true) });
     assert.match(state.sent.at(-1).payload.text, /xHAMSTER BROWSER/);
     await xvdl({ ...state, execCommand, message: state.makeMessage("3", true) });
-    assert.equal(requestedUrl, "https://xhamster.com/categories/amateur");
+    assert.equal(requestedUrl, "https://xhamster.com/categories/amateur?sort=newest");
     assert.match(state.sent.at(-1).payload.text, /Public xHamster category video/);
     assert.match(state.sent.at(-1).payload.text, /18.0 MB/);
+    await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
+    assert.ok(state.sent.some(item => item.payload.video));
   } finally {
     resetXvdlStateForTests();
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
 });
 
-test("xHamster browser offers public keyword search", async () => {
+test("xHamster browser scrapes public keyword search results", async () => {
   resetXvdlStateForTests();
   const state = fixture({ owner: true });
   let requestedUrl;
   const execCommand = async (command, args, options) => {
-    if (args.includes("--dump-single-json")) {
+    if (command === "curl") {
       requestedUrl = args.at(-1);
-      return { stdout: JSON.stringify({ entries: [{
+      return { stdout: '<a href="/videos/search-result-xhAb456" title="Search result video">video</a>' };
+    }
+    if (args.includes("--skip-download")) {
+      return { stdout: JSON.stringify({
         title: "Search result video",
-        webpage_url: "https://xhamster.com/videos/search-result-123",
         filesize_approx: 9 * 1024 * 1024,
-        duration: 60
-      }] }) };
+        duration: 60,
+        formats: [{ vcodec: "avc1", height: 480 }]
+      }) };
     }
     return state.execCommand(command, args, options);
   };
@@ -142,17 +152,59 @@ test("xHamster browser offers public keyword search", async () => {
   }
 });
 
-test("failed Pornhub category listing keeps a retry action", async () => {
+test("Pornhub category falls back to public keyword results when category endpoint fails", async () => {
   resetXvdlStateForTests();
   const state = fixture({ owner: true });
-  let attempts = 0;
+  const requested = [];
   const execCommand = async (command, args, options) => {
     if (args.includes("--flat-playlist")) {
-      attempts++;
-      if (attempts === 1) {
-        const error = new Error("curl: (35) Recv failure: Connection reset by peer");
+      const url = args.at(-1);
+      requested.push(url);
+      if (url.includes("/categories/amateur")) {
+        const error = new Error("HTTP Error 404: Not Found");
         error.stderr = error.message;
         throw error;
+      }
+    }
+    return state.execCommand(command, args, options);
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
+    assert.deepEqual(requested, [
+      "https://www.pornhub.com/categories/amateur",
+      "https://www.pornhub.com/video/search?search=amateur"
+    ]);
+    assert.match(state.sent.at(-1).payload.text, /Public sample video/);
+    assert.match(state.sent.at(-1).payload.text, /search fallback/);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
+test("failed Pornhub category and search keep a retry action", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  let categoryAttempts = 0;
+  let searchAttempts = 0;
+  const execCommand = async (command, args, options) => {
+    if (args.includes("--flat-playlist")) {
+      const url = args.at(-1);
+      if (url.includes("/categories/")) {
+        categoryAttempts++;
+        const error = new Error("HTTP Error 404: Not Found");
+        error.stderr = error.message;
+        throw error;
+      }
+      if (url.includes("/video/search")) {
+        searchAttempts++;
+        if (searchAttempts === 1) {
+          const error = new Error("curl: (35) Recv failure: Connection reset by peer");
+          error.stderr = error.message;
+          throw error;
+        }
       }
     }
     return state.execCommand(command, args, options);
@@ -164,7 +216,8 @@ test("failed Pornhub category listing keeps a retry action", async () => {
     assert.match(state.sent.at(-1).payload.text, /connection එක.*reset/i);
     assert.match(state.sent.at(-1).payload.text, /0.*නැවත උත්සාහ/);
     await xvdl({ ...state, execCommand, message: state.makeMessage("0", true) });
-    assert.equal(attempts, 2);
+    assert.equal(categoryAttempts, 2);
+    assert.equal(searchAttempts, 2);
     assert.match(state.sent.at(-1).payload.text, /Public sample video/);
   } finally {
     resetXvdlStateForTests();
