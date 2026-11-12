@@ -115,7 +115,6 @@ export default async function downloader({ sock, message, config, execCommand = 
     const downloadArgs = [
       "--no-playlist", "--no-warnings",
       ...youtubeOptions(target, fileSystem),
-      "--max-filesize", isAudio ? "32M" : "200M",
       ...(isAudio
         ? ["--max-filesize", "32M", "-x", "--audio-format", "mp3", "--audio-quality", "5"]
         : ["-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best", "--merge-output-format", "mp4"]),
