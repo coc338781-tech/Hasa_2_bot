@@ -149,3 +149,28 @@ test("xHamster creator profile keeps playlist mode enabled", async () => {
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
 });
+
+test("Xvdl rejects files above 200 MiB and removes the temporary file", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  const fileSystem = {
+    ...fs,
+    statSync(file) {
+      const stat = fs.statSync(file);
+      if (String(file).includes("xvdl-")) return { size: 200 * 1024 * 1024 + 1, isFile: () => true };
+      return stat;
+    }
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true), fileSystem });
+    assert.match(state.sent.at(-1).payload.text, /200 MB/);
+    assert.equal(state.sent.some(item => item.payload.video), false);
+    assert.equal(fs.readdirSync(state.dir).length, 0);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
