@@ -1,0 +1,291 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import fs from "node:fs";
+import path from "node:path";
+
+const exec = promisify(execFile);
+const MAX_BYTES = 200 * 1024 * 1024;
+const MAX_RESULTS = 8;
+const SESSION_TTL = 15 * 60 * 1000;
+const sessions = new Map();
+const ageConfirmed = new Set();
+let activeDownloads = 0;
+
+export const commands = [
+  { name: "xvdl", category: "3", usage: "xvdl", description: "Public adult video browser (18+ only; 200 MB limit)" }
+];
+
+const PORNHUB_CATEGORIES = [
+  ["Amateur", "amateur"],
+  ["Cosplay", "cosplay"],
+  ["Mature", "mature"],
+  ["Lesbian", "lesbian"],
+  ["Solo", "solo"]
+];
+
+function getBody(message) {
+  return message.message?.conversation ||
+    message.message?.extendedTextMessage?.text ||
+    message.message?.imageMessage?.caption ||
+    message.message?.videoMessage?.caption || "";
+}
+
+function getSender(message) {
+  return message.key?.participant || message.key?.remoteJid || "";
+}
+
+function isOwner(message, sender, config) {
+  if (message.key?.fromMe) return true;
+  const number = String(sender).split("@")[0].split(":")[0].replace(/\D/g, "");
+  return (Array.isArray(config.owner) ? config.owner : [config.owner])
+    .filter(Boolean)
+    .some(item => String(item).replace(/\D/g, "") === number);
+}
+
+function send(sock, jid, text, message) {
+  return sock.sendMessage(jid, { text }, message ? { quoted: message } : {});
+}
+
+function getSession(key) {
+  const session = sessions.get(key);
+  if (!session) return null;
+  if (Date.now() - session.updatedAt > SESSION_TTL) {
+    sessions.delete(key);
+    return null;
+  }
+  session.updatedAt = Date.now();
+  return session;
+}
+
+function setSession(key, state) {
+  sessions.set(key, { ...state, updatedAt: Date.now() });
+}
+
+function sourceMenu(prefix) {
+  return [
+    "╭━━〔 🔞 *HASА XVDL BROWSER* 〕━━",
+    "┃",
+    "┃ 1️⃣ Pornhub",
+    "┃ 2️⃣ xHamster",
+    "┃",
+    "┃ අංකය Reply කරන්න.",
+    "╰━━━━━━━━━━━━━━━━━━━━",
+    "",
+    "⚠️ 18+ වැඩිහිටියන්ට පමණයි. Public content පමණක්."
+  ].join("\n");
+}
+
+function categoryMenu() {
+  return [
+    "╭━━〔 🎬 *PORNHub CATEGORIES* 〕━━",
+    ...PORNHUB_CATEGORIES.map(([label], index) => "┃ " + (index + 1) + "️⃣ " + label),
+    "┃ 6️⃣ Search keyword",
+    "╰━━━━━━━━━━━━━━━━━━━━",
+    "",
+    "Category අංකය Reply කරන්න."
+  ].join("\n");
+}
+
+function formatSize(bytes) {
+  if (!Number.isFinite(Number(bytes)) || Number(bytes) <= 0) return "Size නොදනී";
+  return (Number(bytes) / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(Number(seconds)) || Number(seconds) < 0) return "දිග නොදනී";
+  const value = Math.floor(Number(seconds));
+  return Math.floor(value / 60) + ":" + String(value % 60).padStart(2, "0");
+}
+
+function normalizeAllowedUrl(value, source) {
+  let url;
+  try { url = new URL(value); } catch { return null; }
+  if (url.protocol !== "https:") return null;
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (source === "pornhub" && host !== "pornhub.com") return null;
+  if (source === "xhamster" && host !== "xhamster.com") return null;
+  if (source === "xhamster" && !/^\/(videos\/|users\/[^/]+\/videos|creators\/)/i.test(url.pathname)) return null;
+  return url.toString();
+}
+
+async function fetchListing(url, execCommand) {
+  const result = await execCommand("yt-dlp", [
+    "--flat-playlist", "--dump-single-json", "--no-warnings",
+    "--no-playlist", "--playlist-end", String(MAX_RESULTS), url
+  ], { timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
+  const info = JSON.parse(result.stdout || "{}");
+  const entries = Array.isArray(info.entries) ? info.entries.filter(Boolean) : [info];
+  return entries.slice(0, MAX_RESULTS).map(entry => ({
+    title: String(entry.title || "Untitled video").replace(/[\r\n]/g, " ").slice(0, 100),
+    url: entry.webpage_url || entry.original_url || entry.url || "",
+    size: entry.filesize_approx || entry.filesize || null,
+    duration: entry.duration
+  })).filter(entry => entry.url);
+}
+
+function listingText(entries, source) {
+  return [
+    "╭━━〔 📺 *" + source + " VIDEO LIST* 〕━━",
+    ...entries.map((entry, index) =>
+      "┃ *" + (index + 1) + ".* " + entry.title +
+      "\n┃    📦 " + formatSize(entry.size) + " | ⏱️ " + formatDuration(entry.duration)
+    ),
+    "╰━━━━━━━━━━━━━━━━━━━━",
+    "",
+    "Download කිරීමට වීඩියෝ අංකය Reply කරන්න.",
+    "📦 උපරිම ගොනු ප්‍රමාණය: *200 MB*"
+  ].join("\n");
+}
+
+async function downloadVideo({ sock, jid, message, entry, config, execCommand, fileSystem }) {
+  if (activeDownloads >= 2) {
+    return send(sock, jid, "⏳ දැනට downloads දෙකක් ක්‍රියාත්මකයි. ටික වේලාවකින් නැවත උත්සාහ කරන්න.", message);
+  }
+  const url = normalizeAllowedUrl(entry.url, entry.source);
+  if (!url) return send(sock, jid, "❌ මේ වීඩියෝ Link එක අවසර ලත් Public source එකකින් නොවේ.", message);
+  activeDownloads++;
+  const dir = path.resolve(config.downloadDir || "downloads");
+  fileSystem.mkdirSync(dir, { recursive: true });
+  const name = "xvdl-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  try {
+    await send(sock, jid, "⏳ *Video එක Download කරමින්...*\n📦 උපරිමය 200 MB", message);
+    await execCommand("yt-dlp", [
+      "--no-playlist", "--no-warnings", "--max-filesize", "200M",
+      "-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best",
+      "--merge-output-format", "mp4",
+      "-o", path.join(dir, name + ".%(ext)s"), url
+    ], { timeout: 600000, maxBuffer: 8 * 1024 * 1024 });
+    const files = fileSystem.readdirSync(dir)
+      .filter(file => file.startsWith(name))
+      .map(file => path.join(dir, file))
+      .filter(file => fileSystem.existsSync(file) && fileSystem.statSync(file).isFile());
+    if (!files.length) throw new Error("No output file was created.");
+    const file = files[0];
+    const size = fileSystem.statSync(file).size;
+    if (size <= 0) throw new Error("Downloaded file is empty.");
+    if (size > MAX_BYTES) throw new Error("Video is larger than 200 MB.");
+    await sock.sendMessage(jid, {
+      video: { url: file },
+      caption: "✅ *XVDL DOWNLOAD COMPLETED*\n\n🎬 " + entry.title +
+        "\n📦 " + formatSize(size) + "\n❤️ *POWERED BY HASA*"
+    }, { quoted: message });
+  } catch (error) {
+    const reason = /larger than|max-filesize/i.test(String(error?.stderr || error?.message))
+      ? "වීඩියෝ එක 200 MB සීමාව ඉක්මවයි."
+      : "Public වීඩියෝ එක ලබාගැනීමට නොහැකි වුණා. Link එක අවහිර/Private විය හැක.";
+    await send(sock, jid, "❌ *DOWNLOAD FAILED*\n" + reason, message).catch(() => {});
+  } finally {
+    for (const file of fileSystem.readdirSync(dir).filter(file => file.startsWith(name))) {
+      try { fileSystem.unlinkSync(path.join(dir, file)); } catch {}
+    }
+    activeDownloads--;
+  }
+}
+
+export default async function xvdl({ sock, message, config, execCommand = exec, fileSystem = fs }) {
+  const jid = message.key?.remoteJid;
+  const sender = getSender(message);
+  if (!jid || !sender) return;
+  const body = getBody(message).trim();
+  const prefix = config.prefix || ".";
+  const commandMatch = body.match(new RegExp("^" + prefix.replace(/[.*+?^\x24{}()|[\]\\]/g, "\\$&") + "xvdl(?:\\s+(.*))?$", "i"));
+  const owner = isOwner(message, sender, config);
+  const senderKey = sender;
+
+  if (commandMatch) {
+    if (!owner && !ageConfirmed.has(senderKey)) {
+      setSession(senderKey, { step: "age" });
+      return send(sock, jid,
+        "🔞 *18+ AGE CONFIRMATION*\n\nමේ පහසුකම වයස අවුරුදු 18 හෝ ඊට වැඩි අයට පමණයි.\nඔබ වයස 18+ නම් *18* ලෙස Reply කරන්න. 18ට අඩු නම් භාවිතා නොකරන්න.", message);
+    }
+    setSession(senderKey, { step: "source" });
+    return send(sock, jid, sourceMenu(prefix), message);
+  }
+
+  const state = getSession(senderKey);
+  if (!state) return;
+  if (state.step === "age") {
+    if (body === "18" || body.toLowerCase() === "yes") {
+      ageConfirmed.add(senderKey);
+      setSession(senderKey, { step: "source" });
+      return send(sock, jid, "✅ ඔබ 18+ බව තහවුරු කළා.\n\n" + sourceMenu(prefix), message);
+    }
+    if (["no", "නැහැ", "නැ"].includes(body.toLowerCase())) {
+      sessions.delete(senderKey);
+      return send(sock, jid, "මෙම පහසුකම 18ට අඩු අයට ලබාගත නොහැක.", message);
+    }
+    return send(sock, jid, "ඉදිරියට යාමට 18+ නම් *18* ලෙස Reply කරන්න.", message);
+  }
+  if (state.step === "source") {
+    if (body === "1") {
+      setSession(senderKey, { step: "category", source: "pornhub" });
+      return send(sock, jid, categoryMenu(), message);
+    }
+    if (body === "2") {
+      setSession(senderKey, { step: "xhamster-url", source: "xhamster" });
+      return send(sock, jid,
+        "🔗 xHamster හි Public video URL එකක් හෝ creator profile videos URL එකක් යවන්න.\n\nCategory browser එක මෙහි සහාය නොදක්වයි.", message);
+    }
+    return send(sock, jid, "1 හෝ 2 තෝරන්න.", message);
+  }
+  if (state.step === "category") {
+    let url;
+    if (/^[1-5]$/.test(body)) {
+      const [, slug] = PORNHUB_CATEGORIES[Number(body) - 1];
+      url = "https://www.pornhub.com/categories/" + slug;
+    } else if (body === "6") {
+      setSession(senderKey, { step: "pornhub-search", source: "pornhub" });
+      return send(sock, jid, "🔎 සෙවීමට අවශ්‍ය category එක හෝ keyword එක යවන්න.", message);
+    } else {
+      return send(sock, jid, "ලැයිස්තුවෙන් 1-6 අතර අංකයක් තෝරන්න.", message);
+    }
+    try {
+      const entries = await fetchListing(url, execCommand);
+      if (!entries.length) throw new Error("No public entries found.");
+      setSession(senderKey, { step: "video", source: "pornhub", entries });
+      return send(sock, jid, listingText(entries, "Pornhub"), message);
+    } catch {
+      return send(sock, jid, "❌ Public category එකේ වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා. පසුව උත්සාහ කරන්න.", message);
+    }
+  }
+  if (state.step === "pornhub-search") {
+    if (!body || body.length > 80) return send(sock, jid, "කෙටි Search keyword එකක් යවන්න.", message);
+    const url = "https://www.pornhub.com/video/search?search=" + encodeURIComponent(body);
+    try {
+      const entries = await fetchListing(url, execCommand);
+      if (!entries.length) throw new Error("No public entries found.");
+      setSession(senderKey, { step: "video", source: "pornhub", entries });
+      return send(sock, jid, listingText(entries, "Pornhub"), message);
+    } catch {
+      return send(sock, jid, "❌ Public search results ලබාගත නොහැකි වුණා. පසුව උත්සාහ කරන්න.", message);
+    }
+  }
+  if (state.step === "xhamster-url") {
+    const url = normalizeAllowedUrl(body, "xhamster");
+    if (!url) return send(sock, jid, "නිවැරදි Public xHamster video හෝ creator profile URL එකක් යවන්න.", message);
+    try {
+      const entries = await fetchListing(url, execCommand);
+      if (!entries.length) throw new Error("No public entries found.");
+      setSession(senderKey, { step: "video", source: "xhamster", entries });
+      return send(sock, jid, listingText(entries, "xHamster"), message);
+    } catch {
+      return send(sock, jid, "❌ මේ Public page එකෙන් වීඩියෝ ලැයිස්තුව ලබාගත නොහැකි වුණා.", message);
+    }
+  }
+  if (state.step === "video") {
+    if (!/^[1-8]$/.test(body)) return send(sock, jid, "ලැයිස්තුවේ 1-" + state.entries.length + " අතර වීඩියෝ අංකයක් යවන්න.", message);
+    const entry = state.entries[Number(body) - 1];
+    if (!entry) return send(sock, jid, "වැරදි වීඩියෝ අංකයක්.", message);
+    sessions.delete(senderKey);
+    return downloadVideo({
+      sock, jid, message, entry: { ...entry, source: state.source },
+      config, execCommand, fileSystem
+    });
+  }
+}
+
+export function resetXvdlStateForTests() {
+  sessions.clear();
+  ageConfirmed.clear();
+  activeDownloads = 0;
+}
