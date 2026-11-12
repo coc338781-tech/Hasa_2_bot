@@ -140,8 +140,14 @@ jobs:
             echo "- Trigger: ${{ github.event_name }}"
             echo "- Commit: ${{ github.sha }}"
             echo "- Scope: ${{ inputs.scope || 'scheduled full' }}"
-            echo "- Full output is in the job logs and attached artifact."
+            echo "- Provider failures are WARNs (third-party availability), not false claims that Oracle/WhatsApp is offline."
             echo "- Read-only: no PM2 restart and no WhatsApp auth/session file access."
+            if [ -f provider-smoke.txt ]; then
+              echo
+              echo "### Provider results and why each matters"
+              grep -E '^(PASS|WARN) \\|' provider-smoke.txt || true
+              grep '^RESULT ' provider-smoke.txt || true
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload diagnostic reports
