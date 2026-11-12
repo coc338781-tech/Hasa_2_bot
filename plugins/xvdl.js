@@ -61,9 +61,9 @@ function setSession(key, state) {
   sessions.set(key, { ...state, updatedAt: Date.now() });
 }
 
-function sourceMenu(prefix) {
+function sourceMenu() {
   return [
-    "╭━━〔 🔞 *HASА XVDL BROWSER* 〕━━",
+    "╭━━〔 🔞 *HASA XVDL BROWSER* 〕━━",
     "┃",
     "┃ 1️⃣ Pornhub",
     "┃ 2️⃣ xHamster",
@@ -222,7 +222,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
         "🔞 *18+ AGE CONFIRMATION*\n\nමේ පහසුකම වයස අවුරුදු 18 හෝ ඊට වැඩි අයට පමණයි.\nඔබ වයස 18+ නම් *18* ලෙස Reply කරන්න. 18ට අඩු නම් භාවිතා නොකරන්න.", message);
     }
     setSession(senderKey, { step: "source" });
-    return send(sock, jid, sourceMenu(prefix), message);
+    return send(sock, jid, sourceMenu(), message);
   }
 
   const state = getSession(senderKey);
