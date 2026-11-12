@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -551,6 +551,62 @@ jobs:
               bash -n "$GUARD"
               echo "Deploy guard updated; original backup: $BACKUP"
               sed -n "14,52p" "$GUARD"
+              ;;
+            xvdl-diagnose)
+              echo "Read-only public XVDL source diagnostics; no media downloads, bot restart, or session changes."
+              TMP="$(mktemp -d /tmp/hasa-xvdl-diagnostic.XXXXXX)"
+              trap 'rm -rf -- "$TMP"' EXIT
+              probe() {
+                local label="$1" url="$2" code
+                code="$(curl -4 -L -sS -o "$TMP/page" -w '%{http_code}' --connect-timeout 8 --max-time 25 "$url" 2>"$TMP/curl.err" || true)"
+                echo "HTTP_PROBE=$label STATUS=${code:-000}"
+                if [ -s "$TMP/curl.err" ]; then
+                  sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' "$TMP/curl.err" | head -n 1
+                fi
+              }
+              probe "pornhub-root" "https://www.pornhub.com/"
+              probe "pornhub-amateur" "https://www.pornhub.com/categories/amateur"
+              probe "xhamster-root" "https://xhamster.com/"
+              probe "xhamster-popular" "https://xhamster.com/videos?sort=popular"
+              probe "xhamster-amateur" "https://xhamster.com/categories/amateur"
+              for item in "pornhub-amateur|https://www.pornhub.com/categories/amateur" "pornhub-popular|https://www.pornhub.com/video?o=mv" "xhamster-popular|https://xhamster.com/videos?sort=popular" "xhamster-amateur|https://xhamster.com/categories/amateur"; do
+                label="${item%%|*}"
+                url="${item#*|}"
+                echo "--- YTDLP $label ---"
+                if timeout 100 yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "$url" >"$TMP/list.json" 2>"$TMP/list.err"; then
+                  python3 - "$TMP/list.json" <<'PY'
+          import json,sys
+          try:
+              d=json.load(open(sys.argv[1]))
+              entries=d.get("entries") if isinstance(d,dict) else None
+              if entries is None: entries=[d]
+              print("ENTRIES_COUNT="+str(sum(1 for x in entries if isinstance(x,dict))))
+              print("EXTRACTOR="+str(d.get("extractor_key","unknown")) if isinstance(d,dict) else "EXTRACTOR=unknown")
+          except Exception:
+              print("JSON_PARSE=FAILED")
+          PY
+                else
+                  echo "YTDLP_EXIT=FAILED"
+                  if [ -s "$TMP/list.err" ]; then
+                    grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out' "$TMP/list.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+                  fi
+                fi
+              done
+              echo "--- YTDLP IMPERSONATED PROBE ---"
+              if timeout 100 yt-dlp --impersonate Chrome-133 --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://xhamster.com/videos?sort=popular" >"$TMP/imp.json" 2>"$TMP/imp.err"; then
+                python3 - "$TMP/imp.json" <<'PY'
+          import json,sys
+          try:
+              d=json.load(open(sys.argv[1])); e=d.get("entries") if isinstance(d,dict) else None
+              print("IMPERSONATED_ENTRIES="+str(sum(1 for x in (e if e is not None else [d]) if isinstance(x,dict))))
+              print("IMPERSONATED_EXTRACTOR="+str(d.get("extractor_key","unknown")) if isinstance(d,dict) else "IMPERSONATED_EXTRACTOR=unknown")
+          except Exception: print("IMPERSONATED_JSON=FAILED")
+          PY
+              else
+                echo "IMPERSONATED_YTDLP_EXIT=FAILED"
+                grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out' "$TMP/imp.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+              fi
+              print_status
               ;;
             deploy)
               echo "Starting guarded Oracle deployment; local AI code will be preserved."
