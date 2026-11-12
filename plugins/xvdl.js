@@ -5,7 +5,7 @@ import path from "node:path";
 
 const exec = promisify(execFile);
 const MAX_BYTES = 200 * 1024 * 1024;
-const MAX_RESULTS = 6;
+const MAX_RESULTS = 10;
 const SESSION_TTL = 15 * 60 * 1000;
 const sessions = new Map();
 const ageConfirmed = new Set();
@@ -105,9 +105,33 @@ function xhamsterMenu() {
   ].join("\n");
 }
 
-function formatSize(bytes) {
+function formatSize(bytes, approximate = false) {
   if (!Number.isFinite(Number(bytes)) || Number(bytes) <= 0) return "Size නොදනී";
-  return (Number(bytes) / (1024 * 1024)).toFixed(1) + " MB";
+  return (approximate ? "≈ " : "") + (Number(bytes) / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function getVideoSize(details) {
+  if (Number(details.filesize) > 0) return { size: Number(details.filesize), approximate: false };
+  if (Number(details.filesize_approx) > 0) return { size: Number(details.filesize_approx), approximate: true };
+  const formats = Array.isArray(details.formats) ? details.formats : [];
+  const candidates = formats.filter(format => format.vcodec && format.vcodec !== "none" &&
+    (!format.height || format.height <= 480));
+  const pool = candidates.length ? candidates : formats.filter(format =>
+    format.vcodec && format.vcodec !== "none" && (!format.height || format.height <= 720));
+  pool.sort((a, b) => (b.height || 0) - (a.height || 0) ||
+    (b.tbr || b.vbr || 0) - (a.tbr || a.vbr || 0));
+  const selected = pool.find(format => Number(format.filesize) > 0 || Number(format.filesize_approx) > 0);
+  if (selected) return {
+    size: Number(selected.filesize || selected.filesize_approx),
+    approximate: !Number(selected.filesize)
+  };
+  const bitrateFormat = pool.find(format => Number(format.tbr || format.vbr) > 0);
+  const duration = Number(details.duration);
+  const bitrate = Number(bitrateFormat?.tbr || bitrateFormat?.vbr);
+  if (bitrate > 0 && duration > 0) {
+    return { size: bitrate * 1000 / 8 * duration, approximate: true };
+  }
+  return { size: null, approximate: false };
 }
 
 function formatDuration(seconds) {
@@ -194,7 +218,9 @@ async function fetchXHamsterListing(url, execCommand) {
         ], { timeout: 45000, maxBuffer: 2 * 1024 * 1024 });
         const details = JSON.parse(metadata.stdout || "{}");
         entry.title = String(details.title || entry.title).replace(/[\r\n]/g, " ").slice(0, 100);
-        entry.size = details.filesize_approx || details.filesize || null;
+        const measured = getVideoSize(details);
+        entry.size = measured.size;
+        entry.sizeApproximate = measured.approximate;
         entry.duration = details.duration || null;
       } catch {
         // Keep the public URL and a readable slug-derived title.
@@ -239,8 +265,9 @@ async function fetchListing(url, source, execCommand) {
           (!format.height || format.height <= 720));
         videoFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
         const selected = videoFormats[0] || {};
-        entry.size = details.filesize_approx || details.filesize ||
-          selected.filesize_approx || selected.filesize || null;
+        const measured = getVideoSize(details);
+        entry.size = measured.size || selected.filesize_approx || selected.filesize || null;
+        entry.sizeApproximate = measured.approximate || (!selected.filesize && Number(selected.filesize_approx) > 0);
         entry.duration = details.duration || entry.duration;
       } catch {
         // Keep the entry visible and mark its size/duration as unavailable.
@@ -266,7 +293,7 @@ function listingText(entries, source) {
     "╭━━〔 📺 *" + source + " VIDEO LIST* 〕━━",
     ...entries.map((entry, index) =>
       "┃ *" + (index + 1) + ".* " + entry.title +
-      "\n┃    📦 " + formatSize(entry.size) + " | ⏱️ " + formatDuration(entry.duration)
+      "\n┃    📦 " + formatSize(entry.size, entry.sizeApproximate) + " | ⏱️ " + formatDuration(entry.duration)
     ),
     "╰━━━━━━━━━━━━━━━━━━━━",
     "",
