@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure restricted SSH
-        if: ${{ github.event_name == 'schedule' || inputs.scope != 'external-services' }}
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.scope != 'external-services' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
@@ -54,13 +54,13 @@ jobs:
           printf 'SSH_HOST=%s\nSSH_USER=%s\n' "$SSH_HOST" "$SSH_USER" >> "$GITHUB_ENV"
 
       - name: Run read-only host, PM2 and crash diagnostics
-        if: ${{ github.event_name == 'schedule' || inputs.scope == 'full' || inputs.scope == 'host-and-pm2' }}
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.scope == 'full' || inputs.scope == 'host-and-pm2' }}
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" 'bash -s' < scripts/oracle-diagnostics.sh | tee oracle-diagnostics.txt
 
       - name: Run real external-provider smoke tests on Oracle
-        if: ${{ github.event_name == 'schedule' || inputs.scope == 'full' || inputs.scope == 'external-services' }}
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.scope == 'full' || inputs.scope == 'external-services' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
