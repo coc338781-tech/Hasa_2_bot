@@ -336,3 +336,32 @@ test("XVDL video list supports next and previous pages", async () => {
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
 });
+
+
+test("XVDL refuses to start when less than 1.5 GiB disk space is free", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  let downloadStarted = false;
+  const execCommand = async (command, args, options) => {
+    if (args.includes("--version") || args[0] === "-version") return { stdout: "ok" };
+    if (args.includes("--dump-single-json")) return state.execCommand(command, args, options);
+    downloadStarted = true;
+    return state.execCommand(command, args, options);
+  };
+  const fileSystem = {
+    ...fs,
+    statfsSync() { return { bavail: 100, bsize: 4096 }; }
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, execCommand, fileSystem, message: state.makeMessage("1", true) });
+    assert.match(state.sent.at(-1).payload.text, /free disk space/);
+    assert.equal(downloadStarted, false);
+    assert.equal(fs.readdirSync(state.dir).length, 0);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
