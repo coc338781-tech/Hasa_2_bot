@@ -393,3 +393,28 @@ test("pending video selection does not answer ordinary chat or swallow commands"
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
 });
+
+test("XVDL reports a safe technical reason when the selected video download fails", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  const execCommand = async (command, args, options) => {
+    if (args.includes("--dump-single-json")) return state.execCommand(command, args, options);
+    if (args.includes("--version") || args[0] === "-version") return { stdout: "ok" };
+    const error = new Error("ERROR: HTTP Error 403: Forbidden https://example.invalid/private-token");
+    error.stderr = error.message;
+    throw error;
+  };
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, execCommand, message: state.makeMessage("1", true) });
+    const failure = state.sent.at(-1).payload.text;
+    assert.match(failure, /Oracle server එකෙන් download request එක අවහිර කළා/);
+    assert.match(failure, /Technical:/);
+    assert.doesNotMatch(failure, /example\\.invalid|private-token/);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
