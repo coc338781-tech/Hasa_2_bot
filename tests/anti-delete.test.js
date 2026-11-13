@@ -82,5 +82,5 @@ test("anti-delete finds cached message when revoke JID differs but message ID ma
   state.cache.entries = () => [["94771111111@lid:original-1", original]];
   await antiDelete(state);
   assert.match(state.sent[0].payload.text, /cached before revoke/);
-  assert.deepEqual(state.deleted, ["chat@g.us:original-1"]);
+  assert.deepEqual(state.deleted, ["94771111111@lid:original-1"]);
 });
