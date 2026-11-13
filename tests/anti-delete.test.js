@@ -63,3 +63,11 @@ test("anti-delete respects groups-only mode in private chats", async () => {
   assert.equal(state.sent.length, 0);
   assert.deepEqual(state.deleted, []);
 });
+
+test("anti-delete ignores messages deleted by the owner", async () => {
+  const state = setup({ original: { message: { conversation: "owner message" } } });
+  state.message.message.protocolMessage.key.fromMe = true;
+  await antiDelete(state);
+  assert.equal(state.sent.length, 0);
+  assert.deepEqual(state.deleted, []);
+});
