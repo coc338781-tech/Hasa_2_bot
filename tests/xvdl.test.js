@@ -365,3 +365,31 @@ test("XVDL refuses to start when less than 1.5 GiB disk space is free", async ()
     fs.rmSync(state.dir, { recursive: true, force: true });
   }
 });
+
+
+test("pending video selection does not answer ordinary chat or swallow commands", async () => {
+  resetXvdlStateForTests();
+  const state = fixture({ owner: true });
+  try {
+    await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
+    await xvdl({ ...state, message: state.makeMessage("2", true) });
+    await xvdl({ ...state, message: state.makeMessage("3", true) });
+    assert.match(state.sent.at(-1).payload.text, /1-.*අතර/);
+    const before = state.sent.length;
+
+    // A different bot command must fall through to the main dispatcher.
+    await xvdl({ ...state, message: state.makeMessage(".ping", true) });
+    assert.equal(state.sent.length, before);
+
+    // Ordinary conversation must not trigger the stale 1-20 prompt.
+    await xvdl({ ...state, message: state.makeMessage("මේ මොකද වෙලා තියෙන්නේ බන්", true) });
+    assert.equal(state.sent.length, before);
+
+    // The stale session is cleared, so a later message is also ignored.
+    await xvdl({ ...state, message: state.makeMessage("හෙලෝ", true) });
+    assert.equal(state.sent.length, before);
+  } finally {
+    resetXvdlStateForTests();
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
