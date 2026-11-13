@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "badmac-monitor-20261113-02-status"
+  "action": "connection-audit",
+  "request_id": "badmac-monitor-20261113-02-connection-audit"
 }
