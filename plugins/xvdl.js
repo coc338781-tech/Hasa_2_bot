@@ -527,7 +527,7 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     }
   }
   if (state.step === "video") {
-    const selection = /^(?:[1-9]|1\\d|20)$/.test(body);
+    const selection = /^(?:[1-9]|1\d|20)$/.test(body);
     const navigation = ["n", "next", "ඊළඟ", "p", "prev", "previous"].includes(body.toLowerCase());
     if (!selection && !navigation) {
       // Ordinary chat text is not a video selection. End the stale menu silently.
