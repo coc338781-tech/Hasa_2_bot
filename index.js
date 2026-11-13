@@ -6,7 +6,8 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   Browsers,
   downloadContentFromMessage,
-  normalizeMessageContent
+  normalizeMessageContent,
+  WAMessageStubType
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import pino from "pino";
@@ -198,6 +199,30 @@ async function startBot(authState = null) {
         }
       }
       await plugins.handleMessage(sock, msg, config, messageCache);
+    }
+  });
+
+  // Baileys v7 emits delete-for-everyone as messages.update (REVOKE),
+  // not as a messages.upsert protocolMessage. Route that event to Anti-Delete.
+  sock.ev.on("messages.update", async updates => {
+    for (const item of updates || []) {
+      if (item?.update?.messageStubType !== WAMessageStubType.REVOKE) continue;
+      const key = item.key;
+      if (!key?.remoteJid || !key?.id) continue;
+      const revokeMessage = {
+        key,
+        message: {
+          protocolMessage: {
+            type: 0,
+            key: {
+              remoteJid: key.remoteJid,
+              id: key.id,
+              fromMe: key.fromMe
+            }
+          }
+        }
+      };
+      await plugins.handleMessage(sock, revokeMessage, config, messageCache);
     }
   });
 }
