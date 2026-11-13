@@ -71,3 +71,16 @@ test("anti-delete respects groups-only mode in private chats", async () => {
   assert.equal(state.sent.length, 0);
   assert.deepEqual(state.deleted, []);
 });
+
+test("anti-delete finds cached message when revoke JID differs but message ID matches uniquely", async () => {
+  const original = {
+    key: { remoteJid: "94771111111@lid", id: "original-1" },
+    message: { conversation: "cached before revoke" }
+  };
+  const state = setup({ original });
+  state.message.message.protocolMessage.key.remoteJid = "chat@g.us";
+  state.cache.entries = () => [["94771111111@lid:original-1", original]];
+  await antiDelete(state);
+  assert.match(state.sent[0].payload.text, /cached before revoke/);
+  assert.deepEqual(state.deleted, ["chat@g.us:original-1"]);
+});

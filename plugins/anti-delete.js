@@ -37,7 +37,22 @@ export default async function antiDelete({ sock, message, config, cache }) {
   // Only restore messages sent by someone else; ignore the owner's own deletions.
   if (!deletedKey?.id || deletedKey.fromMe === true) return;
   const cacheKey = (deletedKey.remoteJid || jid) + ":" + deletedKey.id;
-  const original = cache?.get(cacheKey);
+  let original = cache?.get(cacheKey);
+
+  // Some Baileys revoke events omit or normalize remoteJid differently
+  // (PN/LID addressing). Fall back to the unique cached message ID, while
+  // preferring a candidate from the same chat to avoid cross-chat matches.
+  if (!original?.message && cache && typeof cache.entries === "function") {
+    const matches = [...cache.entries()].filter(([key, value]) =>
+      String(key).endsWith(":" + deletedKey.id) && value?.message &&
+      (!value.key?.id || value.key.id === deletedKey.id)
+    );
+    const sameChat = matches.find(([, value]) =>
+      value.key?.remoteJid === (deletedKey.remoteJid || jid)
+    );
+    if (sameChat) original = sameChat[1];
+    else if (matches.length === 1) original = matches[0][1];
+  }
   if (!original?.message) return;
 
   const sender = deletedKey.participant || deletedKey.remoteJid || jid;
