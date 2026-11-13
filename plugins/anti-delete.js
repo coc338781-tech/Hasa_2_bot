@@ -35,6 +35,8 @@ export default async function antiDelete({ sock, message, config, cache }) {
 
   const deletedKey = protocol.key;
   if (!deletedKey?.id) return;
+  // Never report deletions of messages sent by this bot/owner account.
+  if (deletedKey.fromMe === true) return;
   const cacheKey = (deletedKey.remoteJid || jid) + ":" + deletedKey.id;
   const original = cache?.get(cacheKey);
   if (!original?.message) return;
