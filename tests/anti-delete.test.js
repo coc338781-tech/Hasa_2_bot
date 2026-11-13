@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import antiDelete from "../plugins/anti-delete.js";
 
-function setup({ original, mode = true, toInbox = false, failText = false, failMedia = false } = {}) {
+function setup({ original, cacheKey = "chat@g.us:original-1", mode = true, toInbox = false, failText = false, failMedia = false } = {}) {
   const sent = [];
   const deleted = [];
   const cache = {
-    get: key => key === "chat@g.us:original-1" ? original : undefined,
+    get: key => key === cacheKey ? original : undefined,
     delete: key => deleted.push(key)
   };
   const sock = {
@@ -77,7 +77,7 @@ test("anti-delete finds cached message when revoke JID differs but message ID ma
     key: { remoteJid: "94771111111@lid", id: "original-1" },
     message: { conversation: "cached before revoke" }
   };
-  const state = setup({ original });
+  const state = setup({ original, cacheKey: "94771111111@lid:original-1" });
   state.message.message.protocolMessage.key.remoteJid = "chat@g.us";
   state.cache.entries = () => [["94771111111@lid:original-1", original]];
   await antiDelete(state);
