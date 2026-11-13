@@ -1,4 +1,4 @@
 {
-  "action": "inspect-changes",
-  "request_id": "check-live-xvdl-antidel-131113"
+  "action": "inspect-guard-script",
+  "request_id": "inspect-deploy-policy-131113"
 }
