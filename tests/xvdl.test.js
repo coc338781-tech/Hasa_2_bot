@@ -372,8 +372,8 @@ test("pending video selection does not answer ordinary chat or swallow commands"
   const state = fixture({ owner: true });
   try {
     await xvdl({ ...state, message: state.makeMessage(".xvdl", true) });
-    await xvdl({ ...state, message: state.makeMessage("2", true) });
-    await xvdl({ ...state, message: state.makeMessage("3", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
+    await xvdl({ ...state, message: state.makeMessage("1", true) });
     assert.match(state.sent.at(-1).payload.text, /1-.*අතර/);
     const before = state.sent.length;
 
