@@ -222,6 +222,7 @@ async function startBot(authState = null) {
           }
         }
       };
+      if (!isMessageAllowedByMode(revokeMessage, sock, config)) continue;
       await plugins.handleMessage(sock, revokeMessage, config, messageCache);
     }
   });
