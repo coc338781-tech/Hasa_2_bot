@@ -281,17 +281,17 @@ async function fetchListing(url, source, execCommand) {
 
 function downloadDiagnostic(error) {
   const raw = [error?.stderr, error?.stdout, error?.message]
-    .filter(value => typeof value === "string" && value.trim()).join("\\n");
-  const lines = raw.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
+    .filter(value => typeof value === "string" && value.trim()).join("\n");
+  const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const useful = lines.filter(line =>
     /error|403|404|429|forbidden|private|login|sign.?in|unsupported|format|extractor|not available|timed? out|reset|ffmpeg|yt-dlp|requested/i.test(line)
   );
   let detail = useful.at(-1) || lines.at(-1) || (error?.code ? "Process code: " + error.code : "No diagnostic returned");
   return detail
-    .replace(/https?:\\/\\/[^\\s"'<>]+/gi, "[URL]")
-    .replace(/(cookie|authorization|token|password|session)([=: ]+)\\S+/gi, "$1$2[REDACTED]")
-    .replace(/\\b\\d{8,}\\b/g, "[NUMBER]")
-    .replace(/\\s+/g, " ").slice(0, 150);
+    .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL]")
+    .replace(/(cookie|authorization|token|password|session)([=: ]+)\S+/gi, "$1$2[REDACTED]")
+    .replace(/\b\d{8,}\b/g, "[NUMBER]")
+    .replace(/\s+/g, " ").slice(0, 150);
 }
 
 function listingFailureText(error, fallback) {
