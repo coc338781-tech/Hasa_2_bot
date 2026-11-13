@@ -1,4 +1,4 @@
 {
-  "action": "inspect-guard-script",
-  "request_id": "inspect-deploy-policy-131113"
+  "action": "deploy",
+  "request_id": "deploy-xvdl-antidelete-fix-131113"
 }
