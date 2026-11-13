@@ -364,14 +364,20 @@ async function downloadVideo({ sock, jid, message, entry, config, execCommand, f
         "\n📦 " + formatSize(size) + "\n❤️ *POWERED BY HASA*"
     }, { quoted: message });
   } catch (error) {
-    const reason = /larger than|max-filesize/i.test(String(error?.stderr || error?.message))
+    const detail = String(error?.stderr || error?.stdout || error?.message || "");
+    const reason = /larger than|max-filesize/i.test(detail)
       ? "වීඩියෝ එක 500 MB සීමාව ඉක්මවයි."
       : error?.code === "ENOENT" && String(error?.path || "").includes("ffmpeg")
         ? "Server එකේ ffmpeg install කර නැහැ."
         : error?.code === "ENOENT"
           ? "Server එකේ yt-dlp install/update කළ යුතුයි."
-          : "Public වීඩියෝ එක ලබාගැනීමට නොහැකි වුණා. Link එක අවහිර/Private විය හැක.";
-    await send(sock, jid, "❌ *DOWNLOAD FAILED*\n" + reason, message).catch(() => {});
+          : /HTTP Error 403|403 Forbidden|HTTP Error 429|Too Many Requests/i.test(detail)
+            ? "Oracle server එකෙන් download request එක අවහිර කළා."
+            : /timed? out|ETIMEDOUT/i.test(detail)
+              ? "Download එකට website එකෙන් නියමිත වේලාවට පිළිතුරක් ලැබුණේ නැහැ."
+              : "Public වීඩියෝ එක ලබාගැනීමට නොහැකි වුණා. Link එක අවහිර/Private විය හැක.";
+    const diagnostic = downloadDiagnostic(error);
+    await send(sock, jid, "❌ *DOWNLOAD FAILED*\n" + reason + "\n\nTechnical: " + diagnostic, message).catch(() => {});
   } finally {
     try {
       for (const file of fileSystem.readdirSync(dir).filter(file => file.startsWith(name))) {
