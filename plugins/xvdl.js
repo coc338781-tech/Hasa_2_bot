@@ -389,6 +389,14 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
 
   const state = getSession(senderKey);
   if (!state) return;
+
+  // A pending XVDL menu must never swallow unrelated bot commands.
+  // Cancel the pending selection and let the main command dispatcher handle it.
+  if (body.startsWith(prefix) && !commandMatch) {
+    sessions.delete(senderKey);
+    return;
+  }
+
   if (state.step === "age") {
     if (body === "18" || body.toLowerCase() === "yes") {
       ageConfirmed.add(senderKey);
@@ -519,6 +527,13 @@ export default async function xvdl({ sock, message, config, execCommand = exec, 
     }
   }
   if (state.step === "video") {
+    const selection = /^(?:[1-9]|1\\d|20)$/.test(body);
+    const navigation = ["n", "next", "ඊළඟ", "p", "prev", "previous"].includes(body.toLowerCase());
+    if (!selection && !navigation) {
+      // Ordinary chat text is not a video selection. End the stale menu silently.
+      sessions.delete(senderKey);
+      return;
+    }
     if (["n", "next", "ඊළඟ"].includes(body.toLowerCase())) {
       const nextPage = (state.page || 1) + 1;
       const nextUrl = new URL(state.listingUrl);
