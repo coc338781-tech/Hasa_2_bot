@@ -12,6 +12,8 @@ A separate WhatsApp MD bot project. It does not overwrite or share the existing 
 - AI chat using Gemini when an API key is configured.
 - Video downloader for supported public URLs via yt-dlp (.dl and .fb).
 - Optional auto voice reply and composing presence.
+- Owner-only personal WhatsApp assistant: contact lookup, daily incoming-message counts, and explicit message sending.
+- Optional context-aware AI Smart Reply for private one-to-one chats; disabled by default.
 - Pairing-code Subbot with separate per-owner session storage.
 
 ## Termux installation
@@ -30,7 +32,7 @@ npm start
 
 Set the `owner` number in config.json to your WhatsApp number with country code, digits only. The main bot asks for the WhatsApp number on first pairing; you can alternatively set `BOT_PHONE_NUMBER` in a private `.env` file. The pairing code is shown in the terminal. On WhatsApp: Linked devices -> Link a device -> Link with phone number instead.
 
-For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in config.json.
+For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in config.json. Smart Reply has a separate `smartReply` switch (default false); incoming private-chat text and up to 8 recent text turns are sent to Gemini to generate a reply. No media or contact list is sent. Daily statistics store sender JIDs and counts locally in a permission-restricted file.
 
 ## Commands
 - `.menu`, `.ping`, `.alive`, `.uptime`
@@ -40,6 +42,7 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 - `.ai question`, `.hack` (owner-only harmless prank simulation)
 - `.dl url`, `.fb url`
 - `.subbot phone-number`, `.subcheck`, `.stopsubbot`, `.restartsubbot`, `.delsubbot`, `.helpsubbot`
+- `.personalhelp`, `.contact <name or number>`, `.today`, `.sendto <name or number> | <message>`, `.smartreply on|off`
 
 ## Important notes
 - Subbot sessions are separate under `subbot_sessions/`; deleting a Subbot removes only that Subbot's own session folder.

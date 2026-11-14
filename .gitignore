@@ -7,3 +7,5 @@ downloads/
 tmp/
 replies.json
 *.log
+
+data/daily-message-stats.json*
