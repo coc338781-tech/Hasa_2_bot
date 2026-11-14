@@ -11,6 +11,7 @@ const pendingReplies = new Map();
 const seenIncomingIds = new Map();
 const COLOMBO_TZ = "Asia/Colombo";
 const MAX_CONTEXT = 8;
+const MAX_TRACKED_CHATS = 300;
 
 function digits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -74,6 +75,9 @@ function markIncomingOnce(message) {
   const jid = message?.key?.remoteJid;
   const id = message?.key?.id;
   if (!jid || !id) return true;
+  if (!seenIncomingIds.has(jid) && seenIncomingIds.size >= MAX_TRACKED_CHATS) {
+    seenIncomingIds.delete(seenIncomingIds.keys().next().value);
+  }
   const ids = seenIncomingIds.get(jid) || new Set();
   if (ids.has(id)) return false;
   ids.add(id);
@@ -179,6 +183,9 @@ async function resolveRecipient(sock, query, config) {
 
 function addConversationLine(jid, role, text) {
   if (!jid || !text) return;
+  if (!conversations.has(jid) && conversations.size >= MAX_TRACKED_CHATS) {
+    conversations.delete(conversations.keys().next().value);
+  }
   const list = conversations.get(jid) || [];
   list.push({ role, text: String(text).slice(0, 2000) });
   conversations.set(jid, list.slice(-MAX_CONTEXT));
