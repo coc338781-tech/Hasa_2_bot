@@ -26,7 +26,9 @@ const SETTINGS = [
   { id: "10.1", key: "alwaysOnline", label: "Always Online", value: true },
   { id: "10.2", key: "alwaysOnline", label: "Always Online", value: false },
   { id: "11.1", key: "publicMode", label: "Public Mode", value: true },
-  { id: "11.2", key: "publicMode", label: "Private Mode", value: false }
+  { id: "11.2", key: "publicMode", label: "Private Mode", value: false },
+  { id: "12.1", key: "smartReply", label: "AI Smart Reply", value: true },
+  { id: "12.2", key: "smartReply", label: "AI Smart Reply", value: false }
 ];
 
 const CATEGORIES = {
@@ -395,9 +397,13 @@ function makeSettingsMenu(config, prefix) {
     "│  10.1 | Enable  " + (current("alwaysOnline") === "🟢 ON" ? "🟢" : ""),
     "│  10.2 | Disable",
     "│",
-    "└─ *[11] PUBLIC / PRIVATE MODE*",
+    "├─ *[11] PUBLIC / PRIVATE MODE*",
     "   11.1 | Public  " + (current("publicMode") === "🟢 ON" ? "🟢" : ""),
     "   11.2 | Private " + (current("publicMode") === "🔴 OFF" ? "🟢" : ""),
+    "│",
+    "└─ *[12] AI SMART REPLY*",
+    "   12.1 | Enable  " + (current("smartReply") === "🟢 ON" ? "🟢" : ""),
+    "   12.2 | Disable",
     "",
     "📌 *Setting එක ON/OFF කිරීමට අදාල අංකය Reply කරන්න.*",
     "🔹 Prefix commands: " + prefix + "settings"
@@ -469,6 +475,10 @@ export default async function core({ sock, message, config }) {
       if (!owner) return send("⛔ Settings වෙනස් කළ හැක්කේ Ownerට පමණයි.");
       const setting = SETTINGS.find(item => item.id === body);
       if (!setting) return send("❌ ඒ Setting අංකය හමු වුණේ නැහැ. " + prefix + "settings යවන්න.");
+      if (setting.key === "smartReply" && setting.value === true && !process.env.GEMINI_API_KEY) {
+        return send("❌ AI Smart Reply ON කිරීමට .env තුළ GEMINI_API_KEY සකස් කළ යුතුයි.");
+      }
+
       const currentValue = config[setting.key];
       const alreadySelected = typeof setting.value === "boolean"
         ? isEnabled(currentValue) === setting.value
