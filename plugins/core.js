@@ -397,7 +397,7 @@ function makeSettingsMenu(config, prefix) {
     "│  10.1 | Enable  " + (current("alwaysOnline") === "🟢 ON" ? "🟢" : ""),
     "│  10.2 | Disable",
     "│",
-    "└─ *[11] PUBLIC / PRIVATE MODE*",
+    "├─ *[11] PUBLIC / PRIVATE MODE*",
     "   11.1 | Public  " + (current("publicMode") === "🟢 ON" ? "🟢" : ""),
     "   11.2 | Private " + (current("publicMode") === "🔴 OFF" ? "🟢" : ""),
     "│",
