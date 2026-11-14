@@ -140,7 +140,7 @@ function isOwner(message, config) {
 
 function isPrivateChat(jid) {
   return typeof jid === "string" &&
-    jid.endsWith("@s.whatsapp.net") &&
+    (jid.endsWith("@s.whatsapp.net") || jid.endsWith("@lid")) &&
     jid !== "status@broadcast";
 }
 
