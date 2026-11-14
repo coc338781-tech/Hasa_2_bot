@@ -331,13 +331,13 @@ export default async function personalAssistant({ sock, message, config }) {
   }
 
   // Incoming message counters store only daily totals and sender JIDs, never message text.
-  if (!message.key?.fromMe && markIncomingOnce(message)) {
+  const firstDelivery = !message.key?.fromMe && markIncomingOnce(message);
+  if (firstDelivery) {
     try { recordIncomingMessage(message); }
     catch { console.error("Daily message counter could not be updated."); }
   }
 
-  if (!config.smartReply || message.key?.fromMe || !isPrivateChat(jid) || !body || isCommand) return;
-  if (!markIncomingOnce(message)) return;
+  if (!config.smartReply || !firstDelivery || !isPrivateChat(jid) || !body || isCommand) return;
   if (!process.env.GEMINI_API_KEY) return;
 
   const queue = pendingReplies.get(jid) || [];
