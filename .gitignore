@@ -11,3 +11,5 @@ replies.json
 group-settings.json
 group-warnings.json
 data/
+
+data/daily-message-stats.json*
