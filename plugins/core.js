@@ -475,6 +475,10 @@ export default async function core({ sock, message, config }) {
       if (!owner) return send("⛔ Settings වෙනස් කළ හැක්කේ Ownerට පමණයි.");
       const setting = SETTINGS.find(item => item.id === body);
       if (!setting) return send("❌ ඒ Setting අංකය හමු වුණේ නැහැ. " + prefix + "settings යවන්න.");
+      if (setting.key === "smartReply" && setting.value === true && !process.env.GEMINI_API_KEY) {
+        return send("❌ AI Smart Reply ON කිරීමට .env තුළ GEMINI_API_KEY සකස් කළ යුතුයි.");
+      }
+
       const currentValue = config[setting.key];
       const alreadySelected = typeof setting.value === "boolean"
         ? isEnabled(currentValue) === setting.value
