@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "npm run test:ping && node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && for f in plugins/*.js; do node --input-type=module -e \"await import('./$f')\" || exit 1; done && node --input-type=module -e \"await import('./lib/subbot-manager.js')\" && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\" && npm run test:anti-delete && npm run test:downloader && npm run test:subbot-restore && npm run test:subbot-pairing && npm run test:utilities && npm run test:language-tools && npm run test:subbot-bulk && npm run test:downloader-check && npm run test:status-saver && npm run test:command-catalog && npm run test:advanced-tools && npm run test:delete-on-read && npm run test:decrypt-retry && npm run test:session-log-redaction && npm run test:xvdl",
+    "check": "npm run test:ping && node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && for f in plugins/*.js; do node --input-type=module -e \"await import('./$f')\" || exit 1; done && node --input-type=module -e \"await import('./lib/subbot-manager.js')\" && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\" && npm run test:anti-delete && npm run test:downloader && npm run test:subbot-restore && npm run test:subbot-pairing && npm run test:utilities && npm run test:language-tools && npm run test:subbot-bulk && npm run test:downloader-check && npm run test:status-saver && npm run test:command-catalog && npm run test:advanced-tools && npm run test:delete-on-read && npm run test:decrypt-retry && npm run test:session-log-redaction && npm run test:xvdl && npm run test:personal-assistant",
     "postinstall": "node scripts/patch-baileys.js",
     "test:ping": "node --test tests/ping.test.js",
     "test:decrypt-retry": "node --test tests/decrypt-retry-patch.test.js",
@@ -26,7 +26,8 @@
     "test:delete-on-read": "node --test tests/delete-on-read.test.js",
     "test:session-log-redaction": "node --test tests/session-log-redaction.test.js",
     "test:xvdl": "node --test tests/xvdl.test.js",
-    "test:bot-mode": "node --test tests/bot-mode.test.js"
+    "test:bot-mode": "node --test tests/bot-mode.test.js",
+    "test:personal-assistant": "node --test tests/personal-assistant.test.js"
   },
   "engines": {
     "node": ">=20.0.0"
