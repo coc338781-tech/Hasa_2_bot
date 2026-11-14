@@ -26,7 +26,9 @@ const SETTINGS = [
   { id: "10.1", key: "alwaysOnline", label: "Always Online", value: true },
   { id: "10.2", key: "alwaysOnline", label: "Always Online", value: false },
   { id: "11.1", key: "publicMode", label: "Public Mode", value: true },
-  { id: "11.2", key: "publicMode", label: "Private Mode", value: false }
+  { id: "11.2", key: "publicMode", label: "Private Mode", value: false },
+  { id: "12.1", key: "smartReply", label: "AI Smart Reply", value: true },
+  { id: "12.2", key: "smartReply", label: "AI Smart Reply", value: false }
 ];
 
 const CATEGORIES = {
@@ -398,6 +400,10 @@ function makeSettingsMenu(config, prefix) {
     "└─ *[11] PUBLIC / PRIVATE MODE*",
     "   11.1 | Public  " + (current("publicMode") === "🟢 ON" ? "🟢" : ""),
     "   11.2 | Private " + (current("publicMode") === "🔴 OFF" ? "🟢" : ""),
+    "│",
+    "└─ *[12] AI SMART REPLY*",
+    "   12.1 | Enable  " + (current("smartReply") === "🟢 ON" ? "🟢" : ""),
+    "   12.2 | Disable",
     "",
     "📌 *Setting එක ON/OFF කිරීමට අදාල අංකය Reply කරන්න.*",
     "🔹 Prefix commands: " + prefix + "settings"
