@@ -7,10 +7,9 @@ const STATS_FILE = path.join(DATA_DIR, "daily-message-stats.json");
 const contacts = new Map();
 const conversations = new Map();
 const processing = new Set();
-const lastReplyAt = new Map();
+const pendingReplies = new Map();
 const COLOMBO_TZ = "Asia/Colombo";
 const MAX_CONTEXT = 8;
-const REPLY_COOLDOWN_MS = 12_000;
 
 function digits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -308,7 +307,7 @@ export default async function personalAssistant({ sock, message, config }) {
   const command = isCommand ? body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase() : "";
 
   if (isCommand && ["smartreply", "contact", "today", "sendto", "personalhelp"].includes(command)) {
-    if (!isOwner(message, config)) return sock.sendMessage(jid, { text: "⛔ මේ පහසුකම් Ownerට පමණයි." }, { quoted: message });
+    if (!isOwner(message, config) || !isPrivateChat(jid)) return sock.sendMessage(jid, { text: "⛔ මේ Personal Assistant Commands Ownerගේ private chat එකෙන් පමණයි." }, { quoted: message });
     try {
       return await handleOwnerCommand({ sock, message, config, body, jid });
     } catch (error) {
@@ -324,22 +323,32 @@ export default async function personalAssistant({ sock, message, config }) {
   }
 
   if (!config.smartReply || message.key?.fromMe || !isPrivateChat(jid) || !body || isCommand) return;
-  if (!process.env.GEMINI_API_KEY || processing.has(jid)) return;
-  const now = Date.now();
-  if (now - (lastReplyAt.get(jid) || 0) < REPLY_COOLDOWN_MS) return;
+  if (!process.env.GEMINI_API_KEY) return;
+
+  const queue = pendingReplies.get(jid) || [];
+  if (queue.length >= 10) queue.shift();
+  queue.push(message);
+  pendingReplies.set(jid, queue);
+  if (processing.has(jid)) return;
 
   processing.add(jid);
   try {
-    addConversationLine(jid, "user", body);
-    const reply = await generateSmartReply(conversations.get(jid) || [], config);
-    if (!reply) return;
-    await sock.sendMessage(jid, { text: reply }, { quoted: message });
-    addConversationLine(jid, "model", reply);
-    lastReplyAt.set(jid, Date.now());
-  } catch (error) {
-    if (error?.message === "AI_KEY_MISSING") return;
-    console.error("Smart reply generation failed; message content was not logged.");
+    while (pendingReplies.get(jid)?.length) {
+      const current = pendingReplies.get(jid).shift();
+      const currentText = extractMessageText(current);
+      if (!currentText) continue;
+      addConversationLine(jid, "user", currentText);
+      try {
+        const reply = await generateSmartReply(conversations.get(jid) || [], config);
+        if (!reply) continue;
+        await sock.sendMessage(jid, { text: reply }, { quoted: current });
+        addConversationLine(jid, "model", reply);
+      } catch {
+        console.error("Smart reply generation failed; message content was not logged.");
+      }
+    }
   } finally {
     processing.delete(jid);
+    if (!pendingReplies.get(jid)?.length) pendingReplies.delete(jid);
   }
 }
