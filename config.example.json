@@ -9,6 +9,7 @@
   "antiDeleteToInbox": false,
   "viewOnce": true,
   "aiChat": false,
+  "smartReply": false,
   "aiModel": "gemini-2.0-flash",
   "groupCommands": true,
   "publicMode": true,
