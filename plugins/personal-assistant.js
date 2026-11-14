@@ -210,7 +210,8 @@ async function handleOwnerCommand({ sock, message, config, body, jid }) {
   if (name === "smartreply") {
     if (!arg || !["on", "off"].includes(arg.toLowerCase())) {
       return send("🤖 *AI SMART REPLY*\nතත්ත්වය: " + (config.smartReply ? "🟢 ON" : "🔴 OFF") +
-        "\nභාවිතය: .smartreply on / .smartreply off\n\nON කළ විට පුද්ගලික Chats වලට පමණක් AI Reply යවයි.");
+        "\nභාවිතය: .smartreply on / .smartreply off\n\nON කළ විට පුද්ගලික Chats වලට පමණක් AI Reply යවයි." +
+        (config.smartReply ? "\n🔐 Incoming text සහ අලුත්ම context messages Gemini API වෙත යවයි." : ""));
     }
     if (arg.toLowerCase() === "on" && !process.env.GEMINI_API_KEY) {
       return send("❌ GEMINI_API_KEY සකස් කර නැහැ. API key එක .env තුළ සකස් කළ පසු නැවත උත්සාහ කරන්න.");
