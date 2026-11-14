@@ -138,7 +138,7 @@ function isOwner(message, config) {
   return (config.owner || []).some(owner => digits(owner) === number && number.length > 0);
 }
 
-function isPrivateChat(jid) {
+export function isPrivateChat(jid) {
   return typeof jid === "string" &&
     (jid.endsWith("@s.whatsapp.net") || jid.endsWith("@lid")) &&
     jid !== "status@broadcast";
@@ -223,7 +223,8 @@ async function handleOwnerCommand({ sock, message, config, body, jid }) {
       return send("❌ Smart Reply Setting එක Save කරන්න බැරි වුණා.");
     }
     return send("✅ *AI Smart Reply:* " + (config.smartReply ? "🟢 ON" : "🔴 OFF") +
-      "\nPrivate Chats පමණයි. Group සහ Status Messages වලට Reply නොකරයි.");
+      "\nPrivate Chats පමණයි. Group සහ Status Messages වලට Reply නොකරයි." +
+      (config.smartReply ? "\n🔐 Incoming text සහ අලුත්ම context messages Gemini API වෙත යවා Reply සකස් කරයි." : ""));
   }
 
   if (name === "contact") {
@@ -275,7 +276,7 @@ async function handleOwnerCommand({ sock, message, config, body, jid }) {
       "│ .sendto <නම/අංකය> | <Message> — Message යවන්න",
       "│ .smartreply on/off — AI Smart Reply පාලනය",
       "╰━━━━━━━━━━━━━━━━━━━━",
-      "AI replies use Gemini. Only recent text context is sent for reply generation."
+      "AI replies send incoming private-chat text and up to 8 recent text turns to the configured Gemini API. No media or contact list is sent. Daily statistics store only sender JIDs and counts locally."
     ].join("\n"));
   }
 }
