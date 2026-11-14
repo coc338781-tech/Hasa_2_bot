@@ -21,7 +21,9 @@ const SETTINGS = [
   { id: "8.2", key: "autoVoice", label: "Auto Voice", value: false },
   { id: "9.1", key: "statusReact", label: "Status React: Green Heart 💚", value: "green" },
   { id: "9.2", key: "statusReact", label: "Status React: Random Emoji 🎲", value: "random" },
-  { id: "9.3", key: "statusReact", label: "Status React", value: "off" }
+  { id: "9.3", key: "statusReact", label: "Status React", value: "off" },
+  { id: "12.1", key: "smartReply", label: "AI Smart Reply", value: true },
+  { id: "12.2", key: "smartReply", label: "AI Smart Reply", value: false }
 ];
 
 const CATEGORIES = {
@@ -47,6 +49,10 @@ const CATEGORIES = {
   "7": ["SUBBOT", [
     ".subbot <number>", ".subcheck", ".getsubbot", ".stopsubbot",
     ".restartsubbot", ".delsubbot", ".helpsubbot"
+  ]],
+  "8": ["PERSONAL ASSISTANT", [
+    ".personalhelp", ".contact <name or number>", ".today",
+    ".sendto <name or number> | <message>", ".smartreply on/off"
   ]]
 };
 
@@ -123,7 +129,8 @@ function makeMainMenu(config) {
     "4   AI & PRANK",
     "5   AUTO REPLY",
     "6   OWNER & SETTINGS",
-    "7   SUBBOT"
+    "7   SUBBOT",
+    "8   PERSONAL ASSISTANT"
   ];
   return [
     "*HELLO! WELCOME TO HASA 2 BOT*",
@@ -213,6 +220,10 @@ function makeSettingsMenu(config, prefix) {
     "└─ *[8] AUTO VOICE*",
     "   8.1 | Enable  " + (current("autoVoice") === "🟢 ON" ? "🟢" : ""),
     "   8.2 | Disable",
+    "│",
+    "└─ *[12] AI SMART REPLY*",
+    "   12.1 | Enable  " + (current("smartReply") === "🟢 ON" ? "🟢" : ""),
+    "   12.2 | Disable",
     "",
     "📌 *Setting එක ON/OFF කිරීමට අදාල අංකය Reply කරන්න.*",
     "🔹 Prefix commands: " + prefix + "settings"
@@ -250,6 +261,9 @@ export default async function core({ sock, message, config }) {
       if (!owner) return send("⛔ Settings වෙනස් කළ හැක්කේ Ownerට පමණයි.");
       const setting = SETTINGS.find(item => item.id === body);
       if (!setting) return send("❌ ඒ Setting අංකය හමු වුණේ නැහැ. " + prefix + "settings යවන්න.");
+      if (setting.key === "smartReply" && setting.value === true && !process.env.GEMINI_API_KEY) {
+        return send("❌ AI Smart Reply ON කිරීමට .env තුළ GEMINI_API_KEY සකස් කළ යුතුයි.");
+      }
       config[setting.key] = setting.value;
       try {
         saveConfig(config);
