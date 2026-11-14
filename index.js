@@ -109,6 +109,7 @@ async function startBot(authState = null) {
     defaultQueryTimeoutMs: 60_000,
     keepAliveIntervalMs: 25_000
   });
+  await plugins?.onConnection?.(sock, config);
 
   sock.ev.on("creds.update", saveCreds);
   sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
