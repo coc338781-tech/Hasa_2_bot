@@ -26,16 +26,18 @@ Authorization: Bearer <owner-session>
 ```
 
 - `GET /v1/owner/servers` — list up to 500 registered servers and their latest telemetry.
+- `GET /v1/owner/settings` — read the current minimum free RAM reserve.
+- `PUT /v1/owner/settings` — change `min_free_memory_mb` (128–65536 MiB). Default: 768 MiB. This is a free-RAM admission threshold, not total server RAM or a bot memory quota. Existing bots are not stopped when available RAM falls below it.
 - `GET /v1/owner/bots` — list customer bot instances for owner-side allocation.
 - `POST /v1/owner/bots/{bot_id}/assign-server` — assign a bot to an online server. JSON body: `{"server_id":"<registered-server-uuid>"}`. Assignment is audited and rejects offline/stale servers.
 - `POST /v1/owner/server-enrollment-tickets` — create a one-use enrollment ticket valid for 10 minutes. JSON body: `{"label":"Oracle primary","provider":"Oracle Cloud"}`. The raw ticket is returned once.
 - `POST /v1/owner/servers/{server_id}/revoke` — disable a server and revoke its agent credential. This action is audited.
 
-The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`. The isolated worker uses that same server agent token over HTTPS for `POST /v1/agent/jobs/claim`, `/v1/agent/jobs/finish`, `/v1/agent/pairing-code`, `/v1/agent/pairing-status`, `/v1/agent/instances/list` and `/v1/agent/instances/status`. Every job and instance is bound to the enrolled server identity; workers cannot request arbitrary commands.
+The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`. The isolated worker reads the current RAM reserve from `POST /v1/agent/settings` and uses that same server agent token over HTTPS for `POST /v1/agent/jobs/claim`, `/v1/agent/jobs/finish`, `/v1/agent/pairing-code`, `/v1/agent/pairing-status`, `/v1/agent/instances/list` and `/v1/agent/instances/status`. Every job and instance is bound to the enrolled server identity; workers cannot request arbitrary commands.
 
 ## Current limitations
 
-The owner dashboard is available at `/owner`. A PostgreSQL runtime connection is enabled with `DATABASE_URL`; run `npm run db:migrate` from this directory to apply all numbered migrations. `/readyz` requires the persistent stores and encrypted pairing-code vault to be configured. The owner UI supports server inventory, live telemetry, one-time enrollment tickets, credential revocation, customer bot inventory and server assignment. TLS reverse-proxy deployment, release manager/rollback, production backups, customer quotas and live end-to-end validation remain outstanding. Without configured persistent storage and the pairing-code key, management and worker endpoints fail closed. Do not deploy this API publicly until HTTPS and deployment secrets are configured.
+The owner dashboard is available at `/owner`. A PostgreSQL runtime connection is enabled with `DATABASE_URL`; run `npm run db:migrate` from this directory to apply all numbered migrations. `/readyz` requires the persistent stores and encrypted pairing-code vault to be configured. The owner UI supports server inventory, live telemetry, one-time enrollment tickets, credential revocation, customer bot inventory, server assignment and owner-editable minimum free RAM admission policy. TLS reverse-proxy deployment, release manager/rollback, production backups, customer quotas and live end-to-end validation remain outstanding. Without configured persistent storage and the pairing-code key, management and worker endpoints fail closed. Do not deploy this API publicly until HTTPS and deployment secrets are configured.
 
 The platform owner retains the credentials and final authority. An assistant can help maintain the code and perform actions only through tools and permissions explicitly made available by the owner; it does not receive permanent independent access to servers.
 
