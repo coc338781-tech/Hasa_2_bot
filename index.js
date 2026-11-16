@@ -38,7 +38,7 @@ function writeBotHealth(status, errorCode = null) {
   if (!healthFile) return;
   try {
     fs.mkdirSync("./data", { recursive: true });
-    fs.writeFileSync(healthFile, JSON.stringify({ status, pid: process.pid, updated_at: new Date().toISOString(), error_code: errorCode }) + "\\n", { mode: 0o600 });
+    fs.writeFileSync(healthFile, JSON.stringify({ status, pid: process.pid, updated_at: new Date().toISOString(), error_code: errorCode }) + "\n", { mode: 0o600 });
     fs.chmodSync(healthFile, 0o600);
   } catch (error) { logger.warn({ error: error.message }, "Bot health file update failed"); }
 }
