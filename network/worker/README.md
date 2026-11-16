@@ -30,13 +30,13 @@ Install:
 
 ```bash
 cd network/worker
-sudo bash install-systemd.sh
+sudo env HASA_CONFIRM_ENCRYPTED_VOLUME=true bash install-systemd.sh
 sudo systemctl enable --now hasa-worker
 sudo systemctl status hasa-worker
 sudo journalctl -u hasa-worker -n 100 --no-pager
 ```
 
-The installer refuses to proceed unless the session directory is already a mount point. It creates a dedicated `hasa-worker` account, installs the control-plane worker to `/opt/hasa-network`, copies the shared HASA bot source to `/opt/hasa-bot`, installs both dependency sets, and writes the enrolled server's API token into a root-managed, group-restricted service environment file. It does not print the token.
+The installer refuses to proceed unless the session directory is already a mount point and the operator explicitly confirms that the mounted filesystem is encrypted at rest. Verify the mount encryption before setting that confirmation; the script cannot independently verify every supported filesystem encryption scheme. It creates a dedicated `hasa-worker` account, installs the control-plane worker to `/opt/hasa-network`, copies the shared HASA bot source to `/opt/hasa-bot`, installs both dependency sets, and writes the enrolled server's API token into a root-managed, group-restricted service environment file. It does not print the token.
 
 ## Session security
 
