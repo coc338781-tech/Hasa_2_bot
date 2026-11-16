@@ -40,6 +40,7 @@ if [[ ! -f /etc/hasa-worker/worker.env ]]; then
     printf 'HASA_AGENT_TOKEN=%s\n' "$AGENT_TOKEN"
     printf 'HASA_WHATSAPP_DATA_DIR=%s\n' "$DATA_DIR"
     printf 'HASA_WHATSAPP_DATA_ENCRYPTED=true\n'
+    printf 'HASA_BOT_CODE_DIR=/opt/hasa-bot\n'
     printf 'HASA_WORKER_MAX_SESSIONS=1\n'
     printf 'LOG_LEVEL=warn\n'
   } > /etc/hasa-worker/worker.env
