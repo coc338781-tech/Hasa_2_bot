@@ -141,3 +141,68 @@ test("customer API fails closed without configured database", async () => {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+test("customer registration, dashboard and pairing intake stay scoped to the signed-in customer", async () => {
+  const { hashPassword, hashCustomerToken } = await import("../src/customer-auth.js");
+  const customerId = "11111111-1111-4111-8111-111111111111";
+  const botId = "22222222-2222-4222-8222-222222222222";
+  let storedSessionHash = null;
+  let pairingOwner = null;
+  const store = {
+    async createCustomer({ email, phone, displayName }) {
+      return { id: customerId, email, phone_e164: phone, display_name: displayName, bot: { id: botId, status: "offline" } };
+    },
+    async createSession({ tokenHash }) { storedSessionHash = tokenHash; },
+    async findCustomerBySession(tokenHash) {
+      return tokenHash === storedSessionHash ? { id: customerId } : null;
+    },
+    async getCustomerDashboard(id) {
+      assert.equal(id, customerId);
+      return {
+        customer_id: customerId, display_name: "Test Customer", phone_e164: "+94771234567",
+        account_status: "active", login_email: "test@example.com",
+        bot_id: botId, bot_status: "offline", release_version: null,
+        last_started_at: null, last_stopped_at: null, last_error_code: null,
+        pairing_id: null, pairing_status: null, pairing_phone: null,
+        pairing_expires_at: null, pairing_created_at: null
+      };
+    },
+    async createPairingRequest(input) {
+      pairingOwner = input.customerId;
+      assert.equal(input.botId, botId);
+      return { id: "33333333-3333-4333-8333-333333333333", status: "queued", phone_e164: input.phone, expires_at: input.expiresAt };
+    },
+    async revokeSession() { return true; }
+  };
+  const server = createAppServer({ customerStore: store });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const registration = await fetch(`${base}/v1/customer/register`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "Test@Example.com", phone: "+94 77 123 4567", display_name: "Test Customer", password: "a-long-customer-password" })
+    });
+    assert.equal(registration.status, 201);
+    const session = await registration.json();
+    assert.equal(session.authenticated, true);
+    assert.equal(typeof session.access_token, "string");
+    assert.equal(storedSessionHash, hashCustomerToken(session.access_token));
+
+    const dashboard = await fetch(`${base}/v1/customer/me`, { headers: { authorization: `Bearer ${session.access_token}` } });
+    assert.equal(dashboard.status, 200);
+    const data = await dashboard.json();
+    assert.equal(data.customer.id, customerId);
+    assert.equal(data.bot.id, botId);
+    assert.equal("password_hash" in data.customer, false);
+
+    const pairing = await fetch(`${base}/v1/customer/pairing-requests`, {
+      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ phone: "+94771234567" })
+    });
+    assert.equal(pairing.status, 202);
+    assert.equal(pairingOwner, customerId);
+    assert.equal((await pairing.json()).worker, "not_connected");
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
