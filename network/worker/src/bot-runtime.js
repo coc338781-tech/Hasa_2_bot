@@ -1,0 +1,113 @@
+import { mkdir, lstat, readFile, writeFile, chmod } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
+import { spawn } from "node:child_process";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function instancePath(root, id) {
+  if (!UUID.test(id || "")) throw new TypeError("invalid_instance_id");
+  const base = resolve(root), target = resolve(base, id);
+  if (!target.startsWith(base + sep)) throw new TypeError("invalid_instance_path");
+  return target;
+}
+async function ensureDirectory(path) {
+  await mkdir(path, { recursive: true, mode: 0o700 });
+  const info = await lstat(path);
+  if (info.isSymbolicLink() || !info.isDirectory()) throw new Error("unsafe_instance_directory");
+  await chmod(path, 0o700);
+}
+export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, logger, onExit = async () => {} } = {}) {
+  if (!dataDir || !codeDir || !baileys?.useMultiFileAuthState) throw new TypeError("bot_runtime_configuration_required");
+  const root = resolve(dataDir), codeRoot = resolve(codeDir), children = new Map();
+  async function createInstance({ bot_instance_id, payload = {} }) {
+    const dir = instancePath(root, bot_instance_id);
+    await ensureDirectory(root); await ensureDirectory(dir);
+    for (const child of ["auth_info", "data", "downloads"]) await ensureDirectory(join(dir, child));
+    const configPath = join(dir, "config.json");
+    try {
+      const existing = await lstat(configPath);
+      if (existing.isSymbolicLink() || !existing.isFile()) throw new Error("unsafe_instance_config");
+      JSON.parse(await readFile(configPath, "utf8"));
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      const template = JSON.parse(await readFile(join(codeRoot, "config.example.json"), "utf8"));
+      const ownerPhone = typeof payload.owner_phone === "string" ? payload.owner_phone.replace(/\D/g, "") : "";
+      if (!/^\d{8,15}$/.test(ownerPhone)) throw new Error("customer_owner_phone_missing");
+      template.owner = [ownerPhone];
+      template.botName = "HASA BOT";
+      template.downloadDir = "downloads";
+      await writeFile(configPath, JSON.stringify(template, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    }
+    return { instanceId: bot_instance_id, directory: dir };
+  }
+  async function startInstance(instanceId) {
+    if (children.has(instanceId)) {
+      const current = children.get(instanceId);
+      if (current.exitCode === null && !current.killed) return { started: true, alreadyRunning: true };
+      children.delete(instanceId);
+    }
+    const dir = instancePath(root, instanceId);
+    await ensureDirectory(dir);
+    const authDir = join(dir, "auth_info");
+    const auth = await baileys.useMultiFileAuthState(authDir);
+    if (!auth.state.creds.registered) throw new Error("whatsapp_session_not_registered");
+    const indexFile = join(codeRoot, "index.js");
+    const packageFile = join(codeRoot, "package.json");
+    await readFile(indexFile, "utf8");
+    await readFile(packageFile, "utf8");
+    const child = spawn(process.execPath, [indexFile], {
+      cwd: dir,
+      env: {
+        PATH: process.env.PATH || "/usr/bin:/bin",
+        HOME: dir,
+        NODE_ENV: "production",
+        LOG_LEVEL: process.env.HASA_BOT_LOG_LEVEL || "silent",
+        BOT_INSTANCE_ID: instanceId,
+        ...(process.env.HASA_SHARED_GEMINI_API_KEY ? { GEMINI_API_KEY: process.env.HASA_SHARED_GEMINI_API_KEY } : {})
+      },
+      stdio: "ignore",
+      windowsHide: true
+    });
+    children.set(instanceId, child);
+    child.once("error", error => {
+      logger?.error?.({ instanceId, error: error?.message }, "Bot child process failed to start");
+      if (children.get(instanceId) === child) children.delete(instanceId);
+      void onExit({ instanceId, code: null, signal: null, error: "bot_process_start_failed" });
+    });
+    child.once("exit", (code, signal) => {
+      if (children.get(instanceId) === child) children.delete(instanceId);
+      void onExit({ instanceId, code, signal, error: code === 0 ? null : "bot_process_exited" });
+    });
+    return { started: true, pid: child.pid };
+  }
+  async function stopInstance(instanceId) {
+    const child = children.get(instanceId);
+    if (!child) return { stopped: true, alreadyStopped: true };
+    children.delete(instanceId);
+    if (child.exitCode !== null || child.killed) return { stopped: true };
+    await new Promise(resolvePromise => {
+      let settled = false;
+      const done = () => { if (settled) return; settled = true; clearTimeout(timer); resolvePromise(); };
+      child.once("exit", done);
+      const timer = setTimeout(() => { try { child.kill("SIGKILL"); } catch {} done(); }, 12_000);
+      timer.unref?.();
+      try { child.kill("SIGTERM"); } catch { done(); }
+    });
+    return { stopped: true };
+  }
+  async function restartInstance(instanceId) {
+    await stopInstance(instanceId);
+    return startInstance(instanceId);
+  }
+  async function restoreInstances(instanceIds = []) {
+    const results = [];
+    for (const id of instanceIds) {
+      try { results.push({ id, ...(await startInstance(id)) }); }
+      catch (error) { results.push({ id, error: error.message }); }
+    }
+    return results;
+  }
+  async function stopAll() {
+    await Promise.all([...children.keys()].map(stopInstance));
+  }
+  return Object.freeze({ createInstance, startInstance, stopInstance, restartInstance, restoreInstances, stopAll, get activeCount() { return children.size; } });
+}
