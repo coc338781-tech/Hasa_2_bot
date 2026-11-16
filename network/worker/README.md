@@ -44,7 +44,7 @@ Baileys multi-file auth state is sensitive credential material. File mode `0700`
 
 ## Resource limits
 
-The systemd service is capped at 768 MB and starts with one active bot/pairing session by default. The API and worker both require at least 768 MiB of currently available host RAM before admitting a new start. Increase `HASA_WORKER_MAX_SESSIONS`, `HASA_MIN_FREE_MEMORY_BYTES` and the systemd `MemoryMax` together only after measuring real free RAM and testing under load. The API/worker service is separate from the existing production `hasa2` PM2 process.
+The systemd service is capped at 768 MB and starts with one active bot/pairing session by default. The API and worker both require at least 768 MiB of currently available host RAM before admitting a new start. Increase `HASA_WORKER_MAX_SESSIONS` and the systemd `MemoryMax` only after measuring real RAM and testing under load. Change the live admission reserve in Owner Console; `HASA_MIN_FREE_MEMORY_BYTES` is only a fallback default. The API/worker service is separate from the existing production `hasa2` PM2 process.
 
 ## Remaining integration gates
 
