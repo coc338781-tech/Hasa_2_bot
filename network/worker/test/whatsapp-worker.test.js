@@ -39,3 +39,27 @@ test("worker validates tenant instance IDs and phone numbers and enforces capaci
     await assert.rejects(worker.startPairing({ instanceId: "22222222-2222-4222-8222-222222222222", phone: "+94771234567" }), /worker_capacity_reached/);
   } finally { await worker.stopAll(); await rm(root, { recursive: true, force: true }); }
 });
+
+test("worker recovers an existing registered session only for the same WhatsApp number", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hasa-worker-"));
+  const baileys = {
+    sockets: [],
+    async useMultiFileAuthState() {
+      return { state: { creds: { registered: true, me: { id: "94779876543:3@s.whatsapp.net" } } }, saveCreds: async () => {} };
+    },
+    default() { throw new Error("registered session must not open a pairing socket"); }
+  };
+  const statuses = [];
+  const worker = createWhatsAppWorker({ dataDir: root, baileys, onStatus: async item => statuses.push(item) });
+  const id = "33333333-3333-4333-8333-333333333333";
+  try {
+    await assert.rejects(worker.startPairing({ instanceId: id, phone: "+94771234567" }), /whatsapp_session_phone_mismatch/);
+    const result = await worker.startPairing({ instanceId: id, phone: "+94779876543" });
+    assert.equal(result.alreadyRegistered, true);
+    assert.ok(statuses.some(item => item.status === "paired"));
+    assert.equal(worker.activeCount, 0);
+  } finally {
+    await worker.stopAll();
+    await rm(root, { recursive: true, force: true });
+  }
+});
