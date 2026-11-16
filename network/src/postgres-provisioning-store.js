@@ -147,6 +147,48 @@ export function createPostgresProvisioningStore(pool) {
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
+    async queueBotAction({ customerId, botId, action }) {
+      const jobType = ({ start: "instance_start", stop: "instance_stop", restart: "instance_restart" })[action];
+      if (!jobType) return { ok: false, reason: "invalid_action" };
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const found = await client.query(
+          `SELECT b.id, b.server_id, b.status AS bot_status, s.status AS server_status,
+                  s.last_heartbeat_at, s.memory_available_bytes
+             FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
+            WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
+        if (!found.rowCount) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_found" }; }
+        const bot = found.rows[0];
+        if (!bot.server_id || bot.server_status !== "online" || !bot.last_heartbeat_at ||
+            Date.now() - new Date(bot.last_heartbeat_at).getTime() > 150_000) {
+          await client.query("ROLLBACK"); return { ok: false, reason: "server_unavailable" };
+        }
+        const allowed = action === "start" ? ["offline", "failed"] : action === "stop" ? ["online", "provisioning"] : ["online"];
+        if (!allowed.includes(bot.bot_status)) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_action_not_allowed" }; }
+        if (action !== "stop" && Number(bot.memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) {
+          await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" };
+        }
+        const active = await client.query(
+          `SELECT 1 FROM provisioning_jobs WHERE bot_instance_id = $1
+            AND job_type IN ('instance_start','instance_stop','instance_restart')
+            AND status IN ('queued','leased','running') LIMIT 1`, [botId]);
+        if (active.rowCount) { await client.query("ROLLBACK"); return { ok: false, reason: "action_already_queued" }; }
+        const jobId = randomUUID();
+        await client.query(
+          `INSERT INTO provisioning_jobs (id, server_id, bot_instance_id, customer_id, job_type, payload)
+           VALUES ($1, $2, $3, $4, $5, '{}'::jsonb)`,
+          [jobId, bot.server_id, botId, customerId, jobType]);
+        await client.query("UPDATE bot_instances SET status = 'provisioning', updated_at = now() WHERE id = $1", [botId]);
+        await client.query(
+          `INSERT INTO audit_events (action, resource_type, resource_id, outcome, metadata)
+           VALUES ('bot.customer_action', 'bot_instance', $1, 'queued', jsonb_build_object('action', $2))`,
+          [botId, action]);
+        await client.query("COMMIT");
+        return { ok: true, job_id: jobId, status: "queued" };
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
     async listBots() {
       const result = await pool.query(
         `SELECT b.id, b.customer_id, c.display_name, c.phone_e164, b.status,
