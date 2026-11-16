@@ -15,14 +15,26 @@ export function createPostgresAgentStore(pool) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        const activeBots = await client.query(
+          `SELECT id FROM bot_instances WHERE server_id = $1
+            AND (whatsapp_registered = true OR status IN ('online','provisioning','pairing'))
+            LIMIT 1 FOR UPDATE`, [serverId]);
+        if (activeBots.rowCount) { await client.query("ROLLBACK"); return { ok: false, reason: "server_has_customer_bots" }; }
         const changed = await client.query(
           `UPDATE servers SET status = 'disabled', updated_at = now() WHERE id = $1 AND status <> 'disabled' RETURNING id`,
           [serverId]
         );
-        if (changed.rowCount !== 1) { await client.query("ROLLBACK"); return false; }
+        if (changed.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "server_not_found" }; }
         await client.query(
           `UPDATE server_agent_credentials SET revoked_at = COALESCE(revoked_at, now()) WHERE server_id = $1`,
           [serverId]
+        );
+        await client.query(
+          `UPDATE provisioning_jobs SET status = 'cancelled', completed_at = now(), updated_at = now()
+            WHERE server_id = $1 AND status IN ('queued','leased')`, [serverId]);
+        await client.query(
+          `UPDATE bot_instances SET server_id = NULL, updated_at = now()
+            WHERE server_id = $1 AND whatsapp_registered = false AND status IN ('offline','failed')`, [serverId]
         );
         await client.query(
           `INSERT INTO audit_events (action, resource_type, resource_id, outcome, metadata)
@@ -30,7 +42,7 @@ export function createPostgresAgentStore(pool) {
           [serverId]
         );
         await client.query("COMMIT");
-        return true;
+        return { ok: true };
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
