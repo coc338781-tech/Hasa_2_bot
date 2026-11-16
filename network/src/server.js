@@ -157,10 +157,10 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       try {
         const data = await customerStore.getCustomerDashboard(customerSession.id);
         if (!data) { sendJson(res, 404, { error: "customer_not_found" }); return; }
-        const { customer_id, display_name, phone_e164, account_status, login_email, bot_id, bot_status, release_version, last_started_at, last_stopped_at, last_error_code, whatsapp_registered, server_assigned, pairing_id, pairing_status, pairing_phone, pairing_expires_at, pairing_created_at } = data;
+        const { customer_id, display_name, phone_e164, account_status, login_email, bot_id, bot_status, release_version, last_started_at, last_stopped_at, last_error_code, whatsapp_registered, runtime_provisioned, server_assigned, pairing_id, pairing_status, pairing_phone, pairing_expires_at, pairing_created_at } = data;
         sendJson(res, 200, {
           customer: { id: customer_id, display_name, phone_e164, status: account_status, login_email },
-          bot: bot_id ? { id: bot_id, status: bot_status, whatsapp_registered: Boolean(whatsapp_registered), server_assigned: Boolean(server_assigned), release_version, last_started_at, last_stopped_at, last_error_code } : null,
+          bot: bot_id ? { id: bot_id, status: bot_status, whatsapp_registered: Boolean(whatsapp_registered), runtime_provisioned: Boolean(runtime_provisioned), server_assigned: Boolean(server_assigned), release_version, last_started_at, last_stopped_at, last_error_code } : null,
           latest_pairing: pairing_id ? { id: pairing_id, status: pairing_status, phone_e164: pairing_phone, expires_at: pairing_expires_at, created_at: pairing_created_at } : null
         });
       } catch { sendJson(res, 500, { error: "customer_data_unavailable" }); }
