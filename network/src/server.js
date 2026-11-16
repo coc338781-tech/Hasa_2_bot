@@ -186,7 +186,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
           expiresAt: new Date(clock() + 10 * 60 * 1000).toISOString()
         });
         if (!request) { sendJson(res, 404, { error: "bot_instance_not_found" }); return; }
-        if (!request.ok) { sendJson(res, request.reason === "server_unavailable" ? 503 : request.reason === "bot_not_ready" ? 409 : 404, { error: request.reason }); return; }
+        if (!request.ok) { sendJson(res, request.reason === "server_unavailable" ? 503 : ["bot_not_ready", "already_paired"].includes(request.reason) ? 409 : 404, { error: request.reason }); return; }
         sendJson(res, 202, { accepted: true, request: request.request, worker: "queued" });
       } catch { sendJson(res, 500, { error: "pairing_request_unavailable" }); }
       return;
@@ -202,7 +202,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         const action = body?.action;
         if (!["start", "stop", "restart"].includes(action)) { sendJson(res, 400, { error: "invalid_action" }); return; }
         const result = await customerStore.queueBotAction({ customerId: customerSession.id, botId: botActionMatch[1], action });
-        const status = result.ok ? 202 : ["server_unavailable","server_low_memory","bot_action_not_allowed","action_already_queued"].includes(result.reason) ? 409 : 404;
+        const status = result.ok ? 202 : ["server_unavailable","server_low_memory","bot_action_not_allowed","action_already_queued","pairing_required"].includes(result.reason) ? 409 : 404;
         sendJson(res, status, result);
       } catch { sendJson(res, 500, { error: "bot_action_failed" }); }
       return;
