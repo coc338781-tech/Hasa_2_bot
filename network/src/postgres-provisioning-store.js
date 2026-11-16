@@ -177,6 +177,9 @@ export function createPostgresProvisioningStore(pool) {
           return changed.rowCount === 1;
         }
         if (!["paired","expired","failed"].includes(status)) { await client.query("ROLLBACK"); return false; }
+        const current = await client.query("SELECT status FROM pairing_requests WHERE id = $1 AND customer_id = $2 FOR UPDATE", [pairingId, customerId]);
+        if (!current.rowCount) { await client.query("ROLLBACK"); return false; }
+        if (status === "paired" && current.rows[0].status === "paired") { await client.query("COMMIT"); return true; }
         const result = await client.query(
           `UPDATE pairing_requests SET status = $3, failure_code = $4,
              paired_at = CASE WHEN $3 = 'paired' THEN now() ELSE paired_at END, updated_at = now()
