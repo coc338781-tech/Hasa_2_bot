@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+const MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
+
 export function createPostgresProvisioningStore(pool) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") {
     throw new TypeError("A PostgreSQL Pool-compatible object is required");
@@ -10,11 +12,12 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const server = await client.query(
-          `SELECT id FROM servers
+          `SELECT id, memory_available_bytes FROM servers
             WHERE id = $1 AND status = 'online'
               AND last_heartbeat_at > now() - interval '150 seconds'
             FOR UPDATE`, [serverId]);
         if (server.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "server_not_online" }; }
+        if (Number(server.rows[0].memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) { await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" }; }
         const bot = await client.query(
           `UPDATE bot_instances SET server_id = $2, status = 'offline', updated_at = now()
             WHERE id = $1 AND status IN ('offline','failed')
