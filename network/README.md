@@ -21,6 +21,8 @@ A separate multi-server hosting and management platform for the single shared HA
 6. **Release Manager** — builds one versioned HASA BOT release, tests it, then rolls it out gradually with rollback support.
 7. **Owner Console** — sole administrative control plane for servers, customers, instances, releases and audit events.
 
+See [Owner API documentation](./OWNER_API.md) for the development authentication and server-management routes.
+
 ## Suggested implementation order
 
 - Phase 0: architecture, threat model and operational boundaries.
