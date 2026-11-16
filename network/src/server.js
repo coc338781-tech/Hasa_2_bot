@@ -1,11 +1,16 @@
 import http from "node:http";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { join, extname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { acceptHeartbeat } from "./heartbeat.js";
 import { exchangeEnrollmentTicket, hashSecret } from "./enrollment.js";
 import { createOwnerSession, verifyOwnerSession, createEnrollmentTicketValue } from "./owner-auth.js";
 import { randomUUID } from "node:crypto";
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
+const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
+const STATIC_TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 const MAX_BODY_BYTES = 16 * 1024;
 const enrollmentAttempts = new Map();
 const ownerLoginAttempts = new Map();
@@ -57,6 +62,26 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+    const staticFiles = { "/owner": "owner.html", "/owner/": "owner.html", "/owner.css": "owner.css", "/owner.js": "owner.js" };
+    if (req.method === "GET" && Object.hasOwn(staticFiles, req.url)) {
+      try {
+        const filename = staticFiles[req.url];
+        const content = await readFile(join(PUBLIC_DIR, filename));
+        res.writeHead(200, {
+          "Content-Type": STATIC_TYPES[extname(filename)],
+          "Content-Length": content.length,
+          "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+          "X-Frame-Options": "DENY"
+        });
+        res.end(content);
+      } catch {
+        sendJson(res, 500, { error: "dashboard_unavailable" });
+      }
+      return;
+    }
 
     if (req.method === "GET" && req.url === "/healthz") {
       sendJson(res, 200, { service: "hasa-bot-network-api", status: "ok", version: VERSION, timestamp: new Date(clock()).toISOString() });
