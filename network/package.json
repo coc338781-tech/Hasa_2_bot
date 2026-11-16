@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check worker/src/main.js && node --check worker/src/agent-client.js && node --test && npm run test:worker",
+    "check": "node --check src/server.js && node --check src/postgres-provisioning-store.js && node --check public/owner.js && node --check public/customer.js && node --check worker/src/main.js && node --check worker/src/agent-client.js && node --check worker/src/provisioning-worker.js && node --test && npm run test:worker",
     "db:migrate": "node db/migrate.js",
     "test:worker": "node --test worker/test/*.test.js",
     "worker:start": "node worker/src/main.js"
