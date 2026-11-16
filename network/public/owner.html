@@ -27,6 +27,7 @@
 <div id="ticket-result" class="ticket hidden"><label>One-time enrollment ticket</label><code id="ticket-value"></code><button id="copy-ticket" class="secondary">Copy ticket</button><small id="ticket-expiry" class="muted"></small><p class="warning">Shown once. Keep it secret. Expires in 10 minutes.</p></div><p id="ticket-error" class="error" role="alert"></p>
 </aside>
 </div>
+<section class="card bots"><div class="section-head"><div><div class="eyebrow">CUSTOMER BOT FLEET</div><h2>Assign bots to online servers</h2><p class="muted">Only you can choose which registered server hosts each customer bot.</p></div></div><div id="bot-list" class="server-list"><div class="empty">Sign in to load customer bots.</div></div></section>
 <section class="card guide"><div><div class="eyebrow">AGENT INSTALLATION</div><h2>Connect an approved Linux server</h2><p class="muted">After generating a ticket, install the agent from the private development branch. Never paste the ticket into chat or a public terminal recording.</p></div><div class="command"><code>cd network/agent &amp;&amp; sudo bash install-systemd.sh</code></div><p class="muted tiny">Then edit /etc/hasa-agent/agent.env with the HTTPS API URL and the one-time ticket, and run systemctl enable --now hasa-agent. Remove the ticket line after enrollment. The dashboard never receives the server's permanent agent token.</p></section>
 </section>
 <div id="notice" class="notice" role="status"></div>
