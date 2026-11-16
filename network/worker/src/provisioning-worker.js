@@ -58,6 +58,11 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
         const pairingId = job.payload?.pairing_request_id;
         const phone = job.payload?.phone_e164;
         if (!pairingId || !phone || !job.bot_instance_id) throw Object.assign(new Error("invalid_pairing_job"), { code: "invalid_pairing_job" });
+        const registeredPhone = await botRuntime.getRegisteredPhone(job.bot_instance_id);
+        const requestedPhone = phone.replace(/\D/g, "");
+        if (registeredPhone && registeredPhone !== requestedPhone) {
+          const error = new Error("whatsapp_session_phone_mismatch"); error.code = "whatsapp_session_phone_mismatch"; throw error;
+        }
         await botRuntime.setOwnerPhone(job.bot_instance_id, phone);
         activePairs.set(job.bot_instance_id, { pairingId, jobId: job.id });
         await whatsapp.startPairing({ instanceId: job.bot_instance_id, phone });
