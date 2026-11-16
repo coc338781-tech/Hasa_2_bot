@@ -47,7 +47,10 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
       catch (error) { log.warn({ instanceId, error: error?.message }, "Socket close failed"); }
     }, pairingTimeoutMs);
     entry.timer.unref?.();
-    socket.ev.on("creds.update", auth.saveCreds);
+    socket.ev.on("creds.update", async () => {
+      try { await auth.saveCreds(); }
+      catch (error) { log.warn({ instanceId, error: error?.message }, "WhatsApp credentials could not be saved"); }
+    });
     socket.ev.on("connection.update", async update => {
       if (sessions.get(instanceId) !== entry) return;
       if (update.qr && !auth.state.creds.registered && !entry.pairingCodeIssued) {
@@ -56,6 +59,7 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
           const code = await socket.requestPairingCode(phone.replace(/\D/g, ""));
           if (sessions.get(instanceId) !== entry || entry.status !== "pairing") return;
           await onPairingCode({ instanceId, code, expiresAt: new Date(Date.now() + pairingTimeoutMs).toISOString() });
+          if (sessions.get(instanceId) !== entry || entry.status !== "pairing") return;
           entry.status = "code_ready";
           await notify(instanceId, "code_ready");
         } catch (error) {
@@ -64,7 +68,7 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
           log.warn({ instanceId, error: error?.message }, "WhatsApp pairing code request failed");
         }
       }
-      if (update.connection === "open") { clearTimeout(entry.timer); entry.status = "online"; await notify(instanceId, "paired"); }
+      if (update.connection === "open" && entry.status !== "expired") { clearTimeout(entry.timer); entry.status = "online"; await notify(instanceId, "paired"); }
       else if (update.connection === "close") {
         clearTimeout(entry.timer);
         if (entry.status !== "expired") { entry.status = "offline"; await notify(instanceId, "offline"); }
@@ -76,7 +80,8 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
   async function stop(instanceId) {
     const entry = sessions.get(instanceId); if (!entry) return false;
     sessions.delete(instanceId); clearTimeout(entry.timer); entry.status = "stopped";
-    try { entry.socket.end?.(new Error("instance_stopped")); } catch {}
+    try { void Promise.resolve(entry.socket.end?.(new Error("instance_stopped"))).catch(error => log.warn({ instanceId, error: error?.message }, "Socket stop failed")); }
+    catch (error) { log.warn({ instanceId, error: error?.message }, "Socket stop failed"); }
     await notify(instanceId, "stopped"); return true;
   }
   async function stopAll() { await Promise.all([...sessions.keys()].map(stop)); }
