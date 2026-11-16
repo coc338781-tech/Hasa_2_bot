@@ -29,7 +29,7 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
     const entry = { socket, status: "pairing", pairingCodeIssued: false, timer: null, generation: randomUUID() };
     sessions.set(instanceId, entry); await notify(instanceId, "pairing");
     entry.timer = setTimeout(() => {
-      if (sessions.get(instanceId) !== entry || entry.status !== "pairing") return;
+      if (sessions.get(instanceId) !== entry || !["pairing", "code_ready"].includes(entry.status)) return;
       entry.status = "expired"; void notify(instanceId, "expired"); void socket.end?.(new Error("pairing_timeout"));
     }, pairingTimeoutMs);
     entry.timer.unref?.();
@@ -50,8 +50,10 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
         }
       }
       if (update.connection === "open") { clearTimeout(entry.timer); entry.status = "online"; await notify(instanceId, "paired"); }
-      else if (update.connection === "close" && entry.status !== "expired") {
-        clearTimeout(entry.timer); entry.status = "offline"; await notify(instanceId, "offline"); sessions.delete(instanceId);
+      else if (update.connection === "close") {
+        clearTimeout(entry.timer);
+        if (entry.status !== "expired") { entry.status = "offline"; await notify(instanceId, "offline"); }
+        sessions.delete(instanceId);
       }
     });
     return { instanceId, status: "pairing" };
