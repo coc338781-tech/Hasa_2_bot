@@ -40,6 +40,11 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
     if (authInfo.isSymbolicLink() || !authInfo.isDirectory()) throw new Error("unsafe_instance_auth_directory");
     await chmod(authDir, 0o700);
     const auth = await baileys.useMultiFileAuthState(authDir);
+    if (auth.state.creds.registered) {
+      const acknowledged = await notify(instanceId, "paired");
+      if (!acknowledged) { const error = new Error("pairing_completion_failed"); error.code = "pairing_completion_failed"; throw error; }
+      return { instanceId, status: "paired", alreadyRegistered: true };
+    }
     const socket = baileys.default({ auth: auth.state, logger: log, printQRInTerminal: false, markOnlineOnConnect: false, syncFullHistory: false, connectTimeoutMs: 60_000, defaultQueryTimeoutMs: 60_000, keepAliveIntervalMs: 25_000, browser: ["HASA BOT NETWORK", "Chrome", "1.0"] });
     const entry = { socket, status: "pairing", pairingCodeIssued: false, timer: null, generation: randomUUID() };
     sessions.set(instanceId, entry); await notify(instanceId, "pairing");
