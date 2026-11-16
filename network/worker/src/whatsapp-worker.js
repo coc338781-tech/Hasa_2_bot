@@ -15,8 +15,8 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
   if (!Number.isInteger(maxSessions) || maxSessions < 1 || maxSessions > 100) throw new TypeError("invalid_max_sessions");
   const sessions = new Map(), log = logger || pino({ level: "silent" });
   async function notify(instanceId, status, extra = {}) {
-    try { await onStatus({ instanceId, status, ...extra }); }
-    catch (error) { log.warn({ instanceId, status, error: error?.message }, "Worker status callback failed"); }
+    try { await onStatus({ instanceId, status, ...extra }); return true; }
+    catch (error) { log.warn({ instanceId, status, error: error?.message }, "Worker status callback failed"); return false; }
   }
   async function startPairing({ instanceId, phone }) {
     if (!PHONE.test(phone || "")) throw new TypeError("invalid_phone");
@@ -72,9 +72,29 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
           log.warn({ instanceId, error: error?.message }, "WhatsApp pairing code request failed");
         }
       }
-      if (update.connection === "open" && entry.status !== "expired") { clearTimeout(entry.timer); entry.status = "online"; await notify(instanceId, "paired"); }
+      if (update.connection === "open" && entry.status !== "expired" && !entry.pairingCompleteInFlight) {
+        clearTimeout(entry.timer);
+        entry.status = "online";
+        entry.pairingCompleteInFlight = true;
+        const finalize = async () => {
+          if (sessions.get(instanceId) !== entry) return;
+          try { await auth.saveCreds(); }
+          catch (error) { log.warn({ instanceId, error: error?.message }, "Final pairing credentials save failed"); }
+          const acknowledged = await notify(instanceId, "paired");
+          if (acknowledged) {
+            sessions.delete(instanceId);
+            try { void Promise.resolve(socket.end?.()).catch(error => log.warn({ instanceId, error: error?.message }, "Pairing socket close failed")); }
+            catch (error) { log.warn({ instanceId, error: error?.message }, "Pairing socket close failed"); }
+          } else {
+            entry.completionRetryTimer = setTimeout(() => void finalize(), 5000);
+            entry.completionRetryTimer.unref?.();
+          }
+        };
+        void finalize();
+      }
       else if (update.connection === "close") {
         clearTimeout(entry.timer);
+        clearTimeout(entry.completionRetryTimer);
         if (entry.status !== "expired") { entry.status = "offline"; await notify(instanceId, "offline"); }
         sessions.delete(instanceId);
       }
@@ -83,7 +103,7 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
   }
   async function stop(instanceId) {
     const entry = sessions.get(instanceId); if (!entry) return false;
-    sessions.delete(instanceId); clearTimeout(entry.timer); entry.status = "stopped";
+    sessions.delete(instanceId); clearTimeout(entry.timer); clearTimeout(entry.completionRetryTimer); entry.status = "stopped";
     try { void Promise.resolve(entry.socket.end?.(new Error("instance_stopped"))).catch(error => log.warn({ instanceId, error: error?.message }, "Socket stop failed")); }
     catch (error) { log.warn({ instanceId, error: error?.message }, "Socket stop failed"); }
     await notify(instanceId, "stopped"); return true;
