@@ -83,3 +83,14 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS servers_status_heartbeat_idx ON servers(status, last_heartbeat_at);
 CREATE INDEX IF NOT EXISTS bot_instances_server_status_idx ON bot_instances(server_id, status);
 CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at DESC);
+
+-- Request IDs are unique per server so a captured heartbeat cannot be replayed.
+CREATE TABLE IF NOT EXISTS server_heartbeat_requests (
+  server_id UUID NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+  request_id UUID NOT NULL,
+  observed_at TIMESTAMPTZ NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (server_id, request_id)
+);
+CREATE INDEX IF NOT EXISTS server_heartbeat_requests_received_idx
+  ON server_heartbeat_requests(received_at);
