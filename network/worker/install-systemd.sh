@@ -42,6 +42,7 @@ if [[ ! -f /etc/hasa-worker/worker.env ]]; then
     printf 'HASA_WHATSAPP_DATA_ENCRYPTED=true\n'
     printf 'HASA_BOT_CODE_DIR=/opt/hasa-bot\n'
     printf 'HASA_WORKER_MAX_SESSIONS=1\n'
+    printf 'HASA_MIN_FREE_MEMORY_BYTES=805306368\n'
     printf 'LOG_LEVEL=warn\n'
   } > /etc/hasa-worker/worker.env
   chown root:hasa-worker /etc/hasa-worker/worker.env
