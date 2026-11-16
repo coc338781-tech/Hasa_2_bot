@@ -277,6 +277,9 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       if (!match || !agentStore || !provisioningStore) { sendJson(res, 401, { error: "agent_unauthorized" }); return; }
       const server = await agentStore.findActiveServerByTokenHash(hashSecret(match[1])).catch(() => null);
       if (!server) { sendJson(res, 401, { error: "agent_unauthorized" }); return; }
+      if (server.status !== "online" || !server.last_heartbeat_at || clock() - Date.parse(server.last_heartbeat_at) > 150_000) {
+        sendJson(res, 409, { error: "agent_server_not_online" }); return;
+      }
       try {
         if (agentClaim) {
           const job = await provisioningStore.claimNextJob(server.id);
