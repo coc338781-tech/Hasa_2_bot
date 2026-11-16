@@ -94,7 +94,7 @@ export function createPostgresProvisioningStore(pool) {
         await client.query(
           `INSERT INTO provisioning_jobs (id, server_id, bot_instance_id, customer_id, job_type, payload)
            VALUES ($1, $2, $3, $4, 'pairing_start', $5::jsonb)`,
-          [jobId, server.server_id, botId, customerId, JSON.stringify({ pairing_request_id: pairingId, phone_e164: phone })]);
+          [jobId, server.server_id, botId, customerId, JSON.stringify({ pairing_request_id: pairingId })]);
         await client.query("UPDATE bot_instances SET status = 'pairing', updated_at = now() WHERE id = $1", [botId]);
         await client.query("COMMIT");
         return { ok: true, request: { id: pairingId, status: "queued", phone_e164: phone, expires_at: expiresAt } };
@@ -107,19 +107,23 @@ export function createPostgresProvisioningStore(pool) {
         await client.query("BEGIN");
         const claimed = await client.query(
           `WITH candidate AS (
-             SELECT id FROM provisioning_jobs
-              WHERE server_id = $1 AND job_type = ANY($3::text[])
-                AND ((status = 'queued' AND available_at <= now())
-                  OR (status = 'leased' AND lease_expires_at < now()))
-                AND attempts < 5
-              ORDER BY created_at
-              FOR UPDATE SKIP LOCKED LIMIT 1
+             SELECT j.id, p.phone_e164 FROM provisioning_jobs j
+             LEFT JOIN pairing_requests p ON p.id::text = j.payload->>'pairing_request_id'
+              WHERE j.server_id = $1 AND j.job_type = ANY($3::text[])
+                AND ((j.status = 'queued' AND j.available_at <= now())
+                  OR (j.status = 'leased' AND j.lease_expires_at < now()))
+                AND j.attempts < 5
+              ORDER BY j.created_at
+              FOR UPDATE OF j SKIP LOCKED LIMIT 1
+           ), leased AS (
+             UPDATE provisioning_jobs j
+                SET status = 'leased', attempts = attempts + 1,
+                    lease_expires_at = now() + ($2 * interval '1 second'), updated_at = now()
+               FROM candidate c WHERE j.id = c.id
+             RETURNING j.id, j.bot_instance_id, j.customer_id, j.job_type, j.payload, j.attempts
            )
-           UPDATE provisioning_jobs j
-              SET status = 'leased', attempts = attempts + 1,
-                  lease_expires_at = now() + ($2 * interval '1 second'), updated_at = now()
-             FROM candidate c WHERE j.id = c.id
-           RETURNING j.id, j.bot_instance_id, j.customer_id, j.job_type, j.payload, j.attempts`,
+           SELECT leased.*, candidate.phone_e164 FROM leased
+           JOIN candidate ON candidate.id = leased.id`,
           [serverId, leaseSeconds, allowedTypes]);
         if (claimed.rowCount !== 1) { await client.query("COMMIT"); return null; }
         const job = claimed.rows[0];
