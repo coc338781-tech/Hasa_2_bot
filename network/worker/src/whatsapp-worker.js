@@ -41,6 +41,11 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
     await chmod(authDir, 0o700);
     const auth = await baileys.useMultiFileAuthState(authDir);
     if (auth.state.creds.registered) {
+      const linkedId = auth.state.creds.me?.id || auth.state.creds.me?.jid || "";
+      const linkedPhone = String(linkedId).split(":")[0].replace(/\D/g, "");
+      if (!linkedPhone || linkedPhone !== phone.replace(/\D/g, "")) {
+        const error = new Error("whatsapp_session_phone_mismatch"); error.code = "whatsapp_session_phone_mismatch"; throw error;
+      }
       const acknowledged = await notify(instanceId, "paired");
       if (!acknowledged) { const error = new Error("pairing_completion_failed"); error.code = "pairing_completion_failed"; throw error; }
       return { instanceId, status: "paired", alreadyRegistered: true };
