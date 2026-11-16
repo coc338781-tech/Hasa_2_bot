@@ -110,7 +110,9 @@
     try {
       await api(`/v1/owner/bots/${encodeURIComponent(botId)}/assign-server`,{method:"POST",body:JSON.stringify({server_id:serverId})});
       notify("Bot assigned to server."); await refresh();
-    } catch(error){notify(error.message)}
+    } catch(error){
+      notify(error.message === "server_low_memory" ? "Not enough free RAM on that server. Choose another server or free up memory." : error.message === "server_not_online" ? "That server is offline. Refresh and choose an online server." : error.message);
+    }
     finally{button.disabled=false}
   }
   async function revoke(id,label) {
