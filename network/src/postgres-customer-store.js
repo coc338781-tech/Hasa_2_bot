@@ -66,7 +66,7 @@ export function createPostgresCustomerStore(pool) {
     async getCustomerDashboard(customerId) {
       const result = await pool.query(
         `SELECT c.id AS customer_id, c.display_name, c.phone_e164, c.status AS account_status,
-                a.login_email, b.id AS bot_id, b.status AS bot_status, b.release_version,
+                a.login_email, b.id AS bot_id, b.status AS bot_status, b.whatsapp_registered, (b.server_id IS NOT NULL) AS server_assigned, b.release_version,
                 b.last_started_at, b.last_stopped_at, b.last_error_code,
                 p.id AS pairing_id, p.status AS pairing_status, p.phone_e164 AS pairing_phone,
                 p.expires_at AS pairing_expires_at, p.created_at AS pairing_created_at
