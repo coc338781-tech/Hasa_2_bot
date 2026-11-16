@@ -1,6 +1,6 @@
 # HASA Server Agent
 
-The agent is telemetry-only. It reports host capacity to the central API and has no remote shell, process control, customer-file access or WhatsApp session access.
+The agent is telemetry-only. It reports host capacity to the central API and has no remote shell, process control, customer-file access or WhatsApp session access. On Linux it reports `MemAvailable` from `/proc/meminfo`, matching the `available` column shown by `free -h`; the owner console uses that live value for RAM admission decisions.
 
 ## Requirements
 
