@@ -325,6 +325,19 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       }
       try {
         if (agentSettings) {
+          if (typeof agentStore.recordWorkerHeartbeat !== "function") { sendJson(res, 503, { error: "worker_health_unavailable" }); return; }
+          const heartbeat = await readJson(req);
+          const activeSessions = heartbeat?.active_sessions;
+          const maxSessions = heartbeat?.max_sessions;
+          const workerVersion = typeof heartbeat?.worker_version === "string" ? heartbeat.worker_version.slice(0, 40) : "";
+          if (!Number.isInteger(activeSessions) || activeSessions < 0 || activeSessions > 100 ||
+              !Number.isInteger(maxSessions) || maxSessions < 1 || maxSessions > 100 ||
+              activeSessions > maxSessions || !workerVersion) {
+            sendJson(res, 400, { error: "invalid_worker_heartbeat" }); return;
+          }
+          await agentStore.recordWorkerHeartbeat(server.id, {
+            workerVersion, maxSessions, activeSessions, now: clock()
+          });
           const bytes = await provisioningStore.getMinFreeMemoryBytes();
           sendJson(res, 200, { min_free_memory_bytes: bytes });
           return;
