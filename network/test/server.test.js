@@ -47,7 +47,8 @@ test("readiness is unavailable until persistent storage is configured", async ()
     assert.deepEqual(await response.json(), {
       service: "hasa-bot-network-api",
       ready: false,
-      database: "not_configured"
+      database: "not_configured",
+      pairing_code_vault: false
     });
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
