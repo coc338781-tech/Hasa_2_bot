@@ -97,7 +97,7 @@ export function createPostgresProvisioningStore(pool) {
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
-    async finishJob(jobId, { status, result = null, errorCode = null } = {}) {
+    async finishJob(jobId, serverId, { status, result = null, errorCode = null } = {}) {
       if (!["succeeded", "failed", "cancelled"].includes(status)) throw new TypeError("invalid_job_status");
       const client = await pool.connect();
       try {
@@ -106,7 +106,7 @@ export function createPostgresProvisioningStore(pool) {
           `UPDATE provisioning_jobs SET status = $2, result = $3::jsonb, updated_at = now(),
              completed_at = now(), lease_expires_at = NULL WHERE id = $1`,
           [jobId, status, result ? JSON.stringify(result) : null]);
-        const job = await client.query("SELECT bot_instance_id, payload FROM provisioning_jobs WHERE id = $1", [jobId]);
+        const job = await client.query("SELECT bot_instance_id, customer_id, payload FROM provisioning_jobs WHERE id = $1 AND server_id = $2", [jobId, serverId]);
         if (job.rowCount && status === "failed") {
           await client.query(
             `UPDATE pairing_requests SET status = 'failed', failure_code = $2, updated_at = now()
@@ -119,6 +119,12 @@ export function createPostgresProvisioningStore(pool) {
         await client.query("COMMIT");
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
+    },
+    async getJobForServer(jobId, serverId) {
+      const result = await pool.query(
+        `SELECT id, server_id, bot_instance_id, customer_id, job_type, status, payload
+           FROM provisioning_jobs WHERE id = $1 AND server_id = $2 LIMIT 1`, [jobId, serverId]);
+      return result.rows[0] || null;
     },
     async updatePairingStatus(pairingId, customerId, status, failureCode = null) {
       const result = await pool.query(
