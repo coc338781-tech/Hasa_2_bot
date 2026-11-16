@@ -60,10 +60,11 @@ async function postJson(fetchImpl, url, body, token) {
 
 export async function saveCredentials(path, credentials) {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  const handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW || 0), 0o600);
+  const handle = await open(path, constants.O_WRONLY | constants.O_CREAT | (constants.O_NOFOLLOW || 0), 0o600);
   try {
-    await handle.writeFile(JSON.stringify(credentials) + "\n", "utf8");
     await handle.chmod(0o600);
+    await handle.truncate(0);
+    await handle.writeFile(JSON.stringify(credentials) + "\n", "utf8");
   } finally {
     await handle.close();
   }
