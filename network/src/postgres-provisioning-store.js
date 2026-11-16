@@ -129,7 +129,7 @@ export function createPostgresProvisioningStore(pool) {
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
-    async claimNextJob(serverId, leaseSeconds = 90, allowedTypes = ["instance_create","pairing_start","instance_start","instance_stop","instance_restart"]) {
+    async claimNextJob(serverId, leaseSeconds = 90, allowedTypes = ["instance_create","pairing_start","instance_start","instance_stop","instance_restart"], activeInstanceIds = []) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -141,6 +141,7 @@ export function createPostgresProvisioningStore(pool) {
                 AND ((j.status = 'queued' AND j.available_at <= now())
                   OR (j.status = 'leased' AND j.lease_expires_at < now()))
                 AND j.attempts < 5
+                AND (j.job_type <> 'instance_restart' OR j.bot_instance_id = ANY($4::uuid[]))
               ORDER BY j.created_at
               FOR UPDATE OF j SKIP LOCKED LIMIT 1
            ), leased AS (
@@ -152,7 +153,7 @@ export function createPostgresProvisioningStore(pool) {
            )
            SELECT leased.*, candidate.phone_e164 FROM leased
            JOIN candidate ON candidate.id = leased.id`,
-          [serverId, leaseSeconds, allowedTypes]);
+          [serverId, leaseSeconds, allowedTypes, activeInstanceIds]);
         if (claimed.rowCount !== 1) { await client.query("COMMIT"); return null; }
         const job = claimed.rows[0];
         await client.query(
