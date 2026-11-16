@@ -9,8 +9,9 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --test",
-    "db:migrate": "node db/migrate.js"
+    "check": "node --check src/server.js && node --test && npm run test:worker",
+    "db:migrate": "node db/migrate.js",
+    "test:worker": "node --test worker/test/*.test.js"
   },
   "dependencies": {
     "pg": "^8.16.3",
