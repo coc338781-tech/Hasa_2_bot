@@ -24,8 +24,9 @@ test("worker generates a real pairing code after Baileys readiness and never put
     assert.equal(baileys.sockets[0].requestedPhone, "94771234567");
     assert.equal(JSON.stringify(statuses).includes("ABCD-EFGH"), false);
     await baileys.sockets[0].emit("connection.update", { connection: "open" });
-    assert.equal(worker.getStatus(id).status, "online");
-    await worker.stop(id); assert.equal(worker.activeCount, 0);
+    assert.equal(worker.getStatus(id).status, "offline");
+    assert.ok(statuses.some(item => item.status === "paired"));
+    assert.equal(worker.activeCount, 0);
   } finally { await worker.stopAll(); await rm(root, { recursive: true, force: true }); }
 });
 test("worker validates tenant instance IDs and phone numbers and enforces capacity", async () => {
