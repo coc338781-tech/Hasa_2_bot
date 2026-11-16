@@ -1,0 +1,86 @@
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+let token = null;
+let mode = "login";
+async function api(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(path, { ...options, headers });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || "request_failed");
+  return body;
+}
+function showError(id, message) { $(id).textContent = message; }
+function setMode(next) {
+  mode = next;
+  $("login-form").classList.toggle("hidden", mode !== "login");
+  $("register-form").classList.toggle("hidden", mode !== "register");
+  $("tab-login").classList.toggle("active", mode === "login");
+  $("tab-register").classList.toggle("active", mode === "register");
+  showError("auth-error", "");
+}
+function showWorkspace() {
+  $("auth").classList.add("hidden");
+  $("workspace").classList.remove("hidden");
+  $("logout").classList.remove("hidden");
+}
+async function loadDashboard() {
+  const data = await api("/v1/customer/me");
+  const c = data.customer, b = data.bot;
+  $("customer-name").textContent = c.display_name || c.login_email.split("@")[0];
+  $("customer-phone").textContent = c.phone_e164;
+  $("customer-email").textContent = c.login_email;
+  $("account-status").textContent = c.status;
+  $("bot-status").textContent = b?.status || "Not assigned";
+  $("bot-version").textContent = b?.release_version ? `Version ${b.release_version}` : "Your assigned instance";
+  $("bot-id").textContent = b?.id || "Pending";
+  $("runtime-status").textContent = b?.status || "Not provisioned";
+  $("pair-status").textContent = data.latest_pairing?.status || "None";
+  $("pair-result").classList.toggle("hidden", !data.latest_pairing);
+  if (data.latest_pairing) $("pair-result").textContent = `Pairing request: ${data.latest_pairing.status}. No pairing code is available until the WhatsApp worker is connected.`;
+  if (b?.id) $("pair-phone").value = c.phone_e164;
+  showWorkspace();
+}
+async function submitAuth(event, registering) {
+  event.preventDefault(); showError("auth-error", "");
+  const payload = registering ? {
+    display_name: $("register-name").value.trim(),
+    email: $("register-email").value,
+    phone: $("register-phone").value,
+    password: $("register-password").value
+  } : { email: $("login-email").value, password: $("login-password").value };
+  try {
+    const result = await api(registering ? "/v1/customer/register" : "/v1/customer/login", { method: "POST", body: JSON.stringify(payload) });
+    token = result.access_token;
+    await loadDashboard();
+  } catch (error) {
+    const messages = {
+      invalid_credentials: "Email or password is incorrect.",
+      account_exists: "An account with that email or WhatsApp number already exists.",
+      invalid_registration: "Check your email, international WhatsApp number and password (at least 12 characters).",
+      customer_auth_unavailable: "Customer sign-in is temporarily unavailable. Please try again later."
+    };
+    showError("auth-error", messages[error.message] || "Could not complete the request. Please check your details and try again.");
+  }
+}
+$("tab-login").addEventListener("click", () => setMode("login"));
+$("tab-register").addEventListener("click", () => setMode("register"));
+$("login-form").addEventListener("submit", event => submitAuth(event, false));
+$("register-form").addEventListener("submit", event => submitAuth(event, true));
+$("logout").addEventListener("click", async () => {
+  try { await api("/v1/customer/logout", { method: "POST", body: "{}" }); } catch {}
+  token = null; $("workspace").classList.add("hidden"); $("auth").classList.remove("hidden"); $("logout").classList.add("hidden"); setMode("login");
+});
+$("pair-form").addEventListener("submit", async event => {
+  event.preventDefault(); showError("pair-error", "");
+  try {
+    const result = await api("/v1/customer/pairing-requests", { method: "POST", body: JSON.stringify({ phone: $("pair-phone").value }) });
+    $("pair-result").classList.remove("hidden");
+    $("pair-result").textContent = `Request received. Status: ${result.request.status}. A real pairing code will appear only after the secure WhatsApp worker is connected.`;
+    $("pair-status").textContent = result.request.status;
+  } catch (error) {
+    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : "Could not create the pairing request. Please try again.");
+  }
+});
+})();
