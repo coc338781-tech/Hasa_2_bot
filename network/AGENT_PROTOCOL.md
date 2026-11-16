@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The agent is telemetry-only. It reports host identity and resource capacity over outbound HTTPS. It cannot install software, execute shell commands, restart services, read customer files or access WhatsApp session data.
+The telemetry agent is telemetry-only. It reports host identity and resource capacity over outbound HTTPS. A separate isolated worker process uses the same server-bound token for a small allow-listed job API. The telemetry agent itself cannot install software, execute shell commands, restart services, read customer files or access WhatsApp session data.
 
 ## Enrollment
 
@@ -39,9 +39,9 @@ The API verifies the credential, validates payload bounds and timestamp, rejects
 - Hostname and labels are untrusted display data; escape them in dashboards.
 - Heartbeat data must not include IP credentials, environment variables, process command lines, customer message content or WhatsApp session data.
 
-## Future command channel
+## Isolated worker channel (current development implementation)
 
-A later phase may add a signed, expiring, replay-protected job queue with a strict typed allow-list (for example, deploy approved immutable release to bot_id). Each job requires owner authorization and audit logging. Never add a generic `exec` or shell command operation.
+The separate worker service calls the central API over HTTPS using the enrolled server token. It can claim only jobs leased to its server ID and currently supports instance create/start/stop/restart and WhatsApp pairing. Pairing codes are submitted to the central API and encrypted there before customer retrieval. The worker cannot request a generic command, shell script or arbitrary path. Every new job type must be explicitly added to the API allow-list, scoped to the assigned server and audited. Never add a generic `exec` or shell command operation.
 
 ## Agent configuration
 
