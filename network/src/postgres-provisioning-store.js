@@ -1,13 +1,32 @@
 import { randomUUID } from "node:crypto";
 
-const MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
-if (!Number.isSafeInteger(MIN_FREE_MEMORY_BYTES) || MIN_FREE_MEMORY_BYTES < 0) throw new Error("HASA_MIN_FREE_MEMORY_BYTES must be a non-negative safe integer");
+const DEFAULT_MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
+if (!Number.isSafeInteger(DEFAULT_MIN_FREE_MEMORY_BYTES) || DEFAULT_MIN_FREE_MEMORY_BYTES < 128 * 1024 * 1024) throw new Error("HASA_MIN_FREE_MEMORY_BYTES must be at least 128 MiB");
+async function readMinFreeMemoryBytes(client) {
+  const result = await client.query("SELECT setting_value FROM network_settings WHERE setting_key = 'min_free_memory_bytes'");
+  const value = result.rows[0]?.setting_value;
+  const bytes = Number(value);
+  return Number.isSafeInteger(bytes) && bytes >= 128 * 1024 * 1024 ? bytes : DEFAULT_MIN_FREE_MEMORY_BYTES;
+}
 
 export function createPostgresProvisioningStore(pool) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") {
     throw new TypeError("A PostgreSQL Pool-compatible object is required");
   }
   return {
+    async getMinFreeMemoryBytes() {
+      const result = await pool.query("SELECT setting_value FROM network_settings WHERE setting_key = 'min_free_memory_bytes'");
+      const bytes = Number(result.rows[0]?.setting_value);
+      return Number.isSafeInteger(bytes) && bytes >= 128 * 1024 * 1024 ? bytes : DEFAULT_MIN_FREE_MEMORY_BYTES;
+    },
+    async setMinFreeMemoryBytes(bytes) {
+      if (!Number.isSafeInteger(bytes) || bytes < 128 * 1024 * 1024 || bytes > 64 * 1024 * 1024 * 1024) throw new TypeError("invalid_min_free_memory_bytes");
+      await pool.query(
+        "INSERT INTO network_settings (setting_key, setting_value, updated_at) VALUES ('min_free_memory_bytes', to_jsonb($1::bigint), now()) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()",
+        [bytes]
+      );
+      return bytes;
+    },
     async assignBotToServer({ botId, serverId }) {
       const client = await pool.connect();
       try {
@@ -18,7 +37,8 @@ export function createPostgresProvisioningStore(pool) {
               AND last_heartbeat_at > now() - interval '150 seconds'
             FOR UPDATE`, [serverId]);
         if (server.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "server_not_online" }; }
-        if (Number(server.rows[0].memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) { await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" }; }
+        const minFreeMemoryBytes = await readMinFreeMemoryBytes(client);
+        if (Number(server.rows[0].memory_available_bytes || 0) < minFreeMemoryBytes) { await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" }; }
         const bot = await client.query(
           `UPDATE bot_instances SET server_id = $2, status = 'offline', runtime_provisioned = false, updated_at = now()
             WHERE id = $1 AND status IN ('offline','failed') AND whatsapp_registered = false
@@ -201,7 +221,8 @@ export function createPostgresProvisioningStore(pool) {
         if (!allowed.includes(bot.bot_status)) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_action_not_allowed" }; }
         if (!bot.runtime_provisioned) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
         if (action !== "stop" && !bot.whatsapp_registered) { await client.query("ROLLBACK"); return { ok: false, reason: "pairing_required" }; }
-        if (action !== "stop" && Number(bot.memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) {
+        const minFreeMemoryBytes = await readMinFreeMemoryBytes(client);
+        if (action !== "stop" && Number(bot.memory_available_bytes || 0) < minFreeMemoryBytes) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" };
         }
         const active = await client.query(
