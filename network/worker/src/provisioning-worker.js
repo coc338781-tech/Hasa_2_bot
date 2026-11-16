@@ -26,6 +26,7 @@ export function createProvisioningWorker({ client, dataDir, baileys, logger, max
   });
   let running = false, stopped = false, loopPromise = null;
   async function runOne() {
+    if (whatsapp.activeCount >= maxSessions) return false;
     const job = await client.claimNextJob();
     if (!job) return false;
     const pairingId = job.payload?.pairing_request_id;
