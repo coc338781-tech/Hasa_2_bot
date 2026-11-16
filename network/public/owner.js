@@ -2,6 +2,7 @@
   "use strict";
   let session = null;
   let expiryTimer = null;
+  let serverCache = [];
   const $ = id => document.getElementById(id);
   const fmtBytes = value => {
     if (value === null || value === undefined) return "—";
@@ -64,11 +65,53 @@
     }
     $("last-updated").textContent=`Updated ${new Date().toLocaleTimeString()}`;
   }
+  function renderBots(bots) {
+    const list = $("bot-list"); list.replaceChildren();
+    if (!bots.length) { const empty=document.createElement("div"); empty.className="empty"; empty.textContent="No customer bot instances have been registered yet."; list.append(empty); return; }
+    const online = serverCache.filter(server => server.status === "online");
+    for (const bot of bots) {
+      const card=document.createElement("article"); card.className="server";
+      const top=document.createElement("div"); top.className="server-top";
+      const name=document.createElement("div"); name.className="server-name"; name.textContent=bot.display_name || bot.phone_e164 || bot.id;
+      const status=document.createElement("span"); status.className=`pill ${bot.status || "offline"}`; status.textContent=bot.status || "unknown";
+      top.append(name,status); card.append(top);
+      const facts=document.createElement("div"); facts.className="facts";
+      for (const [label,value] of [["WhatsApp",bot.phone_e164],["Bot ID",bot.id],["Assigned server",bot.server_label || "Not assigned"]]) {
+        const item=document.createElement("div"),k=document.createElement("span"),v=document.createElement("b");
+        k.textContent=label; v.textContent=value || "—"; item.append(k,v); facts.append(item);
+      }
+      card.append(facts);
+      const actions=document.createElement("div"); actions.className="server-actions";
+      const select=document.createElement("select"); select.setAttribute("aria-label","Choose hosting server");
+      const placeholder=document.createElement("option"); placeholder.value=""; placeholder.textContent=online.length ? "Choose online server…" : "No online server"; select.append(placeholder);
+      for (const server of online) {
+        const option=document.createElement("option"); option.value=server.id;
+        option.textContent=`${server.label || server.hostname} · ${server.cpu_cores || "?"} CPU · ${fmtBytes(server.memory_available_bytes)} free`;
+        if (server.id === bot.server_id) option.selected=true;
+        select.append(option);
+      }
+      const button=document.createElement("button"); button.className="secondary"; button.textContent="Assign server"; button.disabled=!online.length;
+      button.addEventListener("click",()=>assignBot(bot.id,select.value,button));
+      actions.append(select,button); card.append(actions); list.append(card);
+    }
+  }
   async function refresh() {
     $("refresh").disabled=true;
-    try {const result=await api("/v1/owner/servers");renderServers(result.servers || [])}
-    catch(error){notify(error.message)}
+    try {
+      const [servers,bots]=await Promise.all([api("/v1/owner/servers"),api("/v1/owner/bots")]);
+      serverCache=servers.servers || []; renderServers(serverCache); renderBots(bots.bots || []);
+    } catch(error){notify(error.message)}
     finally{$("refresh").disabled=false}
+  }
+  async function assignBot(botId, serverId, button) {
+    if (!serverId) { notify("Choose an online server first."); return; }
+    if (!confirm("Assign this customer bot to the selected server?")) return;
+    button.disabled=true;
+    try {
+      await api(`/v1/owner/bots/${encodeURIComponent(botId)}/assign-server`,{method:"POST",body:JSON.stringify({server_id:serverId})});
+      notify("Bot assigned to server."); await refresh();
+    } catch(error){notify(error.message)}
+    finally{button.disabled=false}
   }
   async function revoke(id,label) {
     if(!confirm(`Revoke ${label}? Its agent credential will stop working.`))return;
