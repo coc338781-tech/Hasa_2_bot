@@ -73,14 +73,14 @@ export function createPostgresProvisioningStore(pool) {
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
-    async claimNextJob(serverId, leaseSeconds = 90) {
+    async claimNextJob(serverId, leaseSeconds = 90, allowedTypes = ["instance_create","pairing_start","instance_start","instance_stop","instance_restart"]) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         const claimed = await client.query(
           `WITH candidate AS (
              SELECT id FROM provisioning_jobs
-              WHERE server_id = $1 AND job_type IN ('instance_create','pairing_start','instance_start','instance_stop','instance_restart')
+              WHERE server_id = $1 AND job_type = ANY($3::text[])
                 AND ((status = 'queued' AND available_at <= now())
                   OR (status = 'leased' AND lease_expires_at < now()))
                 AND attempts < 5
@@ -92,7 +92,7 @@ export function createPostgresProvisioningStore(pool) {
                   lease_expires_at = now() + ($2 * interval '1 second'), updated_at = now()
              FROM candidate c WHERE j.id = c.id
            RETURNING j.id, j.bot_instance_id, j.customer_id, j.job_type, j.payload, j.attempts`,
-          [serverId, leaseSeconds]);
+          [serverId, leaseSeconds, allowedTypes]);
         if (claimed.rowCount !== 1) { await client.query("COMMIT"); return null; }
         const job = claimed.rows[0];
         await client.query(
