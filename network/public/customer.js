@@ -39,11 +39,12 @@ async function loadDashboard() {
   $("bot-version").textContent = b?.release_version ? `Version ${b.release_version}` : "Your assigned instance";
   $("bot-id").textContent = b?.id || "Pending";
   $("runtime-status").textContent = b?.status || "Not provisioned";
-  $("pairing-panel").classList.toggle("hidden", !b?.server_assigned || b.whatsapp_registered);
+  $("pairing-panel").classList.toggle("hidden", !b?.server_assigned || !b.runtime_provisioned || b.whatsapp_registered);
   $("unassigned-note").classList.toggle("hidden", Boolean(b?.server_assigned));
-  $("bot-start").disabled = !b?.id || !b.whatsapp_registered || !["offline", "failed"].includes(b.status);
-  $("bot-stop").disabled = !b?.id || !b.whatsapp_registered || !["online", "provisioning"].includes(b.status);
-  $("bot-restart").disabled = !b?.id || !b.whatsapp_registered || b.status !== "online";
+  $("provision-note").classList.toggle("hidden", !b?.server_assigned || Boolean(b.runtime_provisioned));
+  $("bot-start").disabled = !b?.id || !b.runtime_provisioned || !b.whatsapp_registered || !["offline", "failed"].includes(b.status);
+  $("bot-stop").disabled = !b?.id || !b.runtime_provisioned || !b.whatsapp_registered || !["online", "provisioning"].includes(b.status);
+  $("bot-restart").disabled = !b?.id || !b.runtime_provisioned || !b.whatsapp_registered || b.status !== "online";
   $("pair-status").textContent = data.latest_pairing?.status || "None";
   $("pair-result").classList.toggle("hidden", !data.latest_pairing);
   if (data.latest_pairing) {
@@ -177,7 +178,8 @@ async function runBotAction(action) {
       server_low_memory: "The server does not have enough free RAM to start this bot.",
       bot_action_not_allowed: "This action is not available in the bot's current state.",
       action_already_queued: "Another bot action is already processing.",
-      pairing_required: "Connect your WhatsApp first using the pairing panel."
+      pairing_required: "Connect your WhatsApp first using the pairing panel.",
+      bot_not_ready: "Your bot is still being prepared on its assigned server. Please wait and refresh."
     };
     $("action-result").textContent = messages[error.message] || "Could not send the bot action. Please try again.";
     await loadDashboard().catch(() => {});
