@@ -5,7 +5,7 @@ export function createPostgresAgentStore(pool) {
     async listServers() {
       const result = await pool.query(
         `SELECT id, label, provider, hostname, os_name, os_release, architecture, agent_version,
-                status, cpu_cores, memory_total_bytes, memory_available_bytes,
+                CASE WHEN status = 'online' AND last_heartbeat_at < now() - interval '150 seconds' THEN 'offline' ELSE status END AS status, cpu_cores, load_average, memory_total_bytes, memory_available_bytes,
                 disk_total_bytes, disk_available_bytes, last_heartbeat_at, created_at
            FROM servers ORDER BY created_at DESC LIMIT 500`
       );
@@ -77,11 +77,11 @@ export function createPostgresAgentStore(pool) {
         if (replay.rowCount !== 1) { await client.query("ROLLBACK"); return false; }
         await client.query(
           `UPDATE servers SET hostname = $2, os_name = $3, os_release = $4, architecture = $5,
-             agent_version = $6, cpu_cores = $7, memory_total_bytes = $8, memory_available_bytes = $9,
-             disk_total_bytes = $10, disk_available_bytes = $11, last_heartbeat_at = $12,
-             status = 'online', updated_at = $12 WHERE id = $1`,
+             agent_version = $6, cpu_cores = $7, load_average = $8, memory_total_bytes = $9, memory_available_bytes = $10,
+             disk_total_bytes = $11, disk_available_bytes = $12, last_heartbeat_at = $13,
+             status = 'online', updated_at = $13 WHERE id = $1`,
           [serverId, payload.hostname, payload.os_name, payload.os_release, payload.architecture,
-           payload.agent_version, payload.cpu_cores, payload.memory_total_bytes, payload.memory_available_bytes,
+           payload.agent_version, payload.cpu_cores, JSON.stringify(payload.load_average), payload.memory_total_bytes, payload.memory_available_bytes,
            payload.disk_total_bytes, payload.disk_available_bytes, new Date(now).toISOString()]);
         await client.query("COMMIT");
         return true;
