@@ -66,7 +66,11 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
   let restoreQueue = [];
   async function refreshMemoryPolicy() {
     try {
-      const settings = await client.getSettings();
+      const settings = await client.getSettings({
+        activeSessions: botRuntime.activeCount + whatsapp.activeCount,
+        maxSessions,
+        workerVersion: "0.1.0"
+      });
       if (Number.isSafeInteger(settings.minFreeMemoryBytes) && settings.minFreeMemoryBytes >= 512 * 1024 * 1024) {
         activeMinFreeMemoryBytes = settings.minFreeMemoryBytes;
       }
