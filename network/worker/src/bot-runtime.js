@@ -22,7 +22,10 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
   async function notifyExit(payload) {
     if (reportedExit.has(payload.instanceId)) return;
     reportedExit.add(payload.instanceId);
-    if (!suppressExit.delete(payload.instanceId)) await onExit(payload);
+    if (!suppressExit.delete(payload.instanceId)) {
+      try { await onExit(payload); }
+      catch (error) { logger?.warn?.({ instanceId: payload.instanceId, error: error?.message }, "Bot exit callback failed"); }
+    }
   }
   async function createInstance({ bot_instance_id, payload = {} }) {
     const dir = instancePath(root, bot_instance_id);
