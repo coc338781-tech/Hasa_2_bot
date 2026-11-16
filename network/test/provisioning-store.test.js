@@ -79,3 +79,16 @@ test("owner can update the persisted RAM reserve within safe bounds", async () =
   assert.ok(pool.calls.some(call => call.sql.includes("ON CONFLICT (setting_key) DO UPDATE")));
   await assert.rejects(store.setMinFreeMemoryBytes(64 * 1024 * 1024), /invalid_min_free_memory_bytes/);
 });
+
+test("pairing is paused when the assigned server drops below the owner RAM reserve", async () => {
+  const pool = fakePool([
+    { rowCount: 1, rows: [{ id: "bot", server_id: "server", bot_status: "offline", whatsapp_registered: false, runtime_provisioned: true, server_status: "online", last_heartbeat_at: new Date().toISOString(), memory_available_bytes: 256 * 1024 * 1024 }] },
+    { rowCount: 1, rows: [{ setting_value: 768 * 1024 * 1024 }] }
+  ]);
+  const result = await createPostgresProvisioningStore(pool).enqueuePairing({
+    customerId: "customer", botId: "bot", phone: "+94771234567",
+    expiresAt: new Date(Date.now() + 600000).toISOString()
+  });
+  assert.deepEqual(result, { ok: false, reason: "server_low_memory" });
+  assert.equal(pool.calls.some(call => call.sql.includes("INSERT INTO provisioning_jobs")), false);
+});
