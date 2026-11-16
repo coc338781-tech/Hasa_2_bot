@@ -1,5 +1,6 @@
 import os from "node:os";
-import { statfs, mkdir, readFile, writeFile, chmod } from "node:fs/promises";
+import { statfs, mkdir, open } from "node:fs/promises";
+import { constants } from "node:fs";
 import { dirname } from "node:path";
 import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -59,25 +60,32 @@ async function postJson(fetchImpl, url, body, token) {
 
 export async function saveCredentials(path, credentials) {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  await writeFile(path, JSON.stringify(credentials) + "\n", { mode: 0o600, flag: "wx" }).catch(async error => {
-    if (error.code !== "EEXIST") throw error;
-    await chmod(path, 0o600);
-    await writeFile(path, JSON.stringify(credentials) + "\n", { mode: 0o600 });
-  });
-  await chmod(path, 0o600);
+  const handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW || 0), 0o600);
+  try {
+    await handle.writeFile(JSON.stringify(credentials) + "\n", "utf8");
+    await handle.chmod(0o600);
+  } finally {
+    await handle.close();
+  }
 }
 
 export async function loadCredentials(path) {
-  let parsed;
-  try { parsed = JSON.parse(await readFile(path, "utf8")); }
-  catch (error) {
+  let handle;
+  try {
+    handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
+    const parsed = JSON.parse(await handle.readFile("utf8"));
+    if (!UUID_RE.test(parsed?.server_id || "") || typeof parsed?.agent_token !== "string" || parsed.agent_token.length < 32) {
+      throw new Error("Agent credential file is invalid");
+    }
+    return parsed;
+  } catch (error) {
     if (error.code === "ENOENT") return null;
+    if (error.code === "ELOOP") throw new Error("Agent credential file must not be a symbolic link");
+    if (error.message === "Agent credential file is invalid") throw error;
     throw new Error("Unable to read the agent credential file");
+  } finally {
+    await handle?.close();
   }
-  if (!UUID_RE.test(parsed?.server_id || "") || typeof parsed?.agent_token !== "string" || parsed.agent_token.length < 32) {
-    throw new Error("Agent credential file is invalid");
-  }
-  return parsed;
 }
 
 export async function enrollAgent({ baseUrl, ticket, credentialPath, fetchImpl = fetch }) {
