@@ -207,3 +207,44 @@ test("customer registration, dashboard and pairing intake stay scoped to the sig
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+test("only the owner can read and change the minimum free RAM policy", async () => {
+  const previous = process.env.HASA_OWNER_ACCESS_KEY;
+  const ownerKey = "hasa-test-owner-access-key-0123456789abcdef";
+  process.env.HASA_OWNER_ACCESS_KEY = ownerKey;
+  let reserve = 768 * 1024 * 1024;
+  const provisioningStore = {
+    async getMinFreeMemoryBytes() { return reserve; },
+    async setMinFreeMemoryBytes(value) { reserve = value; return reserve; }
+  };
+  const server = createAppServer({ provisioningStore });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const denied = await fetch(`${base}/v1/owner/settings`);
+    assert.equal(denied.status, 401);
+    const login = await fetch(`${base}/v1/owner/login`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ access_key: ownerKey })
+    });
+    assert.equal(login.status, 200);
+    const { access_token } = await login.json();
+    const headers = { authorization: `Bearer ${access_token}`, "content-type": "application/json" };
+    const read = await fetch(`${base}/v1/owner/settings`, { headers });
+    assert.equal((await read.json()).min_free_memory_mb, 768);
+    const update = await fetch(`${base}/v1/owner/settings`, {
+      method: "PUT", headers, body: JSON.stringify({ min_free_memory_mb: 1024 })
+    });
+    assert.equal(update.status, 200);
+    assert.equal((await update.json()).min_free_memory_mb, 1024);
+    assert.equal(reserve, 1024 * 1024 * 1024);
+    const invalid = await fetch(`${base}/v1/owner/settings`, {
+      method: "PUT", headers, body: JSON.stringify({ min_free_memory_mb: 64 })
+    });
+    assert.equal(invalid.status, 400);
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    if (previous === undefined) delete process.env.HASA_OWNER_ACCESS_KEY;
+    else process.env.HASA_OWNER_ACCESS_KEY = previous;
+  }
+});
