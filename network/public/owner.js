@@ -56,7 +56,7 @@
         ["Provider",server.provider || "—"],["Hostname",server.hostname || "Pending"],["OS",`${server.os_name || "—"} ${server.os_release || ""}`],
         ["CPU",server.cpu_cores ? `${server.cpu_cores} cores · load ${(server.load_average || []).map(n => Number(n).toFixed(2)).join("/") || "—"}` : "—"],["RAM",server.memory_total_bytes ? `${fmtBytes(server.memory_available_bytes)} free / ${fmtBytes(server.memory_total_bytes)} · ${Number(server.memory_available_bytes || 0) >= minFreeMemoryMb * 1048576 ? "eligible" : "below reserve"}` : "—"],
         ["Disk",server.disk_total_bytes ? `${fmtBytes(server.disk_available_bytes)} free / ${fmtBytes(server.disk_total_bytes)}` : "—"],
-        ["Agent",server.agent_version || "—"],["Heartbeat",ago(server.last_heartbeat_at)],["Server ID",server.id]
+        ["Agent",server.agent_version || "—"],["Heartbeat",ago(server.last_heartbeat_at)],["Worker",server.worker_status || "not installed"],["Worker sessions",server.worker_max_sessions == null ? "—" : `${server.worker_active_sessions || 0} / ${server.worker_max_sessions} active · ${ago(server.worker_last_seen_at)}`],["Server ID",server.id]
       ];
       for(const [label,value] of values){const item=document.createElement("div"),k=document.createElement("span"),v=document.createElement("b");k.textContent=label;v.textContent=value;item.append(k,v);facts.append(item)}
       card.append(facts);
@@ -69,7 +69,7 @@
   function renderBots(bots) {
     const list = $("bot-list"); list.replaceChildren();
     if (!bots.length) { const empty=document.createElement("div"); empty.className="empty"; empty.textContent="No customer bot instances have been registered yet."; list.append(empty); return; }
-    const online = serverCache.filter(server => server.status === "online" && Number(server.memory_available_bytes || 0) >= minFreeMemoryMb * 1048576);
+    const online = serverCache.filter(server => server.status === "online" && server.worker_status === "online" && Number(server.memory_available_bytes || 0) >= minFreeMemoryMb * 1048576);
     for (const bot of bots) {
       const card=document.createElement("article"); card.className="server";
       const top=document.createElement("div"); top.className="server-top";
@@ -84,7 +84,7 @@
       card.append(facts);
       const actions=document.createElement("div"); actions.className="server-actions";
       const select=document.createElement("select"); select.setAttribute("aria-label","Choose hosting server");
-      const placeholder=document.createElement("option"); placeholder.value=""; placeholder.textContent=online.length ? "Choose eligible server…" : "No online server with enough free RAM"; select.append(placeholder);
+      const placeholder=document.createElement("option"); placeholder.value=""; placeholder.textContent=online.length ? "Choose eligible server…" : "No server with a live worker and enough free RAM"; select.append(placeholder);
       for (const server of online) {
         const option=document.createElement("option"); option.value=server.id;
         option.textContent=`${server.label || server.hostname} · ${server.cpu_cores || "?"} CPU · ${fmtBytes(server.memory_available_bytes)} free`;
