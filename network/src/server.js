@@ -235,6 +235,27 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       } catch (error) { sendJson(res, error.status || 500, { error: error.status ? error.message : "internal_error" }); }
       return;
     }
+    if (req.method === "GET" && req.url === "/v1/owner/settings") {
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
+      if (!provisioningStore?.getMinFreeMemoryBytes) { sendJson(res, 503, { error: "settings_storage_unavailable" }); return; }
+      try {
+        const bytes = await provisioningStore.getMinFreeMemoryBytes();
+        sendJson(res, 200, { min_free_memory_bytes: bytes, min_free_memory_mb: Math.round(bytes / 1048576) });
+      } catch { sendJson(res, 500, { error: "settings_unavailable" }); }
+      return;
+    }
+    if (req.method === "PUT" && req.url === "/v1/owner/settings") {
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
+      if (!provisioningStore?.setMinFreeMemoryBytes) { sendJson(res, 503, { error: "settings_storage_unavailable" }); return; }
+      try {
+        const body = await readJson(req);
+        const mb = body?.min_free_memory_mb;
+        if (!Number.isInteger(mb) || mb < 128 || mb > 65536) { sendJson(res, 400, { error: "invalid_min_free_memory_mb" }); return; }
+        const bytes = await provisioningStore.setMinFreeMemoryBytes(mb * 1048576);
+        sendJson(res, 200, { updated: true, min_free_memory_bytes: bytes, min_free_memory_mb: Math.round(bytes / 1048576) });
+      } catch { sendJson(res, 500, { error: "settings_update_failed" }); }
+      return;
+    }
     const assignBotMatch = req.method === "POST" && /^\\/v1\\/owner\\/bots\\/([0-9a-f-]{36})\\/assign-server$/.exec(req.url || "");
     if (assignBotMatch) {
       if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
@@ -289,13 +310,14 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       } catch (error) { sendJson(res, error.status || 500, { error: error.status ? error.message : "internal_error" }); }
       return;
     }
+    const agentSettings = req.method === "POST" && req.url === "/v1/agent/settings";
     const agentClaim = req.method === "POST" && req.url === "/v1/agent/jobs/claim";
     const agentFinish = req.method === "POST" && req.url === "/v1/agent/jobs/finish";
     const agentPairingCode = req.method === "POST" && req.url === "/v1/agent/pairing-code";
     const agentPairingStatus = req.method === "POST" && req.url === "/v1/agent/pairing-status";
     const agentListInstances = req.method === "POST" && req.url === "/v1/agent/instances/list";
     const agentInstanceStatus = req.method === "POST" && req.url === "/v1/agent/instances/status";
-    if (agentClaim || agentFinish || agentPairingCode || agentPairingStatus || agentListInstances || agentInstanceStatus) {
+    if (agentSettings || agentClaim || agentFinish || agentPairingCode || agentPairingStatus || agentListInstances || agentInstanceStatus) {
       const match = /^Bearer ([A-Za-z0-9_-]{32,256})$/.exec(req.headers.authorization || "");
       if (!match || !agentStore || !provisioningStore) { sendJson(res, 401, { error: "agent_unauthorized" }); return; }
       const server = await agentStore.findActiveServerByTokenHash(hashSecret(match[1])).catch(() => null);
@@ -304,11 +326,17 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         sendJson(res, 409, { error: "agent_server_not_online" }); return;
       }
       try {
+        if (agentSettings) {
+          const bytes = await provisioningStore.getMinFreeMemoryBytes();
+          sendJson(res, 200, { min_free_memory_bytes: bytes });
+          return;
+        }
         if (agentClaim) {
           if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
           const claimBody = await readJson(req);
           const capacityAvailable = claimBody.capacity_available !== false;
-          const enoughMemory = Number(server.memory_available_bytes || 0) >= MIN_FREE_MEMORY_BYTES;
+          const minFreeMemoryBytes = await provisioningStore.getMinFreeMemoryBytes();
+          const enoughMemory = Number(server.memory_available_bytes || 0) >= minFreeMemoryBytes;
           const allowedTypes = !enoughMemory
             ? ["instance_create", "instance_stop"]
             : capacityAvailable
