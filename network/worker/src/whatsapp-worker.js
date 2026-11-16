@@ -14,7 +14,10 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
   if (!dataDir || !baileys?.default || !baileys?.useMultiFileAuthState) throw new TypeError("worker_requires_data_dir_and_baileys_adapter");
   if (!Number.isInteger(maxSessions) || maxSessions < 1 || maxSessions > 100) throw new TypeError("invalid_max_sessions");
   const sessions = new Map(), log = logger || pino({ level: "silent" });
-  async function notify(instanceId, status, extra = {}) { await onStatus({ instanceId, status, ...extra }); }
+  async function notify(instanceId, status, extra = {}) {
+    try { await onStatus({ instanceId, status, ...extra }); }
+    catch (error) { log.warn({ instanceId, status, error: error?.message }, "Worker status callback failed"); }
+  }
   async function startPairing({ instanceId, phone }) {
     if (!PHONE.test(phone || "")) throw new TypeError("invalid_phone");
     if (sessions.has(instanceId)) {
@@ -38,7 +41,10 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
     sessions.set(instanceId, entry); await notify(instanceId, "pairing");
     entry.timer = setTimeout(() => {
       if (sessions.get(instanceId) !== entry || !["pairing", "code_ready"].includes(entry.status)) return;
-      entry.status = "expired"; void notify(instanceId, "expired"); void socket.end?.(new Error("pairing_timeout"));
+      entry.status = "expired";
+      void notify(instanceId, "expired");
+      try { void Promise.resolve(socket.end?.(new Error("pairing_timeout"))).catch(error => log.warn({ instanceId, error: error?.message }, "Socket close failed")); }
+      catch (error) { log.warn({ instanceId, error: error?.message }, "Socket close failed"); }
     }, pairingTimeoutMs);
     entry.timer.unref?.();
     socket.ev.on("creds.update", auth.saveCreds);
