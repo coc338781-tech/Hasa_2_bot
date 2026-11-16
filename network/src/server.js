@@ -335,11 +335,9 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
           const capacityAvailable = claimBody.capacity_available !== false;
           const minFreeMemoryBytes = await provisioningStore.getMinFreeMemoryBytes();
           const enoughMemory = Number(server.memory_available_bytes || 0) >= minFreeMemoryBytes;
-          const allowedTypes = !enoughMemory
-            ? ["instance_create", "instance_stop"]
-            : capacityAvailable
-              ? ["instance_create", "pairing_start", "instance_start", "instance_stop", "instance_restart"]
-              : ["instance_create", "instance_stop", "instance_restart"];
+          const allowedTypes = enoughMemory && capacityAvailable
+            ? ["instance_create", "pairing_start", "instance_start", "instance_stop", "instance_restart"]
+            : ["instance_create", "instance_stop"];
           const job = await provisioningStore.claimNextJob(server.id, 90, allowedTypes);
           sendJson(res, 200, { job, paused: enoughMemory ? null : "low_memory" });
           return;
