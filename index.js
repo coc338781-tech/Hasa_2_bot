@@ -33,6 +33,15 @@ let phoneNumber = process.env.BOT_PHONE_NUMBER || "";
 let restoredSubbotsGeneration = -1;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const healthFile = process.env.BOT_HEALTH_FILE || "";
+function writeBotHealth(status, errorCode = null) {
+  if (!healthFile) return;
+  try {
+    fs.mkdirSync("./data", { recursive: true });
+    fs.writeFileSync(healthFile, JSON.stringify({ status, pid: process.pid, updated_at: new Date().toISOString(), error_code: errorCode }) + "\\n", { mode: 0o600 });
+    fs.chmodSync(healthFile, 0o600);
+  } catch (error) { logger.warn({ error: error.message }, "Bot health file update failed"); }
+}
 
 async function askPhone() {
   if (phoneNumber) return phoneNumber.replace(/\D/g, "");
@@ -120,6 +129,7 @@ async function startBot(authState = null) {
     if (connection === "open") {
       reconnectAttempts = 0;
       console.log("✅ Hasa_2_bot connected. Pairing-code login only.");
+      writeBotHealth("online");
       void plugins.onConnection?.(sock, config).catch(error => console.error("Plugin connection hook failed:", error.message));
       if (restoredSubbotsGeneration !== generation) {
         restoredSubbotsGeneration = generation;
@@ -133,6 +143,7 @@ async function startBot(authState = null) {
     if (connection === "close") {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
       console.log("WhatsApp connection closed:", code ?? "unknown");
+      writeBotHealth(code === DisconnectReason.loggedOut || code === DisconnectReason.badSession ? "failed" : "reconnecting", code === DisconnectReason.loggedOut || code === DisconnectReason.badSession ? "whatsapp_session_invalid" : null);
       const disconnectError = lastDisconnect?.error;
       console.error("Disconnect details:", JSON.stringify({
         message: disconnectError?.message,
@@ -230,6 +241,7 @@ async function startBot(authState = null) {
 }
 
 async function main() {
+  writeBotHealth("starting");
   if (!fs.existsSync("./config.json")) {
     console.error("config.json missing. Run: cp config.example.json config.json");
     process.exit(1);
@@ -270,6 +282,7 @@ function shutdown() {
 process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
 main().catch(error => {
+  writeBotHealth("failed", "fatal_startup_error");
   console.error("Fatal startup error:", error);
   process.exit(1);
 });
