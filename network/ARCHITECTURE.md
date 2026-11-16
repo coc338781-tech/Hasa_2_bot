@@ -25,7 +25,7 @@ Telemetry agent + isolated worker
 HASA instance per customer number (isolated)
 ```
 
-The control plane is central; bot workloads are distributed across registered Linux servers. The control plane must not require inbound SSH access from the public internet. Agents initiate authenticated outbound connections and accept only signed, allow-listed jobs.
+The control plane is central; bot workloads are distributed across registered Linux servers. The control plane must not require inbound SSH access from the public internet. Telemetry agents report over outbound HTTPS; the separate worker polls the central API and claims only server-bound allow-listed jobs.
 
 ## 2. Identity model
 
@@ -35,13 +35,13 @@ The control plane is central; bot workloads are distributed across registered Li
 - `release_id`: immutable version of the shared HASA BOT release.
 - `session_ref`: opaque reference to a per-instance directory on an encrypted filesystem; never the credentials themselves.
 
-A phone number is treated as a unique, verified customer resource. The platform stores a normalized number for matching, but logs and dashboards should mask it by default.
+A customer account has one normalized contact number; the WhatsApp number linked to its bot is separately selected during pairing. Phone numbers are personal data and logs should avoid or mask them.
 
 ## 3. Pairing lifecycle
 
 1. Customer submits their number over HTTPS.
 2. Central API validates format, applies per-IP and per-number rate limits, and creates a short-lived pairing request.
-3. Capacity allocator selects a healthy server with sufficient reserved RAM, disk and process capacity.
+3. The platform owner assigns the bot to a healthy registered server. Assignment requires a fresh heartbeat and the configured free-RAM reserve.
 4. The assigned server worker claims the pairing job over its authenticated HTTPS channel. It asks Baileys for the phone-number pairing code only when the socket is ready.
 5. Portal polls an authenticated request state and displays the code only to the browser session that initiated it.
 6. Customer enters the code in WhatsApp Linked Devices.
