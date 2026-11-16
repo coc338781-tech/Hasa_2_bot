@@ -1,0 +1,14 @@
+{
+  "name": "hasa-bot-network",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Central control-plane foundation for HASA BOT NETWORK",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --test"
+  }
+}
