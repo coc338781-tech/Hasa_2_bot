@@ -75,7 +75,7 @@ export function createPostgresProvisioningStore(pool) {
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
         if (owned.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_found" }; }
         const server = owned.rows[0];
-        if (server.bot_status !== "offline") { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
+        if (!["offline", "failed"].includes(server.bot_status)) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
         if (server.whatsapp_registered) { await client.query("ROLLBACK"); return { ok: false, reason: "already_paired" }; }
         if (!server.server_id || server.server_status !== "online" ||
             !server.last_heartbeat_at || Date.now() - new Date(server.last_heartbeat_at).getTime() > 150_000) {
