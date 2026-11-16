@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 const MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
+if (!Number.isSafeInteger(MIN_FREE_MEMORY_BYTES) || MIN_FREE_MEMORY_BYTES < 0) throw new Error("HASA_MIN_FREE_MEMORY_BYTES must be a non-negative safe integer");
 
 export function createPostgresProvisioningStore(pool) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") {
