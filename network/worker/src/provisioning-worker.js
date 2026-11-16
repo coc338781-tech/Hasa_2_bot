@@ -47,8 +47,30 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
     }
   });
   let running = false, stopped = false, loopPromise = null;
+  let activeMinFreeMemoryBytes = minFreeMemoryBytes;
+  let restoreQueue = [];
+  async function refreshMemoryPolicy() {
+    try {
+      const settings = await client.getSettings();
+      if (Number.isSafeInteger(settings.minFreeMemoryBytes) && settings.minFreeMemoryBytes >= 128 * 1024 * 1024) {
+        activeMinFreeMemoryBytes = settings.minFreeMemoryBytes;
+      }
+    } catch (error) { logger?.warn?.({ error: error?.message }, "Using last known RAM admission policy"); }
+  }
+  async function restoreAvailableInstances() {
+    while (restoreQueue.length && botRuntime.activeCount < maxSessions && os.freemem() >= activeMinFreeMemoryBytes) {
+      const item = restoreQueue.shift();
+      const result = await botRuntime.restoreInstances([item.id]);
+      const restored = result[0];
+      if (restored?.error) {
+        await client.reportInstanceStatus({ instanceId: item.id, status: "failed", errorCode: "bot_restore_failed" }).catch(() => {});
+        logger?.warn?.({ instanceId: item.id, error: restored.error }, "Bot instance restore failed");
+      }
+    }
+  }
   async function runOne() {
-    const capacityAvailable = botRuntime.activeCount + whatsapp.activeCount < maxSessions;
+    await refreshMemoryPolicy();
+    const capacityAvailable = botRuntime.activeCount + whatsapp.activeCount < maxSessions && os.freemem() >= activeMinFreeMemoryBytes;
     const job = await client.claimNextJob({ capacityAvailable });
     if (!job) return false;
     try {
@@ -87,6 +109,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
     while (!stopped) {
       try {
         const worked = await runOne();
+        await restoreAvailableInstances();
         const updates = await botRuntime.collectHealthUpdates();
         for (const update of updates) {
           await client.reportInstanceStatus(update).catch(error => logger?.warn?.({ instanceId: update.instanceId, error: error?.message }, "Bot health update failed"));
@@ -103,27 +126,13 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
       if (running) return;
       running = true; stopped = false;
       try {
+        await refreshMemoryPolicy();
         const instances = await client.listInstances();
-        const allowed = instances.slice(0, maxSessions);
-        const deferred = instances.slice(maxSessions);
-        for (const item of deferred) {
-          await client.reportInstanceStatus({ instanceId: item.id, status: "offline", errorCode: "worker_capacity_reached" }).catch(() => {});
+        restoreQueue = instances.slice(0, maxSessions);
+        if (instances.length > maxSessions) {
+          logger?.warn?.({ registeredInstances: instances.length, workerMaxSessions: maxSessions }, "Some instances exceed this worker's configured session capacity");
         }
-        const restored = [];
-        for (const item of allowed) {
-          if (os.freemem() < minFreeMemoryBytes) {
-            await client.reportInstanceStatus({ instanceId: item.id, status: "offline", errorCode: "server_low_memory" }).catch(() => {});
-            continue;
-          }
-          const result = await botRuntime.restoreInstances([item.id]);
-          restored.push(...result);
-        }
-        for (const item of restored) {
-          if (item.error) {
-            await client.reportInstanceStatus({ instanceId: item.id, status: "failed", errorCode: "bot_restore_failed" }).catch(() => {});
-            logger?.warn?.({ instanceId: item.id, error: item.error }, "Bot instance restore failed");
-          }
-        }
+        await restoreAvailableInstances();
       } catch (error) {
         logger?.warn?.({ error: error?.message }, "Could not restore online bot instances");
       }
