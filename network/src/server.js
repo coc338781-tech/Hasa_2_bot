@@ -62,6 +62,11 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
       sendJson(res, 200, { service: "hasa-bot-network-api", status: "ok", version: VERSION, timestamp: new Date(clock()).toISOString() });
       return;
     }
+    if (req.method === "GET" && req.url === "/readyz") {
+      const ready = Boolean(agentStore);
+      sendJson(res, ready ? 200 : 503, { service: "hasa-bot-network-api", ready, database: ready ? "configured" : "not_configured" });
+      return;
+    }
     if (req.method === "POST" && req.url === "/v1/owner/login") {
       const remote = req.socket.remoteAddress || "unknown";
       if (ownerLoginRateLimited(remote, clock())) {
@@ -179,9 +184,12 @@ async function main() {
   const host = process.env.HASA_API_HOST || "127.0.0.1";
   const port = Number(process.env.HASA_API_PORT || 8787);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("HASA_API_PORT must be an integer between 1 and 65535");
-  const server = createAppServer();
+  const { createConfiguredAgentStore } = await import("./runtime.js");
+  const runtime = await createConfiguredAgentStore();
+  const server = createAppServer({ agentStore: runtime.store });
   server.listen(port, host, () => console.log(`HASA BOT NETWORK API v${VERSION} listening on ${host}:${port}`));
-  const shutdown = signal => server.close(error => {
+  const shutdown = signal => server.close(async error => {
+    if (runtime.close) await runtime.close().catch(closeError => { console.error("Database shutdown failed:", closeError.message); process.exitCode = 1; });
     if (error) { console.error("API shutdown failed:", error.message); process.exitCode = 1; }
     else console.log(`Received ${signal}; API server closed.`);
   });
