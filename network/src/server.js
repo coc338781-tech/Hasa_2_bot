@@ -198,7 +198,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         if (!dashboard || dashboard.pairing_id !== pairingCodeMatch[1] || dashboard.pairing_status !== "code_ready") {
           sendJson(res, 404, { error: "pairing_code_not_available" }); return;
         }
-        const code = pairingCodeStore.take({ pairingId: pairingCodeMatch[1], customerId: customerSession.id });
+        const code = await pairingCodeStore.take({ pairingId: pairingCodeMatch[1], customerId: customerSession.id });
         if (!code) { sendJson(res, 404, { error: "pairing_code_expired_or_already_viewed" }); return; }
         sendJson(res, 200, code);
       } catch { sendJson(res, 500, { error: "pairing_code_unavailable" }); }
