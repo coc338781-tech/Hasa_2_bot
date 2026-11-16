@@ -9,9 +9,10 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --test && npm run test:worker",
+    "check": "node --check src/server.js && node --check worker/src/main.js && node --check worker/src/agent-client.js && node --test && npm run test:worker",
     "db:migrate": "node db/migrate.js",
-    "test:worker": "node --test worker/test/*.test.js"
+    "test:worker": "node --test worker/test/*.test.js",
+    "worker:start": "node worker/src/main.js"
   },
   "dependencies": {
     "pg": "^8.16.3",
