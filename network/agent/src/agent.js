@@ -1,6 +1,7 @@
 import os from "node:os";
 import { statfs } from "node:fs/promises";
 import { hostname } from "node:os";
+import { pathToFileURL } from "node:url";
 
 const VERSION = "0.1.0";
 
@@ -34,7 +35,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(error => {
     console.error("HASA Server Agent:", error.message);
     process.exitCode = 1;
