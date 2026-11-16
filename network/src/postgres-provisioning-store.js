@@ -25,6 +25,10 @@ export function createPostgresProvisioningStore(pool) {
         "INSERT INTO network_settings (setting_key, setting_value, updated_at) VALUES ('min_free_memory_bytes', to_jsonb($1::bigint), now()) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()",
         [bytes]
       );
+      await pool.query(
+        "INSERT INTO audit_events (action, resource_type, resource_id, outcome, metadata) VALUES ('network.settings.update', 'network_setting', 'min_free_memory_bytes', 'success', jsonb_build_object('value_bytes', $1::bigint))",
+        [bytes]
+      );
       return bytes;
     },
     async assignBotToServer({ botId, serverId }) {
