@@ -1,8 +1,9 @@
 import { setTimeout as delay } from "node:timers/promises";
+import os from "node:os";
 import { createWhatsAppWorker } from "./whatsapp-worker.js";
 import { createBotRuntime } from "./bot-runtime.js";
 
-export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa-bot", baileys, logger, maxSessions = 2, pollIntervalMs = 1500 } = {}) {
+export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa-bot", baileys, logger, maxSessions = 2, minFreeMemoryBytes = 768 * 1024 * 1024, pollIntervalMs = 1500 } = {}) {
   if (!client || !dataDir || !codeDir) throw new TypeError("worker_requires_agent_client_and_data_dir");
   const activePairs = new Map();
   const botRuntime = createBotRuntime({
@@ -92,7 +93,20 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
       running = true; stopped = false;
       try {
         const instances = await client.listInstances();
-        const restored = await botRuntime.restoreInstances(instances.map(item => item.id));
+        const allowed = instances.slice(0, maxSessions);
+        const deferred = instances.slice(maxSessions);
+        for (const item of deferred) {
+          await client.reportInstanceStatus({ instanceId: item.id, status: "offline", errorCode: "worker_capacity_reached" }).catch(() => {});
+        }
+        const restored = [];
+        for (const item of allowed) {
+          if (os.freemem() < minFreeMemoryBytes) {
+            await client.reportInstanceStatus({ instanceId: item.id, status: "offline", errorCode: "server_low_memory" }).catch(() => {});
+            continue;
+          }
+          const result = await botRuntime.restoreInstances([item.id]);
+          restored.push(...result);
+        }
         for (const item of restored) {
           if (item.error) {
             await client.reportInstanceStatus({ instanceId: item.id, status: "failed", errorCode: "bot_restore_failed" }).catch(() => {});
