@@ -144,9 +144,9 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const found = await client.query(
-          `SELECT bot_instance_id, customer_id, job_type, payload
+          `SELECT bot_instance_id, customer_id, job_type, payload, status
              FROM provisioning_jobs WHERE id = $1 AND server_id = $2 FOR UPDATE`, [jobId, serverId]);
-        if (!found.rowCount) { await client.query("ROLLBACK"); return false; }
+        if (!found.rowCount || !["running", "leased"].includes(found.rows[0].status)) { await client.query("ROLLBACK"); return false; }
         const job = found.rows[0];
         await client.query(
           `UPDATE provisioning_jobs SET status = $2, result = $3::jsonb, updated_at = now(),
