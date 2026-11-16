@@ -5,7 +5,7 @@
 - Exactly one platform owner has infrastructure-administrator permissions.
 - The current bootstrap API uses `HASA_OWNER_ACCESS_KEY` (minimum 32 characters) supplied only through the deployment secret manager/environment; never commit it or paste it into chat.
 - Owner login is rate-limited and returns a signed bearer session valid for 30 minutes. Enrollment-ticket creation requires that session. If the key is absent or too short, owner login is disabled.
-- The current owner API is a protected backend foundation, not yet a finished browser dashboard. Deploy it only behind HTTPS and a trusted reverse proxy; keep the API bound to localhost until that is configured.
+- The owner API is served through a browser dashboard at `/owner`; its session token remains in tab memory only. Keep the control plane behind HTTPS. Deploy it only behind HTTPS and a trusted reverse proxy; keep the API bound to localhost until that is configured.
 - Customer accounts are tenant-scoped and cannot enumerate other customers, bot IDs, phone numbers, sessions, logs or servers.
 - Server agents have unique revocable identities and least-privilege permissions.
 - The agent cannot run arbitrary shell commands. It accepts typed operations from a strict allow-list.
