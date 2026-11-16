@@ -3,6 +3,7 @@
   let session = null;
   let expiryTimer = null;
   let serverCache = [];
+  let minFreeMemoryMb = 768;
   const $ = id => document.getElementById(id);
   const fmtBytes = value => {
     if (value === null || value === undefined) return "—";
@@ -53,7 +54,7 @@
       const facts=document.createElement("div"); facts.className="facts";
       const values=[
         ["Provider",server.provider || "—"],["Hostname",server.hostname || "Pending"],["OS",`${server.os_name || "—"} ${server.os_release || ""}`],
-        ["CPU",server.cpu_cores ? `${server.cpu_cores} cores · load ${(server.load_average || []).map(n => Number(n).toFixed(2)).join("/") || "—"}` : "—"],["RAM",server.memory_total_bytes ? `${fmtBytes(server.memory_available_bytes)} free / ${fmtBytes(server.memory_total_bytes)}` : "—"],
+        ["CPU",server.cpu_cores ? `${server.cpu_cores} cores · load ${(server.load_average || []).map(n => Number(n).toFixed(2)).join("/") || "—"}` : "—"],["RAM",server.memory_total_bytes ? `${fmtBytes(server.memory_available_bytes)} free / ${fmtBytes(server.memory_total_bytes)} · ${Number(server.memory_available_bytes || 0) >= minFreeMemoryMb * 1048576 ? "eligible" : "below reserve"}` : "—"],
         ["Disk",server.disk_total_bytes ? `${fmtBytes(server.disk_available_bytes)} free / ${fmtBytes(server.disk_total_bytes)}` : "—"],
         ["Agent",server.agent_version || "—"],["Heartbeat",ago(server.last_heartbeat_at)],["Server ID",server.id]
       ];
@@ -68,7 +69,7 @@
   function renderBots(bots) {
     const list = $("bot-list"); list.replaceChildren();
     if (!bots.length) { const empty=document.createElement("div"); empty.className="empty"; empty.textContent="No customer bot instances have been registered yet."; list.append(empty); return; }
-    const online = serverCache.filter(server => server.status === "online");
+    const online = serverCache.filter(server => server.status === "online" && Number(server.memory_available_bytes || 0) >= minFreeMemoryMb * 1048576);
     for (const bot of bots) {
       const card=document.createElement("article"); card.className="server";
       const top=document.createElement("div"); top.className="server-top";
@@ -83,7 +84,7 @@
       card.append(facts);
       const actions=document.createElement("div"); actions.className="server-actions";
       const select=document.createElement("select"); select.setAttribute("aria-label","Choose hosting server");
-      const placeholder=document.createElement("option"); placeholder.value=""; placeholder.textContent=online.length ? "Choose online server…" : "No online server"; select.append(placeholder);
+      const placeholder=document.createElement("option"); placeholder.value=""; placeholder.textContent=online.length ? "Choose eligible server…" : "No online server with enough free RAM"; select.append(placeholder);
       for (const server of online) {
         const option=document.createElement("option"); option.value=server.id;
         option.textContent=`${server.label || server.hostname} · ${server.cpu_cores || "?"} CPU · ${fmtBytes(server.memory_available_bytes)} free`;
@@ -100,8 +101,11 @@
   async function refresh() {
     $("refresh").disabled=true;
     try {
-      const [servers,bots]=await Promise.all([api("/v1/owner/servers"),api("/v1/owner/bots")]);
-      serverCache=servers.servers || []; renderServers(serverCache); renderBots(bots.bots || []);
+      const [servers,bots,settings]=await Promise.all([api("/v1/owner/servers"),api("/v1/owner/bots"),api("/v1/owner/settings")]);
+      serverCache=servers.servers || []; minFreeMemoryMb=settings.min_free_memory_mb || 768;
+      $("min-free-memory").value=String(minFreeMemoryMb);
+      $("memory-policy-note").textContent=`Current reserve: ${minFreeMemoryMb} MiB (${fmtBytes(settings.min_free_memory_bytes)}). Servers below this value cannot receive new bot assignments or starts.`;
+      renderServers(serverCache); renderBots(bots.bots || []);
     } catch(error){notify(error.message)}
     finally{$("refresh").disabled=false}
   }
@@ -144,6 +148,19 @@
       $("ticket-result").classList.remove("hidden");notify("One-time enrollment ticket created.");
     }catch(error){$("ticket-error").textContent=error.message}
     finally{button.disabled=false}
+  });
+  $("memory-policy-form").addEventListener("submit",async event=>{
+    event.preventDefault(); $("memory-policy-error").textContent="";
+    const button=event.submitter; button.disabled=true;
+    const value=Number($("min-free-memory").value);
+    if(!Number.isInteger(value)||value<128||value>65536){$("memory-policy-error").textContent="Enter a value from 128 to 65536 MiB.";button.disabled=false;return;}
+    try {
+      const result=await api("/v1/owner/settings",{method:"PUT",body:JSON.stringify({min_free_memory_mb:value})});
+      minFreeMemoryMb=result.min_free_memory_mb;
+      $("memory-policy-note").textContent=`Saved: ${minFreeMemoryMb} MiB (${fmtBytes(result.min_free_memory_bytes)}). New assignments and starts use this limit immediately.`;
+      notify("Minimum free RAM policy saved."); await refresh();
+    } catch(error){$("memory-policy-error").textContent=error.message;}
+    finally{button.disabled=false;}
   });
   $("copy-ticket").addEventListener("click",async()=>{
     try{await navigator.clipboard.writeText($("ticket-value").textContent);notify("Ticket copied. Keep it secret.")}
