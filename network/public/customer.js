@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 let token = null;
 let mode = "login";
 let pairingPollActive = false;
-let pairingCompletionActive = false;
+let pairingCompletionId = null;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -103,8 +103,8 @@ async function fetchPairingCode(pairingId) {
   }
 }
 async function waitForPairingCompletion(pairingId) {
-  if (pairingCompletionActive) return;
-  pairingCompletionActive = true;
+  if (pairingCompletionId === pairingId) return;
+  pairingCompletionId = pairingId;
   try {
     for (let attempt = 0; attempt < 90 && token; attempt += 1) {
       await wait(3000);
@@ -122,7 +122,7 @@ async function waitForPairingCompletion(pairingId) {
     }
   } catch {
     if (token) $("pair-error").textContent = "Could not refresh pairing status. Refresh your dashboard to check again.";
-  } finally { pairingCompletionActive = false; }
+  } finally { if (pairingCompletionId === pairingId) pairingCompletionId = null; }
 }
 async function waitForPairingCode(pairingId) {
   if (pairingPollActive) return;
