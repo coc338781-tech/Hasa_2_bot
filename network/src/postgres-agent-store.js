@@ -6,7 +6,9 @@ export function createPostgresAgentStore(pool) {
       const result = await pool.query(
         `SELECT id, label, provider, hostname, os_name, os_release, architecture, agent_version,
                 CASE WHEN status = 'online' AND last_heartbeat_at < now() - interval '150 seconds' THEN 'offline' ELSE status END AS status, cpu_cores, load_average, memory_total_bytes, memory_available_bytes,
-                disk_total_bytes, disk_available_bytes, last_heartbeat_at, created_at
+                disk_total_bytes, disk_available_bytes, last_heartbeat_at,
+                CASE WHEN worker_last_seen_at > now() - interval '90 seconds' THEN 'online' ELSE 'offline' END AS worker_status,
+                worker_last_seen_at, worker_version, worker_max_sessions, worker_active_sessions, created_at
            FROM servers ORDER BY created_at DESC LIMIT 500`
       );
       return result.rows;
@@ -77,6 +79,15 @@ export function createPostgresAgentStore(pool) {
         `SELECT s.id, c.token_hash, s.status, s.last_heartbeat_at, s.memory_available_bytes FROM servers s JOIN server_agent_credentials c ON c.server_id = s.id
           WHERE c.token_hash = $1 AND c.revoked_at IS NULL AND s.status <> 'disabled' LIMIT 1`, [tokenHash]);
       return result.rows[0] || null;
+    },
+    async recordWorkerHeartbeat(serverId, { workerVersion, maxSessions, activeSessions, now = Date.now() }) {
+      const result = await pool.query(
+        `UPDATE servers SET worker_last_seen_at = $2, worker_version = $3,
+           worker_max_sessions = $4, worker_active_sessions = $5, updated_at = $2
+          WHERE id = $1 AND status = 'online' RETURNING id`,
+        [serverId, new Date(now).toISOString(), workerVersion, maxSessions, activeSessions]
+      );
+      return result.rowCount === 1;
     },
     async recordHeartbeat(serverId, payload, now) {
       const client = await pool.connect();
