@@ -39,6 +39,32 @@ export function createPostgresProvisioningStore(pool) {
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
+    async expireStalePairings(customerId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const expired = await client.query(
+          `UPDATE pairing_requests SET status = 'expired', failure_code = 'pairing_expired',
+             pairing_code_ciphertext = NULL, pairing_code_nonce = NULL, pairing_code_auth_tag = NULL,
+             pairing_code_key_version = NULL, updated_at = now()
+            WHERE customer_id = $1 AND status IN ('queued','generating','code_ready') AND expires_at <= now()
+            RETURNING id, bot_instance_id`, [customerId]);
+        if (expired.rowCount) {
+          const ids = expired.rows.map(row => row.id);
+          const botIds = [...new Set(expired.rows.map(row => row.bot_instance_id))];
+          await client.query(
+            `UPDATE provisioning_jobs SET status = 'cancelled', completed_at = now(), updated_at = now()
+              WHERE job_type = 'pairing_start' AND status IN ('queued','leased','running')
+                AND payload->>'pairing_request_id' = ANY($1::text[])`, [ids]);
+          await client.query(
+            `UPDATE bot_instances SET status = 'offline', last_error_code = 'pairing_expired', updated_at = now()
+              WHERE id = ANY($1::uuid[]) AND status = 'pairing'`, [botIds]);
+        }
+        await client.query("COMMIT");
+        return expired.rowCount;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
     async enqueuePairing({ customerId, botId, phone, expiresAt }) {
       const client = await pool.connect();
       const pairingId = randomUUID(), jobId = randomUUID();
@@ -57,7 +83,8 @@ export function createPostgresProvisioningStore(pool) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_unavailable" };
         }
         await client.query(
-          `UPDATE pairing_requests SET status = 'cancelled', updated_at = now()
+          `UPDATE pairing_requests SET status = 'cancelled', pairing_code_ciphertext = NULL, pairing_code_nonce = NULL,
+             pairing_code_auth_tag = NULL, pairing_code_key_version = NULL, updated_at = now()
             WHERE bot_instance_id = $1 AND status IN ('queued','generating','code_ready')`, [botId]);
         await client.query(
           `UPDATE provisioning_jobs SET status = 'cancelled', updated_at = now(), completed_at = now()
