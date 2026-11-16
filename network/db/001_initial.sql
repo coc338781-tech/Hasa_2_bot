@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS servers (
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','online','offline','disabled')),
   cpu_cores INTEGER CHECK (cpu_cores IS NULL OR cpu_cores > 0),
+  load_average JSONB,
   memory_total_bytes BIGINT CHECK (memory_total_bytes IS NULL OR memory_total_bytes >= 0),
   memory_available_bytes BIGINT CHECK (memory_available_bytes IS NULL OR memory_available_bytes >= 0),
   disk_total_bytes BIGINT CHECK (disk_total_bytes IS NULL OR disk_total_bytes >= 0),
