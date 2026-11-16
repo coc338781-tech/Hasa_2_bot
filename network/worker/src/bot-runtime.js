@@ -48,6 +48,18 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     }
     return { instanceId: bot_instance_id, directory: dir };
   }
+  async function setOwnerPhone(instanceId, phone) {
+    const ownerPhone = typeof phone === "string" ? phone.replace(/\D/g, "") : "";
+    if (!/^\d{8,15}$/.test(ownerPhone)) throw new Error("invalid_owner_phone");
+    const dir = instancePath(root, instanceId);
+    const configPath = join(dir, "config.json");
+    const info = await lstat(configPath);
+    if (info.isSymbolicLink() || !info.isFile()) throw new Error("unsafe_instance_config");
+    const config = JSON.parse(await readFile(configPath, "utf8"));
+    config.owner = [ownerPhone];
+    await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+    await chmod(configPath, 0o600);
+  }
   async function startInstance(instanceId) {
     if (children.has(instanceId)) {
       const current = children.get(instanceId);
@@ -138,5 +150,5 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     for (const id of children.keys()) suppressExit.add(id);
     await Promise.all([...children.keys()].map(stopInstance));
   }
-  return Object.freeze({ createInstance, startInstance, stopInstance, restartInstance, restoreInstances, collectHealthUpdates, stopAll, get activeCount() { return children.size; } });
+  return Object.freeze({ createInstance, setOwnerPhone, startInstance, stopInstance, restartInstance, restoreInstances, collectHealthUpdates, stopAll, get activeCount() { return children.size; } });
 }
