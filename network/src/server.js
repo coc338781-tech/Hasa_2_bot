@@ -87,6 +87,44 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
       return;
     }
 
+
+    if (req.method === "GET" && req.url === "/v1/owner/servers") {
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) {
+        sendJson(res, 401, { error: "owner_authentication_required" });
+        return;
+      }
+      if (!agentStore || typeof agentStore.listServers !== "function") {
+        sendJson(res, 503, { error: "server_storage_unavailable" });
+        return;
+      }
+      try {
+        const servers = await agentStore.listServers();
+        sendJson(res, 200, { servers });
+      } catch {
+        sendJson(res, 500, { error: "internal_error" });
+      }
+      return;
+    }
+
+    const revokeMatch = req.method === "POST" && /^\/v1\/owner\/servers\/([0-9a-f-]{36})\/revoke$/.exec(req.url || "");
+    if (revokeMatch) {
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) {
+        sendJson(res, 401, { error: "owner_authentication_required" });
+        return;
+      }
+      if (!agentStore || typeof agentStore.revokeServer !== "function") {
+        sendJson(res, 503, { error: "server_storage_unavailable" });
+        return;
+      }
+      try {
+        const revoked = await agentStore.revokeServer(revokeMatch[1]);
+        sendJson(res, revoked ? 200 : 404, revoked ? { revoked: true, server_id: revokeMatch[1] } : { error: "server_not_found_or_disabled" });
+      } catch {
+        sendJson(res, 500, { error: "internal_error" });
+      }
+      return;
+    }
+
     if (req.method === "POST" && req.url === "/v1/owner/server-enrollment-tickets") {
       if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) {
         sendJson(res, 401, { error: "owner_authentication_required" });
