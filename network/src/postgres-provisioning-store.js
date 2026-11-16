@@ -219,7 +219,7 @@ export function createPostgresProvisioningStore(pool) {
         await client.query("BEGIN");
         const found = await client.query(
           `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, b.runtime_provisioned, s.status AS server_status,
-                  s.last_heartbeat_at, s.memory_available_bytes
+                  s.last_heartbeat_at, s.worker_last_seen_at, s.memory_available_bytes
              FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
         if (!found.rowCount) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_found" }; }
