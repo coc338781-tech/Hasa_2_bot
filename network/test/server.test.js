@@ -252,22 +252,28 @@ test("only the owner can read and change the minimum free RAM policy", async () 
 test("enrolled workers can read the current RAM reserve but cannot change it", async () => {
   const { hashSecret } = await import("../src/enrollment.js");
   const token = "w".repeat(48);
+  let workerHeartbeat = null;
   const server = createAppServer({
     agentStore: {
       async findActiveServerByTokenHash(hash) {
         assert.equal(hash, hashSecret(token));
         return { id: "11111111-1111-4111-8111-111111111111", status: "online", last_heartbeat_at: new Date().toISOString() };
-      }
+      },
+      async recordWorkerHeartbeat(serverId, payload) { workerHeartbeat = { serverId, ...payload }; return true; }
     },
     provisioningStore: { async getMinFreeMemoryBytes() { return 1024 * 1024 * 1024; } }
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   try {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/v1/agent/settings`, {
-      method: "POST", headers: { authorization: `Bearer ${token}` }
+      method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ active_sessions: 1, max_sessions: 2, worker_version: "0.1.0" })
     });
     assert.equal(response.status, 200);
     assert.equal((await response.json()).min_free_memory_bytes, 1024 * 1024 * 1024);
+    assert.equal(workerHeartbeat.activeSessions, 1);
+    assert.equal(workerHeartbeat.maxSessions, 2);
+    assert.equal(workerHeartbeat.workerVersion, "0.1.0");
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
