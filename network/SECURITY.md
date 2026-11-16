@@ -7,8 +7,8 @@
 - Owner login is rate-limited and returns a signed bearer session valid for 30 minutes. Enrollment-ticket creation requires that session. If the key is absent or too short, owner login is disabled.
 - The owner API is served through a browser dashboard at `/owner`; its session token remains in tab memory only. Keep the control plane behind HTTPS. Deploy it only behind HTTPS and a trusted reverse proxy; keep the API bound to localhost until that is configured.
 - Customer accounts are tenant-scoped and cannot enumerate other customers, bot IDs, phone numbers, sessions, logs or servers.
-- Server agents have unique revocable identities and least-privilege permissions.
-- The agent cannot run arbitrary shell commands. It accepts typed operations from a strict allow-list.
+- Server telemetry agents have unique revocable identities and report host metrics only.
+- The separate worker service uses the enrolled server token over HTTPS and can claim only typed allow-listed jobs for that server. It cannot run arbitrary shell commands.
 - Secrets are never stored in source control or emitted in logs.
 
 ## Website design and role boundaries
@@ -25,18 +25,20 @@
 - Apply rate limits, abuse detection and a cooldown after failed attempts.
 - Do not reveal whether a number belongs to an existing customer.
 - Pairing codes must be redacted from logs and deleted after completion or expiry.
-- Store each customer's Baileys credentials in a separate encrypted record and filesystem boundary.
-- Restrict session file permissions; use encryption at rest with keys held outside the database and source repository.
+- Store each customer's Baileys auth files in a separate per-instance directory on a dedicated encrypted filesystem volume. Directory permissions alone are not encryption.
+- Keep the volume encryption key outside the volume and source repository. The database AES-256-GCM vault is currently used for short-lived pairing codes; the `whatsapp_session_vault` table is not yet the active auth-file adapter.
 - Never expose raw session credentials in the customer panel, admin reports, chat responses or GitHub artifacts.
 - Provide a customer unlink/deletion workflow and explain that WhatsApp multi-device linking can be revoked by the account owner.
 
-## Server agent
+## Telemetry agent and isolated worker
 
 - Prefer outbound-only connections; do not expose an SSH daemon or agent control port publicly for this platform.
-- Authenticate every agent using a unique certificate/token that can be revoked independently.
-- Use signed, expiring jobs with replay protection.
-- Allow only specific operations such as heartbeat, resource report, install approved release, start/stop a named instance and collect redacted health status.
-- Never allow the agent to read unrelated home directories, SSH keys, environment files or other tenants' session folders.
+- Authenticate each server with a unique revocable token stored in a root-managed file.
+- The telemetry agent reports host metrics only and cannot read customer session files or process environments.
+- The separate worker accepts only typed job operations through the central HTTPS API; no generic shell or arbitrary file-path command exists.
+- Every job is bound to its registered server ID, leased, and checked against current server heartbeat and RAM admission rules.
+- The worker runs as a dedicated unprivileged system user, with write access restricted to the encrypted instance volume and a memory limit.
+- Bot child processes receive a minimal environment; the server agent token and central pairing encryption key are not inherited by customer bot processes.
 - Separate host telemetry from tenant message content. The platform does not need to collect customer chats to monitor server health.
 
 ## Releases and operations
