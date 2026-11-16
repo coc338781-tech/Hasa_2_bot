@@ -1,9 +1,10 @@
 import { createPostgresAgentStore } from "./postgres-agent-store.js";
 import { createPostgresCustomerStore } from "./postgres-customer-store.js";
+import { createPostgresProvisioningStore } from "./postgres-provisioning-store.js";
 
 export async function createConfiguredAgentStore() {
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return { store: null, customerStore: null, close: null };
+  if (!connectionString) return { store: null, customerStore: null, provisioningStore: null, close: null };
   const { Pool } = await import("pg");
   const pool = new Pool({
     connectionString,
@@ -16,6 +17,7 @@ export async function createConfiguredAgentStore() {
   return {
     store: createPostgresAgentStore(pool),
     customerStore: createPostgresCustomerStore(pool),
+    provisioningStore: createPostgresProvisioningStore(pool),
     close: () => pool.end()
   };
 }
