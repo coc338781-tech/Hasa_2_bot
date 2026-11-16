@@ -18,7 +18,12 @@ async function ensureDirectory(path) {
 export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, logger, onExit = async () => {} } = {}) {
   if (!dataDir || !codeDir || !baileys?.useMultiFileAuthState) throw new TypeError("bot_runtime_configuration_required");
   const root = resolve(dataDir), codeRoot = resolve(codeDir), children = new Map();
-  const healthStates = new Map(), suppressExit = new Set();
+  const healthStates = new Map(), suppressExit = new Set(), reportedExit = new Set();
+  async function notifyExit(payload) {
+    if (reportedExit.has(payload.instanceId)) return;
+    reportedExit.add(payload.instanceId);
+    if (!suppressExit.delete(payload.instanceId)) await onExit(payload);
+  }
   async function createInstance({ bot_instance_id, payload = {} }) {
     const dir = instancePath(root, bot_instance_id);
     await ensureDirectory(root); await ensureDirectory(dir);
@@ -43,7 +48,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
   async function startInstance(instanceId) {
     if (children.has(instanceId)) {
       const current = children.get(instanceId);
-      if (current.exitCode === null && !current.killed) return { started: true, alreadyRunning: true };
+      if (current.exitCode === null && current.signalCode === null) return { started: true, alreadyRunning: true };
       children.delete(instanceId);
     }
     const dir = instancePath(root, instanceId);
@@ -75,12 +80,12 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
       logger?.error?.({ instanceId, error: error?.message }, "Bot child process failed to start");
       if (children.get(instanceId) === child) children.delete(instanceId);
       healthStates.delete(instanceId);
-      if (!suppressExit.delete(instanceId)) void onExit({ instanceId, code: null, signal: null, error: "bot_process_start_failed" });
+      void notifyExit({ instanceId, code: null, signal: null, error: "bot_process_start_failed" });
     });
     child.once("exit", (code, signal) => {
       if (children.get(instanceId) === child) children.delete(instanceId);
       healthStates.delete(instanceId);
-      if (!suppressExit.delete(instanceId)) void onExit({ instanceId, code, signal, error: code === 0 || signal === "SIGTERM" ? null : "bot_process_exited" });
+      void notifyExit({ instanceId, code, signal, error: code === 0 || signal === "SIGTERM" ? null : "bot_process_exited" });
     });
     return { started: true, pid: child.pid };
   }
@@ -88,7 +93,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     const child = children.get(instanceId);
     if (!child) return { stopped: true, alreadyStopped: true };
     children.delete(instanceId);
-    if (child.exitCode !== null || child.killed) return { stopped: true };
+    if (child.exitCode !== null || child.signalCode !== null) return { stopped: true };
     await new Promise(resolvePromise => {
       let settled = false;
       const done = () => { if (settled) return; settled = true; clearTimeout(timer); resolvePromise(); };
