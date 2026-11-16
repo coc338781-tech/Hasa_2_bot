@@ -41,6 +41,7 @@ test("worker claims jobs with a database lease and skip-locked semantics", async
 test("owner assignment requires a live server with the configured RAM reserve", async () => {
   const pool = fakePool([
     { rowCount: 1, rows: [{ id: "server", memory_available_bytes: 2 * 1024 * 1024 * 1024 }] },
+    { rowCount: 1, rows: [{ setting_value: 768 * 1024 * 1024 }] },
     { rowCount: 1, rows: [{ id: "bot", customer_id: "customer", server_id: "server" }] }
   ]);
   const result = await createPostgresProvisioningStore(pool).assignBotToServer({ botId: "bot", serverId: "server" });
@@ -48,7 +49,7 @@ test("owner assignment requires a live server with the configured RAM reserve", 
   assert.ok(pool.calls.some(x => x.sql.includes("bot.assign_server")));
 });
 test("owner assignment rejects servers below the RAM safety reserve", async () => {
-  const pool = fakePool([{ rowCount: 1, rows: [{ id: "server", memory_available_bytes: 128 * 1024 * 1024 }] }]);
+  const pool = fakePool([{ rowCount: 1, rows: [{ id: "server", memory_available_bytes: 128 * 1024 * 1024 }] }, { rowCount: 1, rows: [{ setting_value: 768 * 1024 * 1024 }] }]);
   const result = await createPostgresProvisioningStore(pool).assignBotToServer({ botId: "bot", serverId: "server" });
   assert.deepEqual(result, { ok: false, reason: "server_low_memory" });
 });
@@ -68,4 +69,13 @@ test("customer cannot stop or restart another customer's bot", async () => {
   const pool = fakePool([{ rowCount: 0, rows: [] }]);
   const result = await createPostgresProvisioningStore(pool).queueBotAction({ customerId: "other-customer", botId: "bot", action: "stop" });
   assert.deepEqual(result, { ok: false, reason: "bot_not_found" });
+});
+
+test("owner can update the persisted RAM reserve within safe bounds", async () => {
+  const pool = fakePool([{ rowCount: 1, rows: [] }]);
+  const store = createPostgresProvisioningStore(pool);
+  const bytes = await store.setMinFreeMemoryBytes(1024 * 1024 * 1024);
+  assert.equal(bytes, 1024 * 1024 * 1024);
+  assert.ok(pool.calls.some(call => call.sql.includes("ON CONFLICT (setting_key) DO UPDATE")));
+  await assert.rejects(store.setMinFreeMemoryBytes(64 * 1024 * 1024), /invalid_min_free_memory_bytes/);
 });
