@@ -41,8 +41,8 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
   });
   let running = false, stopped = false, loopPromise = null;
   async function runOne() {
-    if (whatsapp.activeCount >= maxSessions) return false;
-    const job = await client.claimNextJob();
+    const capacityAvailable = botRuntime.activeCount + whatsapp.activeCount < maxSessions;
+    const job = await client.claimNextJob({ capacityAvailable });
     if (!job) return false;
     try {
       if (job.job_type === "instance_create") {
@@ -74,6 +74,10 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
     while (!stopped) {
       try {
         const worked = await runOne();
+        const updates = await botRuntime.collectHealthUpdates();
+        for (const update of updates) {
+          await client.reportInstanceStatus(update).catch(error => logger?.warn?.({ instanceId: update.instanceId, error: error?.message }, "Bot health update failed"));
+        }
         if (!worked) await delay(pollIntervalMs);
       } catch (error) {
         logger?.error?.({ error: error?.message }, "Provisioning worker poll failed");
