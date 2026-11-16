@@ -301,9 +301,6 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       if (server.status !== "online" || !server.last_heartbeat_at || clock() - Date.parse(server.last_heartbeat_at) > 150_000) {
         sendJson(res, 409, { error: "agent_server_not_online" }); return;
       }
-      if (Number(server.memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) {
-        sendJson(res, 200, { job: null, paused: "low_memory" }); return;
-      }
       try {
         if (agentClaim) {
           if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
