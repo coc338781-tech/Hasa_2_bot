@@ -19,6 +19,9 @@ fi
 if ! command -v mountpoint >/dev/null || ! mountpoint -q "$DATA_DIR"; then
   echo "$DATA_DIR must already be an encrypted filesystem mount point. Mount it before installing the worker." >&2; exit 1
 fi
+if [[ "${HASA_CONFIRM_ENCRYPTED_VOLUME:-}" != "true" ]]; then
+  echo "Verify that $DATA_DIR is encrypted at rest, then rerun with HASA_CONFIRM_ENCRYPTED_VOLUME=true." >&2; exit 1
+fi
 API_URL="$(sed -n 's/^HASA_AGENT_API_URL=//p' "$AGENT_ENV" | tail -n1)"
 AGENT_TOKEN="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(typeof x.agent_token!=="string"||x.agent_token.length<32)process.exit(2);process.stdout.write(x.agent_token)' "$CREDENTIAL_FILE")"
 if [[ -z "$API_URL" || -z "$AGENT_TOKEN" ]]; then echo "Could not read the enrolled agent API URL/token." >&2; exit 1; fi
