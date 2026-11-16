@@ -40,7 +40,11 @@ async function loadDashboard() {
   $("runtime-status").textContent = b?.status || "Not provisioned";
   $("pair-status").textContent = data.latest_pairing?.status || "None";
   $("pair-result").classList.toggle("hidden", !data.latest_pairing);
-  if (data.latest_pairing) $("pair-result").textContent = `Pairing request: ${data.latest_pairing.status}. No pairing code is available until the WhatsApp worker is connected.`;
+  if (data.latest_pairing) {
+    $("pair-result").textContent = `Pairing request: ${data.latest_pairing.status}.`;
+    if (data.latest_pairing.status === "code_ready") void fetchPairingCode(data.latest_pairing.id);
+    else if (["queued", "generating"].includes(data.latest_pairing.status)) void waitForPairingCode(data.latest_pairing.id);
+  }
   if (b?.id) $("pair-phone").value = c.phone_e164;
   showWorkspace();
 }
