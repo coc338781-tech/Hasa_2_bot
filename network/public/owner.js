@@ -153,7 +153,7 @@
     event.preventDefault(); $("memory-policy-error").textContent="";
     const button=event.submitter; button.disabled=true;
     const value=Number($("min-free-memory").value);
-    if(!Number.isInteger(value)||value<128||value>65536){$("memory-policy-error").textContent="Enter a value from 128 to 65536 MiB.";button.disabled=false;return;}
+    if(!Number.isInteger(value)||value<512||value>65536){$("memory-policy-error").textContent="Enter a value from 512 to 65536 MiB.";button.disabled=false;return;}
     try {
       const result=await api("/v1/owner/settings",{method:"PUT",body:JSON.stringify({min_free_memory_mb:value})});
       minFreeMemoryMb=result.min_free_memory_mb;
