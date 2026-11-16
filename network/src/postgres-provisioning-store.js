@@ -17,7 +17,7 @@ export function createPostgresProvisioningStore(pool) {
         if (server.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "server_not_online" }; }
         const bot = await client.query(
           `UPDATE bot_instances SET server_id = $2, status = 'offline', updated_at = now()
-            WHERE id = $1 AND status NOT IN ('suspended','updating')
+            WHERE id = $1 AND status IN ('offline','failed')
             RETURNING id, customer_id, server_id`, [botId, serverId]);
         if (bot.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_assignable" }; }
         await client.query(
@@ -140,6 +140,15 @@ export function createPostgresProvisioningStore(pool) {
       return result.rows[0] || null;
     },
     async updatePairingStatus(pairingId, customerId, status, failureCode = null) {
+      if (status === "offline") {
+        const result = await pool.query(
+          `UPDATE bot_instances b SET status = 'offline', last_stopped_at = now(), updated_at = now()
+            FROM pairing_requests p
+           WHERE p.id = $1 AND p.customer_id = $2 AND p.bot_instance_id = b.id AND p.status = 'paired'
+           RETURNING b.id`, [pairingId, customerId]);
+        return result.rowCount === 1;
+      }
+      if (!["paired","expired","failed"].includes(status)) return false;
       const result = await pool.query(
         `UPDATE pairing_requests SET status = $3, failure_code = $4, paired_at = CASE WHEN $3 = 'paired' THEN now() ELSE paired_at END,
            updated_at = now()
