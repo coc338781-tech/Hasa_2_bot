@@ -5,6 +5,7 @@ export function createPostgresCustomerStore(pool) {
   const provisioning = createPostgresProvisioningStore(pool);
   return {
     assignBotToServer: provisioning.assignBotToServer,
+    queueBotAction: provisioning.queueBotAction,
     async createCustomer({ email, phone, displayName, passwordHash }) {
       const client = await pool.connect();
       const customerId = randomUUID();
