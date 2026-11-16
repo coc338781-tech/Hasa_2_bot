@@ -7,7 +7,6 @@ import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
 const VERSION = "0.2.0";
-const DEFAULT_INTERVAL_MS = 60_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function collectTelemetry(dataPath = process.env.HASA_AGENT_DATA_PATH || "/") {
