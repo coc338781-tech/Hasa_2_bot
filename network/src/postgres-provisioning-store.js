@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 const DEFAULT_MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
-if (!Number.isSafeInteger(DEFAULT_MIN_FREE_MEMORY_BYTES) || DEFAULT_MIN_FREE_MEMORY_BYTES < 128 * 1024 * 1024) throw new Error("HASA_MIN_FREE_MEMORY_BYTES must be at least 128 MiB");
+if (!Number.isSafeInteger(DEFAULT_MIN_FREE_MEMORY_BYTES) || DEFAULT_MIN_FREE_MEMORY_BYTES < 512 * 1024 * 1024) throw new Error("HASA_MIN_FREE_MEMORY_BYTES must be at least 128 MiB");
 async function readMinFreeMemoryBytes(client) {
   const result = await client.query("SELECT setting_value FROM network_settings WHERE setting_key = 'min_free_memory_bytes'");
   const value = result.rows[0]?.setting_value;
   const bytes = Number(value);
-  return Number.isSafeInteger(bytes) && bytes >= 128 * 1024 * 1024 ? bytes : DEFAULT_MIN_FREE_MEMORY_BYTES;
+  return Number.isSafeInteger(bytes) && bytes >= 512 * 1024 * 1024 ? bytes : DEFAULT_MIN_FREE_MEMORY_BYTES;
 }
 
 export function createPostgresProvisioningStore(pool) {
@@ -17,10 +17,10 @@ export function createPostgresProvisioningStore(pool) {
     async getMinFreeMemoryBytes() {
       const result = await pool.query("SELECT setting_value FROM network_settings WHERE setting_key = 'min_free_memory_bytes'");
       const bytes = Number(result.rows[0]?.setting_value);
-      return Number.isSafeInteger(bytes) && bytes >= 128 * 1024 * 1024 ? bytes : DEFAULT_MIN_FREE_MEMORY_BYTES;
+      return Number.isSafeInteger(bytes) && bytes >= 512 * 1024 * 1024 ? bytes : DEFAULT_MIN_FREE_MEMORY_BYTES;
     },
     async setMinFreeMemoryBytes(bytes) {
-      if (!Number.isSafeInteger(bytes) || bytes < 128 * 1024 * 1024 || bytes > 64 * 1024 * 1024 * 1024) throw new TypeError("invalid_min_free_memory_bytes");
+      if (!Number.isSafeInteger(bytes) || bytes < 512 * 1024 * 1024 || bytes > 64 * 1024 * 1024 * 1024) throw new TypeError("invalid_min_free_memory_bytes");
       await pool.query(
         "INSERT INTO network_settings (setting_key, setting_value, updated_at) VALUES ('min_free_memory_bytes', to_jsonb($1::bigint), now()) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()",
         [bytes]
