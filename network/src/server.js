@@ -229,6 +229,13 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       } catch { sendJson(res, 500, { error: "bot_assignment_failed" }); }
       return;
     }
+    if (req.method === "GET" && req.url === "/v1/owner/bots") {
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
+      if (!provisioningStore || typeof provisioningStore.listBots !== "function") { sendJson(res, 503, { error: "provisioning_storage_unavailable" }); return; }
+      try { sendJson(res, 200, { bots: await provisioningStore.listBots() }); }
+      catch { sendJson(res, 500, { error: "bot_inventory_unavailable" }); }
+      return;
+    }
     if (req.method === "GET" && req.url === "/v1/owner/servers") {
       if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
       if (!agentStore || typeof agentStore.listServers !== "function") { sendJson(res, 503, { error: "server_storage_unavailable" }); return; }
