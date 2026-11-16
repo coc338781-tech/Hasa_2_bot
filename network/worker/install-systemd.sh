@@ -7,6 +7,7 @@ NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
 if [[ "$NODE_MAJOR" -lt 22 ]]; then echo "Node.js 22+ is required." >&2; exit 1; fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NETWORK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+BOT_DIR="$(cd "$NETWORK_DIR/.." && pwd)"
 CREDENTIAL_FILE="${HASA_AGENT_TOKEN_FILE:-/var/lib/hasa-agent/credentials.json}"
 AGENT_ENV="/etc/hasa-agent/agent.env"
 DATA_DIR="/var/lib/hasa-worker/sessions"
@@ -25,6 +26,11 @@ cp -a "$NETWORK_DIR/." /opt/hasa-network/
 cd /opt/hasa-network
 npm install --omit=dev --no-audit --no-fund
 chown -R root:root /opt/hasa-network
+install -d -o root -g root -m 0755 /opt/hasa-bot
+tar -C "$BOT_DIR" --exclude=.git --exclude=node_modules --exclude=network --exclude=auth_info --exclude=auth_info_backup --exclude=data --exclude=downloads --exclude=config.json --exclude=.env --exclude=logs -cf - . | tar -C /opt/hasa-bot -xf -
+cd /opt/hasa-bot
+npm install --omit=dev --no-audit --no-fund
+chown -R root:root /opt/hasa-bot
 install -d -o root -g hasa-worker -m 0750 /etc/hasa-worker
 chown -R hasa-worker:hasa-worker "$DATA_DIR"
 chmod 0700 "$DATA_DIR"
