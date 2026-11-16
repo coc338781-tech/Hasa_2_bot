@@ -8,8 +8,10 @@ if [[ "$NODE_MAJOR" -lt 22 ]]; then echo "Node.js 22+ is required." >&2; exit 1;
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NETWORK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BOT_DIR="$(cd "$NETWORK_DIR/.." && pwd)"
-CREDENTIAL_FILE="${HASA_AGENT_TOKEN_FILE:-/var/lib/hasa-agent/credentials.json}"
 AGENT_ENV="/etc/hasa-agent/agent.env"
+CREDENTIAL_FILE="${HASA_AGENT_TOKEN_FILE:-}"
+if [[ -z "$CREDENTIAL_FILE" && -f "$AGENT_ENV" ]]; then CREDENTIAL_FILE="$(sed -n 's/^HASA_AGENT_TOKEN_FILE=//p' "$AGENT_ENV" | tail -n1)"; fi
+CREDENTIAL_FILE="${CREDENTIAL_FILE:-/var/lib/hasa-agent/credentials.json}"
 DATA_DIR="/var/lib/hasa-worker/sessions"
 if [[ ! -f "$CREDENTIAL_FILE" || ! -f "$AGENT_ENV" ]]; then
   echo "Enroll this server first with hasa-agent and ensure $CREDENTIAL_FILE exists." >&2; exit 1
