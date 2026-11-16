@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { createPostgresProvisioningStore } from "./postgres-provisioning-store.js";
 export function createPostgresCustomerStore(pool) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") throw new TypeError("A PostgreSQL Pool-compatible object is required");
+  const provisioning = createPostgresProvisioningStore(pool);
   return {
+    assignBotToServer: provisioning.assignBotToServer,
     async createCustomer({ email, phone, displayName, passwordHash }) {
       const client = await pool.connect();
       const customerId = randomUUID();
@@ -78,25 +81,7 @@ export function createPostgresCustomerStore(pool) {
       return result.rows[0] || null;
     },
     async createPairingRequest({ customerId, botId, phone, expiresAt }) {
-      const client = await pool.connect();
-      const requestId = randomUUID();
-      try {
-        await client.query("BEGIN");
-        const owned = await client.query(
-          `SELECT id FROM bot_instances WHERE id = $1 AND customer_id = $2 FOR UPDATE`, [botId, customerId]);
-        if (owned.rowCount !== 1) { await client.query("ROLLBACK"); return null; }
-        await client.query(
-          `UPDATE pairing_requests SET status = 'cancelled', updated_at = now()
-            WHERE bot_instance_id = $1 AND status IN ('queued','generating','code_ready')`, [botId]);
-        await client.query(
-          `INSERT INTO pairing_requests (id, customer_id, bot_instance_id, phone_e164, status, expires_at)
-           VALUES ($1, $2, $3, $4, 'queued', $5)`,
-          [requestId, customerId, botId, phone, expiresAt]);
-        await client.query("UPDATE bot_instances SET status = 'pairing', updated_at = now() WHERE id = $1", [botId]);
-        await client.query("COMMIT");
-        return { id: requestId, status: "queued", phone_e164: phone, expires_at: expiresAt };
-      } catch (error) { await client.query("ROLLBACK"); throw error; }
-      finally { client.release(); }
+      return provisioning.enqueuePairing({ customerId, botId, phone, expiresAt });
     }
   };
 }
