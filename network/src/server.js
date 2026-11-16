@@ -11,8 +11,6 @@ import {
   CUSTOMER_SESSION_TTL_MS
 } from "./customer-auth.js";
 import { randomUUID } from "node:crypto";
-import { createPairingCodeStore } from "./pairing-code-store.js";
-import { createProvisioningWorker } from "../worker/src/provisioning-worker.js";
 
 const VERSION = "0.5.0";
 const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
@@ -191,7 +189,8 @@ export function createAppServer({ agentStore = null, customerStore = null, pairi
 
     const pairingCodeMatch = req.method === "GET" && /^\\/v1\\/customer\\/pairing-requests\\/([0-9a-f-]{36})\\/code$/.exec(req.url || "");
     if (pairingCodeMatch) {
-      if (!customerSession || !pairingCodeStore) { sendJson(res, 401, { error: "customer_authentication_required" }); return; }
+      if (!customerSession) { sendJson(res, 401, { error: "customer_authentication_required" }); return; }
+      if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
       try {
         const dashboard = await customerStore.getCustomerDashboard(customerSession.id);
         if (!dashboard || dashboard.pairing_id !== pairingCodeMatch[1] || dashboard.pairing_status !== "code_ready") {
@@ -289,26 +288,9 @@ async function main() {
   const port = Number(process.env.HASA_API_PORT || 8787);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("HASA_API_PORT must be an integer between 1 and 65535");
   const runtime = await import("./runtime.js").then(module => module.createConfiguredAgentStore());
-  const pairingCodeStore = createPairingCodeStore();
-  const server = createAppServer({ agentStore: runtime.store, customerStore: runtime.customerStore, pairingCodeStore });
-  let provisioningWorker = null;
-  if (process.env.HASA_WORKER_ENABLED === "true") {
-    if (!runtime.provisioningStore || !process.env.HASA_WORKER_SERVER_ID || !process.env.HASA_WHATSAPP_DATA_DIR || process.env.HASA_WHATSAPP_DATA_ENCRYPTED !== "true") {
-      throw new Error("Worker requires DATABASE_URL, HASA_WORKER_SERVER_ID, HASA_WHATSAPP_DATA_DIR and explicit encrypted-volume confirmation");
-    }
-    const baileys = await import("@whiskeysockets/baileys");
-    const pino = (await import("pino")).default;
-    provisioningWorker = createProvisioningWorker({
-      store: runtime.provisioningStore, serverId: process.env.HASA_WORKER_SERVER_ID,
-      dataDir: process.env.HASA_WHATSAPP_DATA_DIR, baileys, pairingCodeStore,
-      logger: pino({ level: process.env.LOG_LEVEL || "warn" }),
-      maxSessions: Number(process.env.HASA_WORKER_MAX_SESSIONS || 2)
-    });
-    await provisioningWorker.start();
-  }
+  const server = createAppServer({ agentStore: runtime.store, customerStore: runtime.customerStore, pairingCodeStore: runtime.pairingCodeStore });
   server.listen(port, host, () => console.log(`HASA BOT NETWORK API v${VERSION} listening on ${host}:${port}`));
   const shutdown = signal => server.close(async error => {
-    if (provisioningWorker) await provisioningWorker.stop().catch(workerError => { console.error("Worker shutdown failed:", workerError.message); process.exitCode = 1; });
     if (runtime.close) await runtime.close().catch(closeError => { console.error("Database shutdown failed:", closeError.message); process.exitCode = 1; });
     if (error) { console.error("API shutdown failed:", error.message); process.exitCode = 1; }
     else console.log(`Received ${signal}; API server closed.`);
