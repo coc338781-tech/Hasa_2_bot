@@ -24,6 +24,11 @@ export function createPostgresProvisioningStore(pool) {
             WHERE id = $1 AND status IN ('offline','failed')
             RETURNING id, customer_id, server_id`, [botId, serverId]);
         if (bot.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_assignable" }; }
+        const customer = await client.query("SELECT phone_e164 FROM customers WHERE id = $1", [bot.rows[0].customer_id]);
+        await client.query(
+          `INSERT INTO provisioning_jobs (id, server_id, bot_instance_id, customer_id, job_type, payload)
+           VALUES ($1, $2, $3, $4, 'instance_create', $5::jsonb)`,
+          [randomUUID(), serverId, botId, bot.rows[0].customer_id, JSON.stringify({ owner_phone: customer.rows[0]?.phone_e164 || null })]);
         await client.query(
           `INSERT INTO audit_events (action, resource_type, resource_id, outcome, metadata)
            VALUES ('bot.assign_server', 'bot_instance', $1, 'success', jsonb_build_object('server_id', $2))`,
@@ -74,7 +79,7 @@ export function createPostgresProvisioningStore(pool) {
         const claimed = await client.query(
           `WITH candidate AS (
              SELECT id FROM provisioning_jobs
-              WHERE server_id = $1 AND job_type = 'pairing_start'
+              WHERE server_id = $1 AND job_type IN ('instance_create','pairing_start','instance_start','instance_stop','instance_restart')
                 AND ((status = 'queued' AND available_at <= now())
                   OR (status = 'leased' AND lease_expires_at < now()))
                 AND attempts < 5
@@ -85,17 +90,19 @@ export function createPostgresProvisioningStore(pool) {
               SET status = 'leased', attempts = attempts + 1,
                   lease_expires_at = now() + ($2 * interval '1 second'), updated_at = now()
              FROM candidate c WHERE j.id = c.id
-           RETURNING j.id, j.bot_instance_id, j.customer_id, j.payload, j.attempts`,
+           RETURNING j.id, j.bot_instance_id, j.customer_id, j.job_type, j.payload, j.attempts`,
           [serverId, leaseSeconds]);
         if (claimed.rowCount !== 1) { await client.query("COMMIT"); return null; }
         const job = claimed.rows[0];
         await client.query(
           `UPDATE provisioning_jobs SET status = 'running', updated_at = now()
             WHERE id = $1 AND status = 'leased'`, [job.id]);
-        await client.query(
-          `UPDATE pairing_requests SET status = 'generating', attempts = LEAST(attempts + 1, 10), updated_at = now()
-            WHERE id = $1 AND customer_id = $2 AND status = 'queued'`,
-          [job.payload.pairing_request_id, job.customer_id]);
+        if (job.job_type === "pairing_start") {
+          await client.query(
+            `UPDATE pairing_requests SET status = 'generating', attempts = LEAST(attempts + 1, 10), updated_at = now()
+              WHERE id = $1 AND customer_id = $2 AND status = 'queued'`,
+            [job.payload.pairing_request_id, job.customer_id]);
+        }
         await client.query("COMMIT");
         return job;
       } catch (error) { await client.query("ROLLBACK"); throw error; }
@@ -106,20 +113,33 @@ export function createPostgresProvisioningStore(pool) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        const found = await client.query(
+          `SELECT bot_instance_id, customer_id, job_type, payload
+             FROM provisioning_jobs WHERE id = $1 AND server_id = $2 FOR UPDATE`, [jobId, serverId]);
+        if (!found.rowCount) { await client.query("ROLLBACK"); return false; }
+        const job = found.rows[0];
         await client.query(
           `UPDATE provisioning_jobs SET status = $2, result = $3::jsonb, updated_at = now(),
              completed_at = now(), lease_expires_at = NULL WHERE id = $1 AND server_id = $4`,
           [jobId, status, result ? JSON.stringify(result) : null, serverId]);
-        const job = await client.query("SELECT bot_instance_id, customer_id, payload FROM provisioning_jobs WHERE id = $1 AND server_id = $2", [jobId, serverId]);
-        if (!job.rowCount) { await client.query("ROLLBACK"); return false; }
-        if (job.rowCount && status === "failed") {
-          await client.query(
-            `UPDATE pairing_requests SET status = 'failed', failure_code = $2, updated_at = now()
-              WHERE id = $1 AND status IN ('queued','generating')`,
-            [job.rows[0].payload.pairing_request_id, errorCode || "worker_failed"]);
+        if (status === "failed") {
           await client.query(
             `UPDATE bot_instances SET status = 'failed', last_error_code = $2, updated_at = now()
-              WHERE id = $1`, [job.rows[0].bot_instance_id, errorCode || "worker_failed"]);
+              WHERE id = $1`, [job.bot_instance_id, errorCode || "worker_failed"]);
+          if (job.job_type === "pairing_start") {
+            await client.query(
+              `UPDATE pairing_requests SET status = 'failed', failure_code = $2, updated_at = now()
+                WHERE id = $1 AND status IN ('queued','generating')`,
+              [job.payload.pairing_request_id, errorCode || "worker_failed"]);
+          }
+        } else if (status === "succeeded") {
+          if (job.job_type === "instance_create") {
+            await client.query("UPDATE bot_instances SET status = 'offline', last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
+          } else if (job.job_type === "instance_start" || job.job_type === "instance_restart") {
+            await client.query("UPDATE bot_instances SET status = 'online', last_started_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
+          } else if (job.job_type === "instance_stop") {
+            await client.query("UPDATE bot_instances SET status = 'offline', last_stopped_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
+          }
         }
         await client.query("COMMIT");
         return true;
@@ -144,27 +164,44 @@ export function createPostgresProvisioningStore(pool) {
       return result.rows[0] || null;
     },
     async updatePairingStatus(pairingId, customerId, status, failureCode = null) {
-      if (status === "offline") {
-        const result = await pool.query(
-          `UPDATE bot_instances b SET status = 'offline', last_stopped_at = now(), updated_at = now()
-            FROM pairing_requests p
-           WHERE p.id = $1 AND p.customer_id = $2 AND p.bot_instance_id = b.id AND p.status = 'paired'
-           RETURNING b.id`, [pairingId, customerId]);
-        return result.rowCount === 1;
-      }
-      if (!["paired","expired","failed"].includes(status)) return false;
-      const result = await pool.query(
-        `UPDATE pairing_requests SET status = $3, failure_code = $4, paired_at = CASE WHEN $3 = 'paired' THEN now() ELSE paired_at END,
-           updated_at = now()
-          WHERE id = $1 AND customer_id = $2 AND status IN ('queued','generating','code_ready')
-          RETURNING bot_instance_id`,
-        [pairingId, customerId, status, failureCode]);
-      if (result.rowCount && status === "paired") {
-        await pool.query("UPDATE bot_instances SET status = 'online', last_started_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1", [result.rows[0].bot_instance_id]);
-      } else if (result.rowCount && ["expired","failed"].includes(status)) {
-        await pool.query("UPDATE bot_instances SET status = 'offline', last_error_code = $2, updated_at = now() WHERE id = $1", [result.rows[0].bot_instance_id, failureCode || null]);
-      }
-      return result.rowCount === 1;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        if (status === "offline") {
+          const changed = await client.query(
+            `UPDATE bot_instances b SET status = 'offline', last_stopped_at = now(), updated_at = now()
+              FROM pairing_requests p
+             WHERE p.id = $1 AND p.customer_id = $2 AND p.bot_instance_id = b.id AND p.status = 'paired'
+             RETURNING b.id`, [pairingId, customerId]);
+          await client.query("COMMIT");
+          return changed.rowCount === 1;
+        }
+        if (!["paired","expired","failed"].includes(status)) { await client.query("ROLLBACK"); return false; }
+        const result = await client.query(
+          `UPDATE pairing_requests SET status = $3, failure_code = $4,
+             paired_at = CASE WHEN $3 = 'paired' THEN now() ELSE paired_at END, updated_at = now()
+            WHERE id = $1 AND customer_id = $2 AND status IN ('queued','generating','code_ready')
+            RETURNING bot_instance_id`,
+          [pairingId, customerId, status, failureCode]);
+        if (result.rowCount !== 1) { await client.query("ROLLBACK"); return false; }
+        const botId = result.rows[0].bot_instance_id;
+        if (status === "paired") {
+          const bot = await client.query(
+            `UPDATE bot_instances SET status = 'provisioning', last_error_code = NULL, updated_at = now()
+              WHERE id = $1 RETURNING server_id`, [botId]);
+          if (bot.rows[0]?.server_id) {
+            await client.query(
+              `INSERT INTO provisioning_jobs (id, server_id, bot_instance_id, customer_id, job_type, payload)
+               VALUES ($1, $2, $3, $4, 'instance_start', '{}'::jsonb)`,
+              [randomUUID(), bot.rows[0].server_id, botId, customerId]);
+          }
+        } else {
+          await client.query("UPDATE bot_instances SET status = 'offline', last_error_code = $2, updated_at = now() WHERE id = $1", [botId, failureCode || null]);
+        }
+        await client.query("COMMIT");
+        return true;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
     },
     async markCodeReady(pairingId, customerId) {
       const result = await pool.query(
