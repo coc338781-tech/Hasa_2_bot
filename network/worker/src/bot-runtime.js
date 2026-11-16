@@ -130,6 +130,12 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     for (const [instanceId] of children) {
       try {
         const health = JSON.parse(await readFile(join(instancePath(root, instanceId), "data", "runtime-health.json"), "utf8"));
+        if (health.status === "starting" && Date.now() - Date.parse(health.updated_at) > 120_000 && healthStates.get(instanceId) !== "start_timeout") {
+          healthStates.set(instanceId, "start_timeout");
+          updates.push({ instanceId, status: "failed", errorCode: "bot_connection_timeout" });
+          try { children.get(instanceId)?.kill("SIGTERM"); } catch {}
+          continue;
+        }
         if (!["online", "reconnecting", "failed"].includes(health.status)) continue;
         if (healthStates.get(instanceId) === health.status) continue;
         healthStates.set(instanceId, health.status);
