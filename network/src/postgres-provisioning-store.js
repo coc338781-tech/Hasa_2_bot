@@ -24,11 +24,10 @@ export function createPostgresProvisioningStore(pool) {
             WHERE id = $1 AND status IN ('offline','failed') AND whatsapp_registered = false
             RETURNING id, customer_id, server_id`, [botId, serverId]);
         if (bot.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_assignable" }; }
-        const customer = await client.query("SELECT phone_e164 FROM customers WHERE id = $1", [bot.rows[0].customer_id]);
         await client.query(
           `INSERT INTO provisioning_jobs (id, server_id, bot_instance_id, customer_id, job_type, payload)
-           VALUES ($1, $2, $3, $4, 'instance_create', $5::jsonb)`,
-          [randomUUID(), serverId, botId, bot.rows[0].customer_id, JSON.stringify({ owner_phone: customer.rows[0]?.phone_e164 || null })]);
+           VALUES ($1, $2, $3, $4, 'instance_create', '{}'::jsonb)`,
+          [randomUUID(), serverId, botId, bot.rows[0].customer_id]);
         await client.query(
           `INSERT INTO audit_events (action, resource_type, resource_id, outcome, metadata)
            VALUES ('bot.assign_server', 'bot_instance', $1, 'success', jsonb_build_object('server_id', $2))`,
