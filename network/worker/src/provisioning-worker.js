@@ -31,12 +31,17 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
       const current = activePairs.get(instanceId);
       if (!current) return;
       if (["paired", "expired", "failed", "offline", "stopped"].includes(status)) {
-        await client.updatePairingStatus({
-          jobId: current.jobId,
-          status: status === "stopped" ? "offline" : status,
-          failureCode: failureCode || (status === "offline" || status === "stopped" ? "whatsapp_disconnected" : null)
-        });
-        activePairs.delete(instanceId);
+        try {
+          await client.updatePairingStatus({
+            jobId: current.jobId,
+            status: status === "stopped" ? "offline" : status,
+            failureCode: failureCode || (status === "offline" || status === "stopped" ? "whatsapp_disconnected" : null)
+          });
+          activePairs.delete(instanceId);
+        } catch (error) {
+          if (status !== "paired") activePairs.delete(instanceId);
+          throw error;
+        }
       }
     }
   });
