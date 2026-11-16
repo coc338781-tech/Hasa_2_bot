@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827"><title>HASA BOT NETWORK · Owner Console</title>
+<link rel="stylesheet" href="/owner.css"><script defer src="/owner.js"></script>
+</head>
+<body>
+<header class="top"><div class="brand"><span class="mark">H</span><div><strong>HASA BOT NETWORK</strong><small>OWNER CONTROL PLANE</small></div></div><div class="topright"><span id="api-state" class="pill">Checking API…</span><button id="logout" class="ghost hidden">Sign out</button></div></header>
+<main>
+<section id="login-panel" class="login card">
+<div class="eyebrow">SOLE OWNER ACCESS</div><h1>Control your server network.</h1><p class="muted">Sign in with the owner access key configured on your control-plane server.</p>
+<form id="login-form"><label for="owner-key">Owner access key</label><input id="owner-key" type="password" autocomplete="current-password" required minlength="32"><button class="primary" type="submit">Secure sign in</button></form><p id="login-error" class="error" role="alert"></p><small class="muted">Your session stays in this tab's memory only. It is not saved to browser storage.</small>
+</section>
+<section id="dashboard" class="hidden">
+<div class="heading"><div><div class="eyebrow">NETWORK OVERVIEW</div><h1>Server command center</h1><p class="muted">One owner. Every registered Linux and Oracle server.</p></div><button id="refresh" class="secondary">↻ Refresh</button></div>
+<div class="metrics">
+<article class="metric"><span>Registered servers</span><strong id="m-total">—</strong><small>All enrolled hosts</small></article>
+<article class="metric"><span>Online</span><strong id="m-online">—</strong><small>Recent heartbeat</small></article>
+<article class="metric"><span>Offline / pending</span><strong id="m-offline">—</strong><small>Needs attention</small></article>
+<article class="metric"><span>Total CPU cores</span><strong id="m-cpu">—</strong><small>Reported capacity</small></article>
+</div>
+<div class="grid">
+<section class="card servers"><div class="section-head"><div><h2>Registered servers</h2><p class="muted">Live telemetry from each server agent</p></div><span id="last-updated" class="muted tiny">Not refreshed</span></div><div id="server-list" class="server-list"><div class="empty">Sign in to load server inventory.</div></div></section>
+<aside class="card enroll"><div class="eyebrow">ADD INFRASTRUCTURE</div><h2>Register a server</h2><p class="muted">Create a one-time ticket. Install the read-only agent on the Linux host to connect it.</p>
+<form id="ticket-form"><label for="server-label">Server label</label><input id="server-label" placeholder="e.g. Oracle primary" maxlength="80" required><label for="server-provider">Provider</label><input id="server-provider" placeholder="Oracle Cloud / Linux VPS" maxlength="60" required><button class="primary" type="submit">Generate one-time ticket</button></form>
+<div id="ticket-result" class="ticket hidden"><label>One-time enrollment ticket</label><code id="ticket-value"></code><button id="copy-ticket" class="secondary">Copy ticket</button><small id="ticket-expiry" class="muted"></small><p class="warning">Shown once. Keep it secret. Expires in 10 minutes.</p></div><p id="ticket-error" class="error" role="alert"></p>
+</aside>
+</div>
+<section class="card guide"><div><div class="eyebrow">AGENT INSTALLATION</div><h2>Connect an approved Linux server</h2><p class="muted">After generating a ticket, install the agent from the private development branch. Never paste the ticket into chat or a public terminal recording.</p></div><div class="command"><code>cd network/agent &amp;&amp; npm install --ignore-scripts</code></div><p class="muted tiny">Set HASA_AGENT_API_URL, HASA_AGENT_ENROLLMENT_TICKET and HASA_AGENT_TOKEN_FILE in a protected environment, then start the agent. A systemd service installer and signed release package are still pending.</p></section>
+</section>
+<div id="notice" class="notice" role="status"></div>
+</main>
+<footer>HASA BOT NETWORK · Owner-controlled infrastructure · API <span id="version">—</span></footer>
+</body></html>
