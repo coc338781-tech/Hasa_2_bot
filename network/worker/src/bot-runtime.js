@@ -162,5 +162,5 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     for (const id of children.keys()) suppressExit.add(id);
     await Promise.all([...children.keys()].map(stopInstance));
   }
-  return Object.freeze({ createInstance, getRegisteredPhone, setOwnerPhone, startInstance, stopInstance, restartInstance, restoreInstances, collectHealthUpdates, stopAll, get activeCount() { return children.size; } });
+  return Object.freeze({ createInstance, getRegisteredPhone, setOwnerPhone, startInstance, stopInstance, restartInstance, restoreInstances, collectHealthUpdates, stopAll, get activeCount() { return children.size; }, get activeInstanceIds() { return [...children.keys()]; } });
 }
