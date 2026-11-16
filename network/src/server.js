@@ -333,12 +333,18 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
           if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
           const claimBody = await readJson(req);
           const capacityAvailable = claimBody.capacity_available !== false;
+          const workerMemoryAvailable = claimBody.memory_available !== false;
+          const activeInstanceIds = Array.isArray(claimBody.active_instance_ids)
+            ? claimBody.active_instance_ids.filter(id => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)).slice(0, 100)
+            : [];
           const minFreeMemoryBytes = await provisioningStore.getMinFreeMemoryBytes();
-          const enoughMemory = Number(server.memory_available_bytes || 0) >= minFreeMemoryBytes;
-          const allowedTypes = enoughMemory && capacityAvailable
-            ? ["instance_create", "pairing_start", "instance_start", "instance_stop", "instance_restart"]
-            : ["instance_create", "instance_stop"];
-          const job = await provisioningStore.claimNextJob(server.id, 90, allowedTypes);
+          const enoughMemory = Number(server.memory_available_bytes || 0) >= minFreeMemoryBytes && workerMemoryAvailable;
+          const allowedTypes = !enoughMemory
+            ? ["instance_create", "instance_stop"]
+            : capacityAvailable
+              ? ["instance_create", "pairing_start", "instance_start", "instance_stop", "instance_restart"]
+              : ["instance_create", "instance_stop", "instance_restart"];
+          const job = await provisioningStore.claimNextJob(server.id, 90, allowedTypes, activeInstanceIds);
           sendJson(res, 200, { job, paused: enoughMemory ? null : "low_memory" });
           return;
         }
