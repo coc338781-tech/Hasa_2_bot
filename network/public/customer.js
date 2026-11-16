@@ -38,9 +38,11 @@ async function loadDashboard() {
   $("bot-version").textContent = b?.release_version ? `Version ${b.release_version}` : "Your assigned instance";
   $("bot-id").textContent = b?.id || "Pending";
   $("runtime-status").textContent = b?.status || "Not provisioned";
-  $("bot-start").disabled = !b?.id || !["offline", "failed"].includes(b.status);
-  $("bot-stop").disabled = !b?.id || !["online", "provisioning"].includes(b.status);
-  $("bot-restart").disabled = !b?.id || b.status !== "online";
+  $("pairing-panel").classList.toggle("hidden", !b?.server_assigned || b.whatsapp_registered);
+  $("unassigned-note").classList.toggle("hidden", Boolean(b?.server_assigned));
+  $("bot-start").disabled = !b?.id || !b.whatsapp_registered || !["offline", "failed"].includes(b.status);
+  $("bot-stop").disabled = !b?.id || !b.whatsapp_registered || !["online", "provisioning"].includes(b.status);
+  $("bot-restart").disabled = !b?.id || !b.whatsapp_registered || b.status !== "online";
   $("pair-status").textContent = data.latest_pairing?.status || "None";
   $("pair-result").classList.toggle("hidden", !data.latest_pairing);
   if (data.latest_pairing) {
@@ -135,9 +137,9 @@ async function runBotAction(action) {
       if (!bot) break;
       $("bot-status").textContent = bot.status;
       $("runtime-status").textContent = bot.status;
-      $("bot-start").disabled = !["offline", "failed"].includes(bot.status);
-      $("bot-stop").disabled = !["online", "provisioning"].includes(bot.status);
-      $("bot-restart").disabled = bot.status !== "online";
+      $("bot-start").disabled = !bot.whatsapp_registered || !["offline", "failed"].includes(bot.status);
+      $("bot-stop").disabled = !bot.whatsapp_registered || !["online", "provisioning"].includes(bot.status);
+      $("bot-restart").disabled = !bot.whatsapp_registered || bot.status !== "online";
       if (["online", "offline", "failed"].includes(bot.status)) {
         $("action-result").textContent = `Your bot status is now: ${bot.status}.`;
         return;
@@ -149,7 +151,8 @@ async function runBotAction(action) {
       server_unavailable: "Your assigned server is offline.",
       server_low_memory: "The server does not have enough free RAM to start this bot.",
       bot_action_not_allowed: "This action is not available in the bot's current state.",
-      action_already_queued: "Another bot action is already processing."
+      action_already_queued: "Another bot action is already processing.",
+      pairing_required: "Connect your WhatsApp first using the pairing panel."
     };
     $("action-result").textContent = messages[error.message] || "Could not send the bot action. Please try again.";
     await loadDashboard().catch(() => {});
@@ -167,7 +170,7 @@ $("pair-form").addEventListener("submit", async event => {
     $("pair-status").textContent = result.request.status;
     void waitForPairingCode(result.request.id);
   } catch (error) {
-    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : error.message === "server_unavailable" ? "Your bot is not assigned to an online server yet. Please contact support." : error.message === "bot_not_ready" ? "Your bot is still being prepared or is already connecting. Refresh the dashboard and try again." : "Could not create the pairing request. Please try again.");
+    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : error.message === "server_unavailable" ? "Your bot is not assigned to an online server yet. Please contact support." : error.message === "bot_not_ready" ? "Your bot is still being prepared or is already connecting. Refresh the dashboard and try again." : error.message === "already_paired" ? "Your WhatsApp account is already linked. Use Start or Restart instead." : "Could not create the pairing request. Please try again.");
   }
 });
 })();
