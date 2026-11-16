@@ -65,4 +65,4 @@ Install a worker only on an enrolled server after mounting an encrypted filesyst
 
 ## Current deployment status
 
-All of these changes are development-branch code only. No production API, PostgreSQL instance, encrypted volume, server worker, or WhatsApp customer session has been deployed. The pairing code implementation is not yet verified against a live WhatsApp account. The worker currently handles pairing only; it does not yet start the full customer HASA bot plugin runtime.
+All of these changes are development-branch code only. No production API, PostgreSQL instance, encrypted volume, server worker, or WhatsApp customer session has been deployed. The pairing code implementation is not yet verified against a live WhatsApp account. The worker now provisions isolated customer working directories and starts the shared HASA bot plugin runtime as a separate process, with customer-scoped start/stop/restart controls and worker-restart recovery. These lifecycle paths still need integration tests on an isolated enrolled server.
