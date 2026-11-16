@@ -16,7 +16,7 @@ function fakePool(responses = []) {
 }
 test("pairing jobs are enqueued only for a fresh online server assigned to the owned bot", async () => {
   const pool = fakePool([
-    { rowCount: 1, rows: [{ id: "bot", server_id: "server", bot_status: "offline", whatsapp_registered: false, runtime_provisioned: true, server_status: "online", last_heartbeat_at: new Date().toISOString() }] }
+    { rowCount: 1, rows: [{ id: "bot", server_id: "server", bot_status: "offline", whatsapp_registered: false, runtime_provisioned: true, server_status: "online", last_heartbeat_at: new Date().toISOString(), memory_available_bytes: 2 * 1024 * 1024 * 1024 }] }
   ]);
   const store = createPostgresProvisioningStore(pool);
   const result = await store.enqueuePairing({ customerId: "customer", botId: "bot", phone: "+94771234567", expiresAt: new Date(Date.now()+600000).toISOString() });
