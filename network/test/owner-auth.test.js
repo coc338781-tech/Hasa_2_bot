@@ -9,7 +9,9 @@ test("owner login issues a short-lived signed session and protects ticket creati
   process.env.HASA_OWNER_ACCESS_KEY = ownerKey;
   let saved;
   const store = {
-    async createEnrollmentTicket(input) { saved = input; }
+    async createEnrollmentTicket(input) { saved = input; },
+    async listServers() { return [{ id: "123e4567-e89b-42d3-a456-426614174000", status: "online" }]; },
+    async revokeServer(id) { return id === "123e4567-e89b-42d3-a456-426614174000"; }
   };
   const server = createAppServer({ agentStore: store, clock: () => Date.parse("2026-11-16T18:00:00.000Z") });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -47,6 +49,17 @@ test("owner login issues a short-lived signed session and protects ticket creati
     assert.equal(ticket.label, "Oracle primary");
     assert.equal(saved.ticketHash.length, 64);
     assert.notEqual(saved.ticketHash, ticket.ticket);
+    const inventory = await fetch(base + "/v1/owner/servers", {
+      headers: { Authorization: "Bearer " + session.access_token }
+    });
+    assert.equal(inventory.status, 200);
+    assert.equal((await inventory.json()).servers[0].status, "online");
+
+    const revoke = await fetch(base + "/v1/owner/servers/123e4567-e89b-42d3-a456-426614174000/revoke", {
+      method: "POST", headers: { Authorization: "Bearer " + session.access_token }
+    });
+    assert.equal(revoke.status, 200);
+    assert.equal((await revoke.json()).revoked, true);
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     if (previous === undefined) delete process.env.HASA_OWNER_ACCESS_KEY;
