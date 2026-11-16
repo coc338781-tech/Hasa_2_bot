@@ -71,3 +71,37 @@ test("owner dashboard is served with a restrictive content security policy", asy
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+
+test("public website and assets are served locally with restrictive headers", async () => {
+  const server = createAppServer();
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const page = await fetch(base);
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
+    assert.match(await page.text(), /Your WhatsApp bots/);
+    const css = await fetch(`${base}/site.css`);
+    assert.equal(css.status, 200);
+    assert.match(await css.text(), /\.hero-art/);
+    const script = await fetch(`${base}/site.js`);
+    assert.equal(script.status, 200);
+    assert.match(await script.text(), /menu-toggle/);
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test("public customer website does not expose website editing controls", async () => {
+  const server = createAppServer();
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const html = await response.text();
+    assert.doesNotMatch(html, /edit website|change theme|website editor/i);
+    assert.match(html, /No customer website editor/);
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
