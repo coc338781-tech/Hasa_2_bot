@@ -170,7 +170,7 @@ test("customer registration, dashboard and pairing intake stay scoped to the sig
     async createPairingRequest(input) {
       pairingOwner = input.customerId;
       assert.equal(input.botId, botId);
-      return { id: "33333333-3333-4333-8333-333333333333", status: "queued", phone_e164: input.phone, expires_at: input.expiresAt };
+      return { ok: true, request: { id: "33333333-3333-4333-8333-333333333333", status: "queued", phone_e164: input.phone, expires_at: input.expiresAt } };
     },
     async revokeSession() { return true; }
   };
@@ -201,7 +201,7 @@ test("customer registration, dashboard and pairing intake stay scoped to the sig
     });
     assert.equal(pairing.status, 202);
     assert.equal(pairingOwner, customerId);
-    assert.equal((await pairing.json()).worker, "not_connected");
+    assert.equal((await pairing.json()).worker, "queued");
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
