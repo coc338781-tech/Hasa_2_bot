@@ -1,7 +1,22 @@
 import { setTimeout as delay } from "node:timers/promises";
 import os from "node:os";
+import { readFile } from "node:fs/promises";
 import { createWhatsAppWorker } from "./whatsapp-worker.js";
 import { createBotRuntime } from "./bot-runtime.js";
+
+async function getAvailableMemoryBytes() {
+  if (process.platform === "linux") {
+    try {
+      const meminfo = await readFile("/proc/meminfo", "utf8");
+      const match = /^MemAvailable:\s+(\d+)\s+kB$/m.exec(meminfo);
+      if (match) {
+        const bytes = Number(match[1]) * 1024;
+        if (Number.isSafeInteger(bytes) && bytes >= 0) return bytes;
+      }
+    } catch {}
+  }
+  return os.freemem();
+}
 
 export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa-bot", baileys, logger, maxSessions = 2, minFreeMemoryBytes = 768 * 1024 * 1024, pollIntervalMs = 1500 } = {}) {
   if (!client || !dataDir || !codeDir) throw new TypeError("worker_requires_agent_client_and_data_dir");
@@ -58,7 +73,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
     } catch (error) { logger?.warn?.({ error: error?.message }, "Using last known RAM admission policy"); }
   }
   async function restoreAvailableInstances() {
-    while (restoreQueue.length && botRuntime.activeCount < maxSessions && os.freemem() >= activeMinFreeMemoryBytes) {
+    while (restoreQueue.length && botRuntime.activeCount < maxSessions && await getAvailableMemoryBytes() >= activeMinFreeMemoryBytes) {
       const item = restoreQueue.shift();
       const result = await botRuntime.restoreInstances([item.id]);
       const restored = result[0];
