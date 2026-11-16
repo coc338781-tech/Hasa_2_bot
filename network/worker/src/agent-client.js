@@ -22,6 +22,10 @@ export function createAgentWorkerClient({ apiUrl, token, fetchImpl = fetch, time
     return data;
   }
   return Object.freeze({
+    async getSettings() {
+      const result = await request("/v1/agent/settings");
+      return { minFreeMemoryBytes: Number(result.min_free_memory_bytes) };
+    },
     async claimNextJob({ capacityAvailable = true } = {}) {
       const result = await request("/v1/agent/jobs/claim", { capacity_available: capacityAvailable });
       return result.job || null;
