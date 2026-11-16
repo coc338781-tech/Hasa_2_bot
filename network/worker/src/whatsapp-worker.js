@@ -1,5 +1,5 @@
 import { mkdir, chmod, lstat } from "node:fs/promises";
-import { resolve, sep } from "node:path";
+import { resolve, sep, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import pino from "pino";
 const INSTANCE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -26,11 +26,15 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
       await stop(instanceId);
     }
     if (sessions.size >= maxSessions) { const error = new Error("worker_capacity_reached"); error.code = "worker_capacity_reached"; throw error; }
-    const authDir = safeInstancePath(dataDir, instanceId);
+    const instanceDir = safeInstancePath(dataDir, instanceId);
+    const authDir = join(instanceDir, "auth_info");
     const rootDir = resolve(dataDir);
     await mkdir(rootDir, { recursive: true, mode: 0o700 });
     const rootInfo = await lstat(rootDir);
     if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) throw new Error("unsafe_worker_data_directory");
+    await mkdir(instanceDir, { recursive: true, mode: 0o700 });
+    const instanceInfo = await lstat(instanceDir);
+    if (instanceInfo.isSymbolicLink() || !instanceInfo.isDirectory()) throw new Error("unsafe_instance_directory");
     await mkdir(authDir, { recursive: true, mode: 0o700 });
     const authInfo = await lstat(authDir);
     if (authInfo.isSymbolicLink() || !authInfo.isDirectory()) throw new Error("unsafe_instance_auth_directory");
