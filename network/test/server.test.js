@@ -143,7 +143,7 @@ test("customer API fails closed without configured database", async () => {
 });
 
 test("customer registration, dashboard and pairing intake stay scoped to the signed-in customer", async () => {
-  const { hashPassword, hashCustomerToken } = await import("../src/customer-auth.js");
+  const { hashCustomerToken } = await import("../src/customer-auth.js");
   const customerId = "11111111-1111-4111-8111-111111111111";
   const botId = "22222222-2222-4222-8222-222222222222";
   let storedSessionHash = null;
