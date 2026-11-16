@@ -127,8 +127,9 @@ export function createPostgresProvisioningStore(pool) {
           [jobId, status, result ? JSON.stringify(result) : null, serverId]);
         if (status === "failed") {
           await client.query(
-            `UPDATE bot_instances SET status = 'failed', last_error_code = $2, updated_at = now()
-              WHERE id = $1`, [job.bot_instance_id, errorCode || "worker_failed"]);
+            `UPDATE bot_instances SET status = 'failed', last_error_code = $2,
+               whatsapp_registered = CASE WHEN $2 IN ('whatsapp_session_not_registered','whatsapp_session_invalid') THEN false ELSE whatsapp_registered END,
+               updated_at = now() WHERE id = $1`, [job.bot_instance_id, errorCode || "worker_failed"]);
           if (job.job_type === "pairing_start") {
             await client.query(
               `UPDATE pairing_requests SET status = 'failed', failure_code = $2, updated_at = now()
