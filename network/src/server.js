@@ -28,6 +28,7 @@ const ownerLoginAttempts = new Map();
 const customerLoginAttempts = new Map();
 const customerRegisterAttempts = new Map();
 const customerPairingAttempts = new Map();
+const customerActionAttempts = new Map();
 function rateLimited(map, key, now, limit) {
   const entry = map.get(key) || { start: now, count: 0 };
   if (now - entry.start >= 60_000) { entry.start = now; entry.count = 0; }
@@ -188,6 +189,22 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         if (!request.ok) { sendJson(res, request.reason === "server_unavailable" ? 503 : request.reason === "bot_not_ready" ? 409 : 404, { error: request.reason }); return; }
         sendJson(res, 202, { accepted: true, request: request.request, worker: "queued" });
       } catch { sendJson(res, 500, { error: "pairing_request_unavailable" }); }
+      return;
+    }
+
+    const botActionMatch = req.method === "POST" && /^\\/v1\\/customer\\/bots\\/([0-9a-f-]{36})\\/actions$/.exec(req.url || "");
+    if (botActionMatch) {
+      if (!customerSession) { sendJson(res, 401, { error: "customer_authentication_required" }); return; }
+      if (!customerStore || typeof customerStore.queueBotAction !== "function") { sendJson(res, 503, { error: "customer_action_unavailable" }); return; }
+      if (rateLimited(customerActionAttempts, customerSession.id, clock(), 8)) { sendJson(res, 429, { error: "rate_limited" }); return; }
+      try {
+        const body = await readJson(req);
+        const action = body?.action;
+        if (!["start", "stop", "restart"].includes(action)) { sendJson(res, 400, { error: "invalid_action" }); return; }
+        const result = await customerStore.queueBotAction({ customerId: customerSession.id, botId: botActionMatch[1], action });
+        const status = result.ok ? 202 : ["server_unavailable","server_low_memory","bot_action_not_allowed","action_already_queued"].includes(result.reason) ? 409 : 404;
+        sendJson(res, status, result);
+      } catch { sendJson(res, 500, { error: "bot_action_failed" }); }
       return;
     }
 
