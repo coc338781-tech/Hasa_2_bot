@@ -52,3 +52,20 @@ test("owner assignment rejects servers below the RAM safety reserve", async () =
   const result = await createPostgresProvisioningStore(pool).assignBotToServer({ botId: "bot", serverId: "server" });
   assert.deepEqual(result, { ok: false, reason: "server_low_memory" });
 });
+
+test("customer bot actions are tenant-scoped and queued only for an online assigned instance", async () => {
+  const pool = fakePool([
+    { rowCount: 1, rows: [{ id: "bot", server_id: "server", bot_status: "online", server_status: "online", last_heartbeat_at: new Date().toISOString(), memory_available_bytes: 2 * 1024 * 1024 * 1024 }] },
+    { rowCount: 0, rows: [] }
+  ]);
+  const result = await createPostgresProvisioningStore(pool).queueBotAction({ customerId: "customer", botId: "bot", action: "restart" });
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "queued");
+  assert.ok(pool.calls.some(x => x.sql.includes("b.customer_id = $2")));
+  assert.ok(pool.calls.some(x => x.sql.includes("instance_restart")));
+});
+test("customer cannot stop or restart another customer's bot", async () => {
+  const pool = fakePool([{ rowCount: 0, rows: [] }]);
+  const result = await createPostgresProvisioningStore(pool).queueBotAction({ customerId: "other-customer", botId: "bot", action: "stop" });
+  assert.deepEqual(result, { ok: false, reason: "bot_not_found" });
+});
