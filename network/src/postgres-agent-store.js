@@ -62,7 +62,7 @@ export function createPostgresAgentStore(pool) {
     },
     async findActiveServerByTokenHash(tokenHash) {
       const result = await pool.query(
-        `SELECT s.id, c.token_hash FROM servers s JOIN server_agent_credentials c ON c.server_id = s.id
+        `SELECT s.id, c.token_hash, s.status, s.last_heartbeat_at FROM servers s JOIN server_agent_credentials c ON c.server_id = s.id
           WHERE c.token_hash = $1 AND c.revoked_at IS NULL AND s.status <> 'disabled' LIMIT 1`, [tokenHash]);
       return result.rows[0] || null;
     },
