@@ -185,7 +185,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
           expiresAt: new Date(clock() + 10 * 60 * 1000).toISOString()
         });
         if (!request) { sendJson(res, 404, { error: "bot_instance_not_found" }); return; }
-        if (!request.ok) { sendJson(res, request.reason === "server_unavailable" ? 503 : 404, { error: request.reason }); return; }
+        if (!request.ok) { sendJson(res, request.reason === "server_unavailable" ? 503 : request.reason === "bot_not_ready" ? 409 : 404, { error: request.reason }); return; }
         sendJson(res, 202, { accepted: true, request: request.request, worker: "queued" });
       } catch { sendJson(res, 500, { error: "pairing_request_unavailable" }); }
       return;
