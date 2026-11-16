@@ -157,6 +157,23 @@ export function createPostgresProvisioningStore(pool) {
           ORDER BY b.created_at DESC LIMIT 1000`);
       return result.rows;
     },
+    async listInstancesForServer(serverId) {
+      const result = await pool.query(
+        `SELECT id, status FROM bot_instances
+          WHERE server_id = $1 AND status = 'online'
+          ORDER BY updated_at DESC LIMIT 500`, [serverId]);
+      return result.rows;
+    },
+    async updateBotStatusForServer({ instanceId, serverId, status, errorCode = null }) {
+      if (!["offline", "failed"].includes(status)) return false;
+      const result = await pool.query(
+        `UPDATE bot_instances SET status = $3, last_error_code = $4,
+           last_stopped_at = CASE WHEN $3 = 'offline' THEN now() ELSE last_stopped_at END,
+           updated_at = now()
+          WHERE id = $1 AND server_id = $2 RETURNING id`,
+        [instanceId, serverId, status, errorCode]);
+      return result.rowCount === 1;
+    },
     async getJobForServer(jobId, serverId) {
       const result = await pool.query(
         `SELECT id, server_id, bot_instance_id, customer_id, job_type, status, payload
