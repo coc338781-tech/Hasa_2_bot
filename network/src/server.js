@@ -268,7 +268,9 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       if (!agentStore || typeof agentStore.revokeServer !== "function") { sendJson(res, 503, { error: "server_storage_unavailable" }); return; }
       try {
         const revoked = await agentStore.revokeServer(revokeMatch[1]);
-        sendJson(res, revoked ? 200 : 404, revoked ? { revoked: true, server_id: revokeMatch[1] } : { error: "server_not_found_or_disabled" });
+        if (revoked?.ok) { sendJson(res, 200, { revoked: true, server_id: revokeMatch[1] }); return; }
+        const reason = revoked?.reason || "server_not_found_or_disabled";
+        sendJson(res, reason === "server_has_customer_bots" ? 409 : 404, { revoked: false, error: reason });
       } catch { sendJson(res, 500, { error: "internal_error" }); }
       return;
     }
