@@ -26,10 +26,12 @@ Authorization: Bearer <owner-session>
 ```
 
 - `GET /v1/owner/servers` — list up to 500 registered servers and their latest telemetry.
+- `GET /v1/owner/bots` — list customer bot instances for owner-side allocation.
+- `POST /v1/owner/bots/{bot_id}/assign-server` — assign a bot to an online server. JSON body: `{"server_id":"<registered-server-uuid>"}`. Assignment is audited and rejects offline/stale servers.
 - `POST /v1/owner/server-enrollment-tickets` — create a one-use enrollment ticket valid for 10 minutes. JSON body: `{"label":"Oracle primary","provider":"Oracle Cloud"}`. The raw ticket is returned once.
 - `POST /v1/owner/servers/{server_id}/revoke` — disable a server and revoke its agent credential. This action is audited.
 
-The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`.
+The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`. The isolated worker uses that same server agent token over HTTPS for `POST /v1/agent/jobs/claim`, `/v1/agent/jobs/finish`, `/v1/agent/pairing-code` and `/v1/agent/pairing-status`. Every job is bound to the enrolled server identity; workers cannot request arbitrary commands.
 
 ## Current limitations
 
@@ -51,3 +53,16 @@ The customer workspace is served at `/customer`. Public registration accepts an 
 Customer endpoints fail closed if PostgreSQL is not configured. Login and registration are rate-limited. Customer account and bot lookups are scoped by the authenticated customer ID; no customer-supplied customer ID is trusted.
 
 **Pairing limitation:** request intake is implemented, but the Baileys worker that creates a real WhatsApp pairing code and persists encrypted auth state is not yet connected. The dashboard intentionally never fabricates a pairing code. The request remains queued until the worker and a server runtime are implemented. Do not advertise pairing as live yet.
+
+
+## Real pairing-code delivery
+
+Set `HASA_PAIRING_CODE_KEY` on the central API to a base64-encoded 32-byte key (generate a new key with `openssl rand -base64 32`). Apply migrations with `npm run db:migrate`. The key must remain in the central deployment secret manager and must be backed up securely; it is not stored in PostgreSQL or copied to worker servers.
+
+The API encrypts pairing codes using AES-256-GCM before database storage. The customer endpoint `GET /v1/customer/pairing-requests/{pairing_id}/code` checks the authenticated customer's latest pairing request and consumes the code once. It does not accept a customer ID from the browser.
+
+Install a worker only on an enrolled server after mounting an encrypted filesystem at `/var/lib/hasa-worker/sessions`. Follow [the worker installation guide](./worker/README.md). Do not enable it on production until HTTPS, the database, the encryption key and server resource limits are configured and the actual WhatsApp pairing flow has been tested.
+
+## Current deployment status
+
+All of these changes are development-branch code only. No production API, PostgreSQL instance, encrypted volume, server worker, or WhatsApp customer session has been deployed. The pairing code implementation is not yet verified against a live WhatsApp account. The worker currently handles pairing only; it does not yet start the full customer HASA bot plugin runtime.
