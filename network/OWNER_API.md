@@ -15,7 +15,7 @@ Content-Type: application/json
 {"access_key":"<deployment-secret>"}
 ```
 
-A successful login returns a signed bearer session valid for 30 minutes. Keep it in the trusted owner console's memory; do not place it in URLs, browser local storage, logs, or screenshots.
+A successful login returns a signed bearer session valid for 30 minutes. Open `/owner` to use the browser console; it keeps the session only in tab memory and never writes it to browser storage. Do not place it in URLs, logs, or screenshots.
 
 ## Owner operations
 
@@ -33,6 +33,6 @@ The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sen
 
 ## Current limitations
 
-This is a backend API foundation, not a finished owner web dashboard. A PostgreSQL runtime connection is enabled with `DATABASE_URL`; run `npm run db:migrate` from this directory to apply the initial schema. `/readyz` reports whether a persistent store is configured. The owner UI, secure agent-side token installation, TLS proxy deployment and live enrollment are not yet wired together. Without a configured persistent store, management endpoints fail closed. Do not deploy this API publicly until HTTPS and the deployment secret are configured.
+The owner dashboard is available at `/owner`. A PostgreSQL runtime connection is enabled with `DATABASE_URL`; run `npm run db:migrate` from this directory to apply the initial schema. `/readyz` reports whether a persistent store is configured. The owner UI supports server inventory, live telemetry refresh, one-time enrollment ticket creation and credential revocation. The agent supports one-time enrollment and heartbeat reporting. TLS proxy deployment, customer pairing portal, isolated bot provisioning, encrypted session vault and release manager are not yet implemented. Without a configured persistent store, management endpoints fail closed. Do not deploy this API publicly until HTTPS and the deployment secret are configured.
 
 The platform owner retains the credentials and final authority. An assistant can help maintain the code and perform actions only through tools and permissions explicitly made available by the owner; it does not receive permanent independent access to servers.
