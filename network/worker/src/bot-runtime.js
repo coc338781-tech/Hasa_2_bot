@@ -48,6 +48,14 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     }
     return { instanceId: bot_instance_id, directory: dir };
   }
+  async function getRegisteredPhone(instanceId) {
+    const authDir = join(instancePath(root, instanceId), "auth_info");
+    const auth = await baileys.useMultiFileAuthState(authDir);
+    if (!auth.state.creds.registered) return null;
+    const linkedId = auth.state.creds.me?.id || auth.state.creds.me?.jid || "";
+    const phone = String(linkedId).split(":")[0].replace(/\D/g, "");
+    return phone || null;
+  }
   async function setOwnerPhone(instanceId, phone) {
     const ownerPhone = typeof phone === "string" ? phone.replace(/\D/g, "") : "";
     if (!/^\d{8,15}$/.test(ownerPhone)) throw new Error("invalid_owner_phone");
@@ -156,5 +164,5 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     for (const id of children.keys()) suppressExit.add(id);
     await Promise.all([...children.keys()].map(stopInstance));
   }
-  return Object.freeze({ createInstance, setOwnerPhone, startInstance, stopInstance, restartInstance, restoreInstances, collectHealthUpdates, stopAll, get activeCount() { return children.size; } });
+  return Object.freeze({ createInstance, getRegisteredPhone, setOwnerPhone, startInstance, stopInstance, restartInstance, restoreInstances, collectHealthUpdates, stopAll, get activeCount() { return children.size; } });
 }
