@@ -64,8 +64,11 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
   });
   let running = false, stopped = false, loopPromise = null;
   let activeMinFreeMemoryBytes = minFreeMemoryBytes;
+  let lastPolicyRefreshAt = 0;
   let restoreQueue = [];
-  async function refreshMemoryPolicy() {
+  async function refreshMemoryPolicy(force = false) {
+    if (!force && Date.now() - lastPolicyRefreshAt < 15_000) return;
+    lastPolicyRefreshAt = Date.now();
     try {
       const settings = await client.getSettings({
         activeSessions: botRuntime.activeCount + whatsapp.activeCount,
@@ -147,7 +150,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
       if (running) return;
       running = true; stopped = false;
       try {
-        await refreshMemoryPolicy();
+        await refreshMemoryPolicy(true);
         const instances = await client.listInstances();
         restoreQueue = instances.slice(0, maxSessions);
         if (instances.length > maxSessions) {
