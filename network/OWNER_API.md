@@ -33,7 +33,7 @@ Authorization: Bearer <owner-session>
 - `POST /v1/owner/server-enrollment-tickets` — create a one-use enrollment ticket valid for 10 minutes. JSON body: `{"label":"Oracle primary","provider":"Oracle Cloud"}`. The raw ticket is returned once.
 - `POST /v1/owner/servers/{server_id}/revoke` — disable a server and revoke its agent credential. This action is audited.
 
-The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`. The isolated worker reads the current RAM reserve from `POST /v1/agent/settings` and uses that same server agent token over HTTPS for `POST /v1/agent/jobs/claim`, `/v1/agent/jobs/finish`, `/v1/agent/pairing-code`, `/v1/agent/pairing-status`, `/v1/agent/instances/list` and `/v1/agent/instances/status`. Every job and instance is bound to the enrolled server identity; workers cannot request arbitrary commands.
+The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`. The isolated worker posts a heartbeat (version, active session count and configured session capacity) and reads the current RAM reserve from `POST /v1/agent/settings` every 15 seconds. The Owner Console marks the worker online only while that heartbeat is less than 90 seconds old. The worker uses the same server agent token over HTTPS for `POST /v1/agent/jobs/claim`, `/v1/agent/jobs/finish`, `/v1/agent/pairing-code`, `/v1/agent/pairing-status`, `/v1/agent/instances/list` and `/v1/agent/instances/status`. Every job and instance is bound to the enrolled server identity; workers cannot request arbitrary commands.
 
 ## Current limitations
 
