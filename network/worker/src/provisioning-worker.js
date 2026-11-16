@@ -17,10 +17,10 @@ export function createProvisioningWorker({ client, dataDir, baileys, logger, max
       if (["paired", "expired", "failed", "offline", "stopped"].includes(status)) {
         await client.updatePairingStatus({
           jobId: current.jobId,
-          status: status === "offline" || status === "stopped" ? "failed" : status,
-          failureCode: failureCode || (status === "offline" ? "whatsapp_disconnected" : null)
+          status: status === "stopped" ? "offline" : status,
+          failureCode: failureCode || (status === "offline" || status === "stopped" ? "whatsapp_disconnected" : null)
         });
-        activePairs.delete(instanceId);
+        if (status !== "paired") activePairs.delete(instanceId);
       }
     }
   });
