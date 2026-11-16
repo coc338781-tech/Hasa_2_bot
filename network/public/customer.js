@@ -4,6 +4,7 @@ const $ = id => document.getElementById(id);
 let token = null;
 let mode = "login";
 let pairingPollActive = false;
+let pairingCompletionActive = false;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -47,7 +48,10 @@ async function loadDashboard() {
   $("pair-result").classList.toggle("hidden", !data.latest_pairing);
   if (data.latest_pairing) {
     $("pair-result").textContent = `Pairing request: ${data.latest_pairing.status}.`;
-    if (data.latest_pairing.status === "code_ready") void fetchPairingCode(data.latest_pairing.id);
+    if (data.latest_pairing.status === "code_ready") {
+      void fetchPairingCode(data.latest_pairing.id);
+      void waitForPairingCompletion(data.latest_pairing.id);
+    }
     else if (["queued", "generating"].includes(data.latest_pairing.status)) void waitForPairingCode(data.latest_pairing.id);
   }
   if (b?.id) $("pair-phone").value = c.phone_e164;
@@ -98,6 +102,28 @@ async function fetchPairingCode(pairingId) {
     return false;
   }
 }
+async function waitForPairingCompletion(pairingId) {
+  if (pairingCompletionActive) return;
+  pairingCompletionActive = true;
+  try {
+    for (let attempt = 0; attempt < 90 && token; attempt += 1) {
+      await wait(3000);
+      const dashboard = await api("/v1/customer/me");
+      const latest = dashboard.latest_pairing;
+      if (!latest || latest.id !== pairingId) return;
+      $("pair-status").textContent = latest.status;
+      if (["paired", "expired", "failed", "cancelled"].includes(latest.status)) {
+        $("pair-result").textContent = latest.status === "paired"
+          ? "WhatsApp linked successfully. Your bot is starting…"
+          : `Pairing request status: ${latest.status}. You can request a new code if needed.`;
+        await loadDashboard();
+        return;
+      }
+    }
+  } catch {
+    if (token) $("pair-error").textContent = "Could not refresh pairing status. Refresh your dashboard to check again.";
+  } finally { pairingCompletionActive = false; }
+}
 async function waitForPairingCode(pairingId) {
   if (pairingPollActive) return;
   pairingPollActive = true;
@@ -108,7 +134,7 @@ async function waitForPairingCode(pairingId) {
       const latest = dashboard.latest_pairing;
       if (!latest || latest.id !== pairingId) break;
       if (latest.status === "code_ready") {
-        if (await fetchPairingCode(pairingId)) return;
+        if (await fetchPairingCode(pairingId)) { void waitForPairingCompletion(pairingId); return; }
       }
       if (["paired", "expired", "failed", "cancelled"].includes(latest.status)) {
         $("pair-result").textContent = `Pairing request status: ${latest.status}.`;
