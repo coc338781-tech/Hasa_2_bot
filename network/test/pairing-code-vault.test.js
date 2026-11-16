@@ -7,9 +7,9 @@ function fakePool() {
   const client = { async query(sql, params = []) {
     const normalized = String(sql).replace(/\s+/g, " ").trim();
     calls.push({ sql: normalized, params });
-    if (normalized.includes("SELECT pairing_code_ciphertext")) return { rowCount: row ? 1 : 0, rows: row ? [{ ...row }] : [] };
+    if (normalized.includes("SELECT pairing_code_ciphertext")) return { rowCount: row && row.customerId === params[1] ? 1 : 0, rows: row && row.customerId === params[1] ? [{ ...row }] : [] };
     if (normalized.includes("SET pairing_code_ciphertext = $3")) {
-      row = { pairing_code_ciphertext: params[2], pairing_code_nonce: params[3], pairing_code_auth_tag: params[4], expires_at: params[5] };
+      row = { customerId: params[1], pairing_code_ciphertext: params[2], pairing_code_nonce: params[3], pairing_code_auth_tag: params[4], expires_at: params[5] };
       return { rowCount: 1, rows: [{ id: params[0] }] };
     }
     if (normalized.includes("SET pairing_code_ciphertext = NULL")) { row = null; return { rowCount: 1, rows: [] }; }
