@@ -124,7 +124,7 @@ $("pair-form").addEventListener("submit", async event => {
     $("pair-status").textContent = result.request.status;
     void waitForPairingCode(result.request.id);
   } catch (error) {
-    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : error.message === "server_unavailable" ? "Your bot is not assigned to an online server yet. Please contact support." : "Could not create the pairing request. Please try again.");
+    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : error.message === "server_unavailable" ? "Your bot is not assigned to an online server yet. Please contact support." : error.message === "bot_not_ready" ? "Your bot is still being prepared or is already connecting. Refresh the dashboard and try again." : "Could not create the pairing request. Please try again.");
   }
 });
 })();
