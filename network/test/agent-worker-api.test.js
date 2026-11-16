@@ -18,6 +18,7 @@ test("registered server agent can claim and complete only its own allow-listed p
     customer_id: "44444444-4444-4444-8444-444444444444", job_type: "pairing_start", status: "running",
     payload: { pairing_request_id: "55555555-5555-4555-8555-555555555555", phone_e164: "+94771234567" } };
   const provisioningStore = {
+    async getMinFreeMemoryBytes() { return 768 * 1024 * 1024; },
     async claimNextJob(id) { assert.equal(id, serverId); return job; },
     async getJobForServer(id, server) { assert.equal(id, jobId); assert.equal(server, serverId); return job; },
     async finishJob(id, server, result) { calls.push({ type: "finish", id, server, result }); return true; },
