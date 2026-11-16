@@ -13,7 +13,7 @@ export async function getAvailableMemoryBytes({ readFileImpl = readFile, fallbac
   if (os.platform() === "linux") {
     try {
       const meminfo = await readFileImpl("/proc/meminfo", "utf8");
-      const match = /^MemAvailable:\\s+(\\d+)\\s+kB$/m.exec(meminfo);
+      const match = /^MemAvailable:\s+(\d+)\s+kB$/m.exec(meminfo);
       if (match) {
         const bytes = Number(match[1]) * 1024;
         if (Number.isSafeInteger(bytes) && bytes >= 0) return bytes;
