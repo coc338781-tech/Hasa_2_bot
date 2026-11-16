@@ -3,6 +3,8 @@
 const $ = id => document.getElementById(id);
 let token = null;
 let mode = "login";
+let pairingPollActive = false;
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -72,15 +74,46 @@ $("logout").addEventListener("click", async () => {
   try { await api("/v1/customer/logout", { method: "POST", body: "{}" }); } catch {}
   token = null; $("workspace").classList.add("hidden"); $("auth").classList.remove("hidden"); $("logout").classList.add("hidden"); setMode("login");
 });
+async function fetchPairingCode(pairingId) {
+  try {
+    const result = await api(`/v1/customer/pairing-requests/${encodeURIComponent(pairingId)}/code`);
+    $("pair-result").classList.remove("hidden");
+    $("pair-result").textContent = `Your WhatsApp pairing code: ${result.code} · Expires ${new Date(result.expires_at).toLocaleTimeString()}. Enter it in WhatsApp → Linked devices → Link with phone number.`;
+    return true;
+  } catch { return false; }
+}
+async function waitForPairingCode(pairingId) {
+  if (pairingPollActive) return;
+  pairingPollActive = true;
+  try {
+    for (let attempt = 0; attempt < 90 && token; attempt += 1) {
+      await wait(2000);
+      const dashboard = await api("/v1/customer/me");
+      const latest = dashboard.latest_pairing;
+      if (!latest || latest.id !== pairingId) break;
+      if (latest.status === "code_ready") {
+        if (await fetchPairingCode(pairingId)) return;
+      }
+      if (["paired", "expired", "failed", "cancelled"].includes(latest.status)) {
+        $("pair-result").textContent = `Pairing request status: ${latest.status}.`;
+        return;
+      }
+      $("pair-status").textContent = latest.status;
+    }
+  } catch {
+    if (token) $("pair-error").textContent = "Connection to the pairing worker was interrupted. Refresh your dashboard to check the status.";
+  } finally { pairingPollActive = false; }
+}
 $("pair-form").addEventListener("submit", async event => {
   event.preventDefault(); showError("pair-error", "");
   try {
     const result = await api("/v1/customer/pairing-requests", { method: "POST", body: JSON.stringify({ phone: $("pair-phone").value }) });
     $("pair-result").classList.remove("hidden");
-    $("pair-result").textContent = `Request received. Status: ${result.request.status}. A real pairing code will appear only after the secure WhatsApp worker is connected.`;
+    $("pair-result").textContent = `Request received. Status: ${result.request.status}. Waiting for your assigned server to generate the real WhatsApp pairing code...`;
     $("pair-status").textContent = result.request.status;
+    void waitForPairingCode(result.request.id);
   } catch (error) {
-    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : "Could not create the pairing request. Please try again.");
+    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : error.message === "server_unavailable" ? "Your bot is not assigned to an online server yet. Please contact support." : "Could not create the pairing request. Please try again.");
   }
 });
 })();
