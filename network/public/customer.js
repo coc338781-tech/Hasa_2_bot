@@ -137,15 +137,14 @@ async function runBotAction(action) {
       if (!bot) break;
       $("bot-status").textContent = bot.status;
       $("runtime-status").textContent = bot.status;
-      $("bot-start").disabled = !bot.whatsapp_registered || !["offline", "failed"].includes(bot.status);
-      $("bot-stop").disabled = !bot.whatsapp_registered || !["online", "provisioning"].includes(bot.status);
-      $("bot-restart").disabled = !bot.whatsapp_registered || bot.status !== "online";
       if (["online", "offline", "failed"].includes(bot.status)) {
         $("action-result").textContent = `Your bot status is now: ${bot.status}.`;
+        await loadDashboard();
         return;
       }
     }
     $("action-result").textContent = "Your request is still processing. Refresh this page to check the latest status.";
+    await loadDashboard().catch(() => {});
   } catch (error) {
     const messages = {
       server_unavailable: "Your assigned server is offline.",
