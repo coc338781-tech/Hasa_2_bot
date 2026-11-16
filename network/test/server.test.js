@@ -16,7 +16,7 @@ test("health endpoint returns service status without exposing secrets", async ()
     const body = await response.json();
     assert.equal(body.service, "hasa-bot-network-api");
     assert.equal(body.status, "ok");
-    assert.equal(body.version, "0.4.0");
+    assert.equal(body.version, "0.5.0");
     assert.equal(typeof body.timestamp, "string");
     assert.equal("secrets" in body, false);
   } finally {
@@ -101,6 +101,42 @@ test("public customer website does not expose website editing controls", async (
     const html = await response.text();
     assert.doesNotMatch(html, /edit website|change theme|website editor/i);
     assert.match(html, /No customer website editor/);
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+
+test("customer workspace is served with restrictive CSP", async () => {
+  const server = createAppServer();
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(`${base}/customer`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-security-policy"), /default-src 'self'/);
+    assert.match(await response.text(), /PRIVATE CUSTOMER WORKSPACE/);
+    const script = await fetch(`${base}/customer.js`);
+    assert.equal(script.status, 200);
+    assert.match(await script.text(), /v1\/customer\/me/);
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test("customer API fails closed without configured database", async () => {
+  const server = createAppServer();
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(`${base}/v1/customer/register`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "person@example.com", phone: "+94771234567", password: "a-secure-password" })
+    });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: "customer_auth_unavailable" });
+    const protectedResponse = await fetch(`${base}/v1/customer/me`);
+    assert.equal(protectedResponse.status, 401);
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
