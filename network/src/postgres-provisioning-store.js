@@ -89,7 +89,7 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const owned = await client.query(
-          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, b.runtime_provisioned, s.status AS server_status, s.last_heartbeat_at
+          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, b.runtime_provisioned, s.status AS server_status, s.last_heartbeat_at, s.memory_available_bytes
              FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
         if (owned.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_found" }; }
@@ -100,6 +100,10 @@ export function createPostgresProvisioningStore(pool) {
         if (!server.server_id || server.server_status !== "online" ||
             !server.last_heartbeat_at || Date.now() - new Date(server.last_heartbeat_at).getTime() > 150_000) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_unavailable" };
+        }
+        const minFreeMemoryBytes = await readMinFreeMemoryBytes(client);
+        if (Number(server.memory_available_bytes || 0) < minFreeMemoryBytes) {
+          await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" };
         }
         await client.query(
           `UPDATE pairing_requests SET status = 'cancelled', pairing_code_ciphertext = NULL, pairing_code_nonce = NULL,
