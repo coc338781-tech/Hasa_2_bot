@@ -13,7 +13,7 @@ const client = createAgentWorkerClient({
 });
 const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
 const worker = createProvisioningWorker({
-  client, dataDir, baileys, logger,
+  client, dataDir, codeDir: process.env.HASA_BOT_CODE_DIR || "/opt/hasa-bot", baileys, logger,
   maxSessions: Number(process.env.HASA_WORKER_MAX_SESSIONS || 2)
 });
 await worker.start();
