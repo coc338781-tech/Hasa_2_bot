@@ -26,8 +26,8 @@ export function createAgentWorkerClient({ apiUrl, token, fetchImpl = fetch, time
       const result = await request("/v1/agent/settings");
       return { minFreeMemoryBytes: Number(result.min_free_memory_bytes) };
     },
-    async claimNextJob({ capacityAvailable = true, activeInstanceIds = [] } = {}) {
-      const result = await request("/v1/agent/jobs/claim", { capacity_available: capacityAvailable, active_instance_ids: activeInstanceIds });
+    async claimNextJob({ capacityAvailable = true, memoryAvailable = true, activeInstanceIds = [] } = {}) {
+      const result = await request("/v1/agent/jobs/claim", { capacity_available: capacityAvailable, memory_available: memoryAvailable, active_instance_ids: activeInstanceIds });
       return result.job || null;
     },
     async finishJob(jobId, { status, result = null, errorCode = null } = {}) {
