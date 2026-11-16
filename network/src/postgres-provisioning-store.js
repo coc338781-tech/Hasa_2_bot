@@ -22,7 +22,6 @@ export function createPostgresProvisioningStore(pool) {
         const bot = await client.query(
           `UPDATE bot_instances SET server_id = $2, status = 'offline', updated_at = now()
             WHERE id = $1 AND status IN ('offline','failed') AND whatsapp_registered = false
-              AND server_id IS DISTINCT FROM $2
             RETURNING id, customer_id, server_id`, [botId, serverId]);
         if (bot.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_assignable" }; }
         const customer = await client.query("SELECT phone_e164 FROM customers WHERE id = $1", [bot.rows[0].customer_id]);
