@@ -56,7 +56,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
         await botRuntime.createInstance(job);
       } else if (job.job_type === "pairing_start") {
         const pairingId = job.payload?.pairing_request_id;
-        const phone = job.payload?.phone_e164;
+        const phone = job.phone_e164;
         if (!pairingId || !phone || !job.bot_instance_id) throw Object.assign(new Error("invalid_pairing_job"), { code: "invalid_pairing_job" });
         const registeredPhone = await botRuntime.getRegisteredPhone(job.bot_instance_id);
         const requestedPhone = phone.replace(/\D/g, "");
