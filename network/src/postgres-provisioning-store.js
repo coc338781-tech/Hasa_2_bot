@@ -21,7 +21,8 @@ export function createPostgresProvisioningStore(pool) {
         if (Number(server.rows[0].memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) { await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" }; }
         const bot = await client.query(
           `UPDATE bot_instances SET server_id = $2, status = 'offline', updated_at = now()
-            WHERE id = $1 AND status IN ('offline','failed')
+            WHERE id = $1 AND status IN ('offline','failed') AND whatsapp_registered = false
+              AND server_id IS DISTINCT FROM $2
             RETURNING id, customer_id, server_id`, [botId, serverId]);
         if (bot.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_assignable" }; }
         const customer = await client.query("SELECT phone_e164 FROM customers WHERE id = $1", [bot.rows[0].customer_id]);
@@ -193,7 +194,7 @@ export function createPostgresProvisioningStore(pool) {
     },
     async listBots() {
       const result = await pool.query(
-        `SELECT b.id, b.customer_id, c.display_name, c.phone_e164, b.status,
+        `SELECT b.id, b.customer_id, c.display_name, c.phone_e164, b.status, b.whatsapp_registered,
                 b.server_id, s.label AS server_label, s.status AS server_status,
                 b.release_version, b.last_started_at, b.last_stopped_at, b.last_error_code
            FROM bot_instances b
