@@ -22,8 +22,8 @@ export function createAgentWorkerClient({ apiUrl, token, fetchImpl = fetch, time
     return data;
   }
   return Object.freeze({
-    async claimNextJob() {
-      const result = await request("/v1/agent/jobs/claim");
+    async claimNextJob({ capacityAvailable = true } = {}) {
+      const result = await request("/v1/agent/jobs/claim", { capacity_available: capacityAvailable });
       return result.job || null;
     },
     async finishJob(jobId, { status, result = null, errorCode = null } = {}) {
