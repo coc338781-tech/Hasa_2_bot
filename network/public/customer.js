@@ -84,7 +84,14 @@ async function fetchPairingCode(pairingId) {
     $("pair-result").classList.remove("hidden");
     $("pair-result").textContent = `Your WhatsApp pairing code: ${result.code} · Expires ${new Date(result.expires_at).toLocaleTimeString()}. Enter it in WhatsApp → Linked devices → Link with phone number.`;
     return true;
-  } catch { return false; }
+  } catch (error) {
+    if (error.message === "pairing_code_expired_or_already_viewed") {
+      $("pair-result").classList.remove("hidden");
+      $("pair-result").textContent = "This one-time pairing code has expired or has already been displayed. Start a new pairing request if needed.";
+      return true;
+    }
+    return false;
+  }
 }
 async function waitForPairingCode(pairingId) {
   if (pairingPollActive) return;
