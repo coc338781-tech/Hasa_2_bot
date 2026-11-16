@@ -175,6 +175,7 @@ async function runBotAction(action) {
   } catch (error) {
     const messages = {
       server_unavailable: "Your assigned server is offline.",
+      worker_not_ready: "The server is online, but its bot worker is not ready yet. Please try again shortly.",
       server_low_memory: "The server does not have enough free RAM to start this bot.",
       bot_action_not_allowed: "This action is not available in the bot's current state.",
       action_already_queued: "Another bot action is already processing.",
@@ -197,7 +198,7 @@ $("pair-form").addEventListener("submit", async event => {
     $("pair-status").textContent = result.request.status;
     void waitForPairingCode(result.request.id);
   } catch (error) {
-    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : error.message === "server_unavailable" ? "Your bot is not assigned to an online server yet. Please contact support." : error.message === "bot_not_ready" ? "Your bot is still being prepared or is already connecting. Refresh the dashboard and try again." : error.message === "already_paired" ? "Your WhatsApp account is already linked. Use Start or Restart instead." : "Could not create the pairing request. Please try again.");
+    showError("pair-error", error.message === "invalid_phone" ? "Enter a valid international number, e.g. +94771234567." : error.message === "server_unavailable" ? "Your bot is not assigned to an online server yet. Please contact support." : error.message === "worker_not_ready" ? "Your server bot worker is starting or disconnected. Please try again shortly." : error.message === "bot_not_ready" ? "Your bot is still being prepared or is already connecting. Refresh the dashboard and try again." : error.message === "already_paired" ? "Your WhatsApp account is already linked. Use Start or Restart instead." : "Could not create the pairing request. Please try again.");
   }
 });
 })();
