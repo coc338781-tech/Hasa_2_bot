@@ -11,7 +11,7 @@ test("registered server agent can claim and complete only its own allow-listed p
   const agentStore = {
     async findActiveServerByTokenHash(hash) {
       assert.equal(hash, hashSecret(token));
-      return { id: serverId, status: "online", last_heartbeat_at: new Date().toISOString() };
+      return { id: serverId, status: "online", last_heartbeat_at: new Date().toISOString(), memory_available_bytes: 2 * 1024 * 1024 * 1024 };
     }
   };
   const job = { id: jobId, server_id: serverId, bot_instance_id: "33333333-3333-4333-8333-333333333333",
