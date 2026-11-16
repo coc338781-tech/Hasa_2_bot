@@ -25,6 +25,7 @@ const enrollmentAttempts = new Map();
 const ownerLoginAttempts = new Map();
 const customerLoginAttempts = new Map();
 const customerRegisterAttempts = new Map();
+const customerPairingAttempts = new Map();
 function rateLimited(map, key, now, limit) {
   const entry = map.get(key) || { start: now, count: 0 };
   if (now - entry.start >= 60_000) { entry.start = now; entry.count = 0; }
@@ -70,7 +71,7 @@ async function issueCustomerSession(customerStore, customerId, now) {
   return token;
 }
 
-export function createAppServer({ agentStore = null, customerStore = null, pairingCodeStore = null, clock = () => Date.now() } = {}) {
+export function createAppServer({ agentStore = null, customerStore = null, provisioningStore = null, pairingCodeStore = null, clock = () => Date.now() } = {}) {
   return http.createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "no-store");
@@ -170,6 +171,7 @@ export function createAppServer({ agentStore = null, customerStore = null, pairi
     }
     if (req.method === "POST" && req.url === "/v1/customer/pairing-requests") {
       if (!customerSession) { sendJson(res, 401, { error: "customer_authentication_required" }); return; }
+      if (rateLimited(customerPairingAttempts, customerSession.id, clock(), 3)) { sendJson(res, 429, { error: "rate_limited" }); return; }
       try {
         const body = await readJson(req);
         const phone = normalizePhone(body?.phone);
@@ -259,6 +261,63 @@ export function createAppServer({ agentStore = null, customerStore = null, pairi
       } catch (error) { sendJson(res, error.status || 500, { error: error.status ? error.message : "internal_error" }); }
       return;
     }
+    const agentClaim = req.method === "POST" && req.url === "/v1/agent/jobs/claim";
+    const agentFinish = req.method === "POST" && req.url === "/v1/agent/jobs/finish";
+    const agentPairingCode = req.method === "POST" && req.url === "/v1/agent/pairing-code";
+    const agentPairingStatus = req.method === "POST" && req.url === "/v1/agent/pairing-status";
+    if (agentClaim || agentFinish || agentPairingCode || agentPairingStatus) {
+      const match = /^Bearer ([A-Za-z0-9_-]{32,256})$/.exec(req.headers.authorization || "");
+      if (!match || !agentStore || !provisioningStore) { sendJson(res, 401, { error: "agent_unauthorized" }); return; }
+      const server = await agentStore.findActiveServerByTokenHash(hashSecret(match[1])).catch(() => null);
+      if (!server) { sendJson(res, 401, { error: "agent_unauthorized" }); return; }
+      try {
+        if (agentClaim) {
+          const job = await provisioningStore.claimNextJob(server.id);
+          sendJson(res, 200, { job });
+          return;
+        }
+        const body = await readJson(req);
+        const jobId = typeof body?.job_id === "string" && /^[0-9a-f-]{36}$/i.test(body.job_id) ? body.job_id : null;
+        if (!jobId) { sendJson(res, 400, { error: "invalid_job_id" }); return; }
+        const job = await provisioningStore.getJobForServer(jobId, server.id);
+        if (!job || job.job_type !== "pairing_start") { sendJson(res, 404, { error: "job_not_found" }); return; }
+        if (agentFinish) {
+          const status = body.status;
+          if (!["succeeded", "failed", "cancelled"].includes(status)) { sendJson(res, 400, { error: "invalid_job_status" }); return; }
+          const finished = await provisioningStore.finishJob(jobId, server.id, {
+            status, result: body.result && typeof body.result === "object" ? body.result : null,
+            errorCode: typeof body.error_code === "string" ? body.error_code.slice(0, 80) : null
+          });
+          sendJson(res, finished ? 200 : 404, { finished: Boolean(finished) });
+          return;
+        }
+        if (job.status !== "running" && job.status !== "succeeded") { sendJson(res, 409, { error: "job_not_active" }); return; }
+        if (agentPairingCode) {
+          if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
+          const code = typeof body.code === "string" && /^[A-Z0-9-]{4,32}$/.test(body.code) ? body.code : null;
+          const expiresAt = typeof body.expires_at === "string" && Number.isFinite(Date.parse(body.expires_at)) ? body.expires_at : null;
+          if (!code || !expiresAt) { sendJson(res, 400, { error: "invalid_pairing_code_payload" }); return; }
+          const pairingId = job.payload?.pairing_request_id;
+          await pairingCodeStore.put({ pairingId, customerId: job.customer_id, code, expiresAt });
+          const ready = await provisioningStore.markCodeReady(pairingId, job.customer_id);
+          if (!ready) { await pairingCodeStore.delete(pairingId); sendJson(res, 409, { error: "pairing_request_not_active" }); return; }
+          sendJson(res, 200, { stored: true });
+          return;
+        }
+        const status = body.status;
+        if (!["paired", "expired", "failed"].includes(status)) { sendJson(res, 400, { error: "invalid_pairing_status" }); return; }
+        const updated = await provisioningStore.updatePairingStatus(
+          job.payload?.pairing_request_id, job.customer_id, status,
+          typeof body.failure_code === "string" ? body.failure_code.slice(0, 80) : null
+        );
+        if (status !== "paired") await pairingCodeStore?.delete(job.payload?.pairing_request_id);
+        sendJson(res, updated ? 200 : 409, { updated });
+      } catch (error) {
+        sendJson(res, 500, { error: "agent_job_operation_failed" });
+      }
+      return;
+    }
+
     if (req.method === "POST" && req.url === "/v1/agent/enroll") {
       const remote = req.socket.remoteAddress || "unknown";
       if (enrollmentRateLimited(remote, clock())) { sendJson(res, 429, { error: "rate_limited" }); return; }
@@ -288,7 +347,7 @@ async function main() {
   const port = Number(process.env.HASA_API_PORT || 8787);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("HASA_API_PORT must be an integer between 1 and 65535");
   const runtime = await import("./runtime.js").then(module => module.createConfiguredAgentStore());
-  const server = createAppServer({ agentStore: runtime.store, customerStore: runtime.customerStore, pairingCodeStore: runtime.pairingCodeStore });
+  const server = createAppServer({ agentStore: runtime.store, customerStore: runtime.customerStore, provisioningStore: runtime.provisioningStore, pairingCodeStore: runtime.pairingCodeStore });
   server.listen(port, host, () => console.log(`HASA BOT NETWORK API v${VERSION} listening on ${host}:${port}`));
   const shutdown = signal => server.close(async error => {
     if (runtime.close) await runtime.close().catch(closeError => { console.error("Database shutdown failed:", closeError.message); process.exitCode = 1; });
