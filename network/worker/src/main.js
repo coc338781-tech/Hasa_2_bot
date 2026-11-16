@@ -1,5 +1,5 @@
 import pino from "pino";
-import baileys from "@whiskeysockets/baileys";
+import * as baileys from "@whiskeysockets/baileys";
 import { createProvisioningWorker } from "./provisioning-worker.js";
 import { createAgentWorkerClient } from "./agent-client.js";
 
