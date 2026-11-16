@@ -51,6 +51,8 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
       if (current.exitCode === null && current.signalCode === null) return { started: true, alreadyRunning: true };
       children.delete(instanceId);
     }
+    reportedExit.delete(instanceId);
+    healthStates.delete(instanceId);
     const dir = instancePath(root, instanceId);
     await ensureDirectory(dir);
     const authDir = join(dir, "auth_info");
