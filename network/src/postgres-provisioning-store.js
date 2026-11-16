@@ -122,6 +122,17 @@ export function createPostgresProvisioningStore(pool) {
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
+    async listBots() {
+      const result = await pool.query(
+        `SELECT b.id, b.customer_id, c.display_name, c.phone_e164, b.status,
+                b.server_id, s.label AS server_label, s.status AS server_status,
+                b.release_version, b.last_started_at, b.last_stopped_at, b.last_error_code
+           FROM bot_instances b
+           JOIN customers c ON c.id = b.customer_id
+           LEFT JOIN servers s ON s.id = b.server_id
+          ORDER BY b.created_at DESC LIMIT 1000`);
+      return result.rows;
+    },
     async getJobForServer(jobId, serverId) {
       const result = await pool.query(
         `SELECT id, server_id, bot_instance_id, customer_id, job_type, status, payload
