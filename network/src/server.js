@@ -10,6 +10,10 @@ import { randomUUID } from "node:crypto";
 const VERSION = "0.4.0";
 const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
 const STATIC_TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+const STATIC_FILES = {
+  "/": "index.html", "/index.html": "index.html", "/site.css": "site.css", "/site.js": "site.js",
+  "/owner": "owner.html", "/owner/": "owner.html", "/owner.css": "owner.css", "/owner.js": "owner.js"
+};
 const MAX_BODY_BYTES = 16 * 1024;
 const enrollmentAttempts = new Map();
 const ownerLoginAttempts = new Map();
@@ -21,12 +25,8 @@ function rateLimited(map, key, now, limit) {
   if (map.size > 5000) map.clear();
   return entry.count > limit;
 }
-function enrollmentRateLimited(key, now) {
-  return rateLimited(enrollmentAttempts, key, now, 5);
-}
-function ownerLoginRateLimited(key, now) {
-  return rateLimited(ownerLoginAttempts, key, now, 5);
-}
+function enrollmentRateLimited(key, now) { return rateLimited(enrollmentAttempts, key, now, 5); }
+function ownerLoginRateLimited(key, now) { return rateLimited(ownerLoginAttempts, key, now, 5); }
 function ownerAuthorized(req, configuredKey, now) {
   const match = /^Bearer ([A-Za-z0-9_.-]{40,1024})$/.exec(req.headers.authorization || "");
   return Boolean(match && verifyOwnerSession(match[1], configuredKey, now));
@@ -37,13 +37,11 @@ function cleanLabel(value) {
 function cleanProvider(value) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= 60 ? value.trim() : null;
 }
-
 function sendJson(res, status, body) {
   const encoded = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Content-Length": Buffer.byteLength(encoded) });
   res.end(encoded);
 }
-
 async function readJson(req) {
   let size = 0;
   const chunks = [];
@@ -64,10 +62,9 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
-    const staticFiles = { "/owner": "owner.html", "/owner/": "owner.html", "/owner.css": "owner.css", "/owner.js": "owner.js" };
-    if (req.method === "GET" && Object.hasOwn(staticFiles, req.url)) {
+    if (req.method === "GET" && Object.hasOwn(STATIC_FILES, req.url)) {
       try {
-        const filename = staticFiles[req.url];
+        const filename = STATIC_FILES[req.url];
         const content = await readFile(join(PUBLIC_DIR, filename));
         res.writeHead(200, {
           "Content-Type": STATIC_TYPES[extname(filename)],
@@ -77,7 +74,7 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
         });
         res.end(content);
       } catch {
-        sendJson(res, 500, { error: "dashboard_unavailable" });
+        sendJson(res, 500, { error: "website_unavailable" });
       }
       return;
     }
@@ -93,10 +90,7 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
     }
     if (req.method === "POST" && req.url === "/v1/owner/login") {
       const remote = req.socket.remoteAddress || "unknown";
-      if (ownerLoginRateLimited(remote, clock())) {
-        sendJson(res, 429, { error: "rate_limited" });
-        return;
-      }
+      if (ownerLoginRateLimited(remote, clock())) { sendJson(res, 429, { error: "rate_limited" }); return; }
       try {
         const body = await readJson(req);
         const session = createOwnerSession(body?.access_key, process.env.HASA_OWNER_ACCESS_KEY, clock());
@@ -107,77 +101,43 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
       }
       return;
     }
-
-
     if (req.method === "GET" && req.url === "/v1/owner/servers") {
-      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) {
-        sendJson(res, 401, { error: "owner_authentication_required" });
-        return;
-      }
-      if (!agentStore || typeof agentStore.listServers !== "function") {
-        sendJson(res, 503, { error: "server_storage_unavailable" });
-        return;
-      }
-      try {
-        const servers = await agentStore.listServers();
-        sendJson(res, 200, { servers });
-      } catch {
-        sendJson(res, 500, { error: "internal_error" });
-      }
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
+      if (!agentStore || typeof agentStore.listServers !== "function") { sendJson(res, 503, { error: "server_storage_unavailable" }); return; }
+      try { sendJson(res, 200, { servers: await agentStore.listServers() }); }
+      catch { sendJson(res, 500, { error: "internal_error" }); }
       return;
     }
-
     const revokeMatch = req.method === "POST" && /^\/v1\/owner\/servers\/([0-9a-f-]{36})\/revoke$/.exec(req.url || "");
     if (revokeMatch) {
-      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) {
-        sendJson(res, 401, { error: "owner_authentication_required" });
-        return;
-      }
-      if (!agentStore || typeof agentStore.revokeServer !== "function") {
-        sendJson(res, 503, { error: "server_storage_unavailable" });
-        return;
-      }
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
+      if (!agentStore || typeof agentStore.revokeServer !== "function") { sendJson(res, 503, { error: "server_storage_unavailable" }); return; }
       try {
         const revoked = await agentStore.revokeServer(revokeMatch[1]);
         sendJson(res, revoked ? 200 : 404, revoked ? { revoked: true, server_id: revokeMatch[1] } : { error: "server_not_found_or_disabled" });
-      } catch {
-        sendJson(res, 500, { error: "internal_error" });
-      }
+      } catch { sendJson(res, 500, { error: "internal_error" }); }
       return;
     }
-
     if (req.method === "POST" && req.url === "/v1/owner/server-enrollment-tickets") {
-      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) {
-        sendJson(res, 401, { error: "owner_authentication_required" });
-        return;
-      }
+      if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
       try {
         const body = await readJson(req);
         const label = cleanLabel(body?.label);
         const provider = cleanProvider(body?.provider);
         if (!label || !provider) { sendJson(res, 400, { error: "invalid_server_details" }); return; }
-        if (!agentStore || typeof agentStore.createEnrollmentTicket !== "function") {
-          sendJson(res, 503, { error: "enrollment_storage_unavailable" });
-          return;
-        }
+        if (!agentStore || typeof agentStore.createEnrollmentTicket !== "function") { sendJson(res, 503, { error: "enrollment_storage_unavailable" }); return; }
         const ticket = createEnrollmentTicketValue();
         const expiresAt = new Date(clock() + 10 * 60 * 1000).toISOString();
-        await agentStore.createEnrollmentTicket({
-          id: randomUUID(), ticketHash: hashSecret(ticket), label, provider, expiresAt
-        });
+        await agentStore.createEnrollmentTicket({ id: randomUUID(), ticketHash: hashSecret(ticket), label, provider, expiresAt });
         sendJson(res, 201, { ticket, label, provider, expires_at: expiresAt, uses: 1 });
       } catch (error) {
         sendJson(res, error.status || 500, { error: error.status ? error.message : "internal_error" });
       }
       return;
     }
-
     if (req.method === "POST" && req.url === "/v1/agent/enroll") {
       const remote = req.socket.remoteAddress || "unknown";
-      if (enrollmentRateLimited(remote, clock())) {
-        sendJson(res, 429, { error: "rate_limited" });
-        return;
-      }
+      if (enrollmentRateLimited(remote, clock())) { sendJson(res, 429, { error: "rate_limited" }); return; }
       try {
         const body = await readJson(req);
         const result = await exchangeEnrollmentTicket({ ticket: body?.ticket, store: agentStore, now: clock() });
@@ -187,7 +147,6 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
       }
       return;
     }
-
     if (req.method === "POST" && req.url === "/v1/agent/heartbeat") {
       const match = /^Bearer ([A-Za-z0-9_-]{32,256})$/.exec(req.headers.authorization || "");
       if (!match) { sendJson(res, 401, { error: "unauthorized" }); return; }
@@ -220,7 +179,6 @@ async function main() {
   process.once("SIGTERM", () => shutdown("SIGTERM"));
   process.once("SIGINT", () => shutdown("SIGINT"));
 }
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(error => { console.error("HASA API startup failed:", error.message); process.exitCode = 1; });
 }
