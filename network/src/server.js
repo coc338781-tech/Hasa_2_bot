@@ -274,7 +274,9 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
     const agentFinish = req.method === "POST" && req.url === "/v1/agent/jobs/finish";
     const agentPairingCode = req.method === "POST" && req.url === "/v1/agent/pairing-code";
     const agentPairingStatus = req.method === "POST" && req.url === "/v1/agent/pairing-status";
-    if (agentClaim || agentFinish || agentPairingCode || agentPairingStatus) {
+    const agentListInstances = req.method === "POST" && req.url === "/v1/agent/instances/list";
+    const agentInstanceStatus = req.method === "POST" && req.url === "/v1/agent/instances/status";
+    if (agentClaim || agentFinish || agentPairingCode || agentPairingStatus || agentListInstances || agentInstanceStatus) {
       const match = /^Bearer ([A-Za-z0-9_-]{32,256})$/.exec(req.headers.authorization || "");
       if (!match || !agentStore || !provisioningStore) { sendJson(res, 401, { error: "agent_unauthorized" }); return; }
       const server = await agentStore.findActiveServerByTokenHash(hashSecret(match[1])).catch(() => null);
@@ -292,7 +294,23 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
           sendJson(res, 200, { job });
           return;
         }
+        if (agentListInstances) {
+          const instances = await provisioningStore.listInstancesForServer(server.id);
+          sendJson(res, 200, { instances });
+          return;
+        }
         const body = await readJson(req);
+        if (agentInstanceStatus) {
+          const instanceId = typeof body?.instance_id === "string" && /^[0-9a-f-]{36}$/i.test(body.instance_id) ? body.instance_id : null;
+          const status = body?.status;
+          if (!instanceId || !["offline", "failed"].includes(status)) { sendJson(res, 400, { error: "invalid_instance_status" }); return; }
+          const updated = await provisioningStore.updateBotStatusForServer({
+            instanceId, serverId: server.id, status,
+            errorCode: typeof body.error_code === "string" ? body.error_code.slice(0, 80) : null
+          });
+          sendJson(res, updated ? 200 : 404, { updated });
+          return;
+        }
         const jobId = typeof body?.job_id === "string" && /^[0-9a-f-]{36}$/i.test(body.job_id) ? body.job_id : null;
         if (!jobId) { sendJson(res, 400, { error: "invalid_job_id" }); return; }
         const job = await provisioningStore.getJobForServer(jobId, server.id);
