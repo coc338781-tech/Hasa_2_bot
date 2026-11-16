@@ -190,7 +190,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       return;
     }
 
-    const botActionMatch = req.method === "POST" && /^\\/v1\\/customer\\/bots\\/([0-9a-f-]{36})\\/actions$/.exec(req.url || "");
+    const botActionMatch = req.method === "POST" && /^\/v1\/customer\/bots\/([0-9a-f-]{36})\/actions$/.exec(req.url || "");
     if (botActionMatch) {
       if (!customerSession) { sendJson(res, 401, { error: "customer_authentication_required" }); return; }
       if (!customerStore || typeof customerStore.queueBotAction !== "function") { sendJson(res, 503, { error: "customer_action_unavailable" }); return; }
@@ -206,7 +206,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       return;
     }
 
-    const pairingCodeMatch = req.method === "GET" && /^\\/v1\\/customer\\/pairing-requests\\/([0-9a-f-]{36})\\/code$/.exec(req.url || "");
+    const pairingCodeMatch = req.method === "GET" && /^\/v1\/customer\/pairing-requests\/([0-9a-f-]{36})\/code$/.exec(req.url || "");
     if (pairingCodeMatch) {
       if (!customerSession) { sendJson(res, 401, { error: "customer_authentication_required" }); return; }
       if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
@@ -254,7 +254,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       } catch { sendJson(res, 500, { error: "settings_update_failed" }); }
       return;
     }
-    const assignBotMatch = req.method === "POST" && /^\\/v1\\/owner\\/bots\\/([0-9a-f-]{36})\\/assign-server$/.exec(req.url || "");
+    const assignBotMatch = req.method === "POST" && /^\/v1\/owner\/bots\/([0-9a-f-]{36})\/assign-server$/.exec(req.url || "");
     if (assignBotMatch) {
       if (!ownerAuthorized(req, process.env.HASA_OWNER_ACCESS_KEY, clock())) { sendJson(res, 401, { error: "owner_authentication_required" }); return; }
       if (!customerStore || typeof customerStore.assignBotToServer !== "function") { sendJson(res, 503, { error: "provisioning_storage_unavailable" }); return; }
