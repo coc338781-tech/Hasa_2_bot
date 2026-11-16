@@ -1,9 +1,19 @@
 import http from "node:http";
 import { pathToFileURL } from "node:url";
 import { acceptHeartbeat } from "./heartbeat.js";
+import { exchangeEnrollmentTicket } from "./enrollment.js";
 
 const VERSION = "0.2.0";
 const MAX_BODY_BYTES = 16 * 1024;
+const enrollmentAttempts = new Map();
+function enrollmentRateLimited(key, now) {
+  const entry = enrollmentAttempts.get(key) || { start: now, count: 0 };
+  if (now - entry.start >= 60_000) { entry.start = now; entry.count = 0; }
+  entry.count += 1;
+  enrollmentAttempts.set(key, entry);
+  if (enrollmentAttempts.size > 5000) enrollmentAttempts.clear();
+  return entry.count > 5;
+}
 
 function sendJson(res, status, body) {
   const encoded = JSON.stringify(body);
@@ -33,6 +43,22 @@ export function createAppServer({ agentStore = null, clock = () => Date.now() } 
       sendJson(res, 200, { service: "hasa-bot-network-api", status: "ok", version: VERSION, timestamp: new Date(clock()).toISOString() });
       return;
     }
+    if (req.method === "POST" && req.url === "/v1/agent/enroll") {
+      const remote = req.socket.remoteAddress || "unknown";
+      if (enrollmentRateLimited(remote, clock())) {
+        sendJson(res, 429, { error: "rate_limited" });
+        return;
+      }
+      try {
+        const body = await readJson(req);
+        const result = await exchangeEnrollmentTicket({ ticket: body?.ticket, store: agentStore, now: clock() });
+        sendJson(res, result.status, result.body || { error: result.error });
+      } catch (error) {
+        sendJson(res, error.status || 500, { error: error.status ? error.message : "internal_error" });
+      }
+      return;
+    }
+
     if (req.method === "POST" && req.url === "/v1/agent/heartbeat") {
       const match = /^Bearer ([A-Za-z0-9_-]{32,256})$/.exec(req.headers.authorization || "");
       if (!match) { sendJson(res, 401, { error: "unauthorized" }); return; }
