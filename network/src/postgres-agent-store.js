@@ -2,6 +2,38 @@
 export function createPostgresAgentStore(pool) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") throw new TypeError("A PostgreSQL Pool-compatible object is required");
   return {
+    async listServers() {
+      const result = await pool.query(
+        `SELECT id, label, provider, hostname, os_name, os_release, architecture, agent_version,
+                status, cpu_cores, memory_total_bytes, memory_available_bytes,
+                disk_total_bytes, disk_available_bytes, last_heartbeat_at, created_at
+           FROM servers ORDER BY created_at DESC LIMIT 500`
+      );
+      return result.rows;
+    },
+    async revokeServer(serverId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const changed = await client.query(
+          `UPDATE servers SET status = 'disabled', updated_at = now() WHERE id = $1 AND status <> 'disabled' RETURNING id`,
+          [serverId]
+        );
+        if (changed.rowCount !== 1) { await client.query("ROLLBACK"); return false; }
+        await client.query(
+          `UPDATE server_agent_credentials SET revoked_at = COALESCE(revoked_at, now()) WHERE server_id = $1`,
+          [serverId]
+        );
+        await client.query(
+          `INSERT INTO audit_events (action, resource_type, resource_id, outcome, metadata)
+           VALUES ('server.revoke', 'server', $1, 'success', '{}'::jsonb)`,
+          [serverId]
+        );
+        await client.query("COMMIT");
+        return true;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
     async createEnrollmentTicket({ id, ticketHash, label, provider, expiresAt }) {
       await pool.query(
         `INSERT INTO server_enrollment_tickets (id, ticket_hash, label, provider, expires_at)
