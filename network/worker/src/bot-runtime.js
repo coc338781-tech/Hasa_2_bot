@@ -27,7 +27,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
       catch (error) { logger?.warn?.({ instanceId: payload.instanceId, error: error?.message }, "Bot exit callback failed"); }
     }
   }
-  async function createInstance({ bot_instance_id, payload = {} }) {
+  async function createInstance({ bot_instance_id }) {
     const dir = instancePath(root, bot_instance_id);
     await ensureDirectory(root); await ensureDirectory(dir);
     for (const child of ["auth_info", "data", "downloads"]) await ensureDirectory(join(dir, child));
@@ -39,9 +39,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       const template = JSON.parse(await readFile(join(codeRoot, "config.example.json"), "utf8"));
-      const ownerPhone = typeof payload.owner_phone === "string" ? payload.owner_phone.replace(/\D/g, "") : "";
-      if (!/^\d{8,15}$/.test(ownerPhone)) throw new Error("customer_owner_phone_missing");
-      template.owner = [ownerPhone];
+      template.owner = [];
       template.botName = "HASA BOT";
       template.downloadDir = "downloads";
       await writeFile(configPath, JSON.stringify(template, null, 2) + "\n", { flag: "wx", mode: 0o600 });
