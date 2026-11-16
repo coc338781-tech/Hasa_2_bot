@@ -248,7 +248,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       try {
         const body = await readJson(req);
         const mb = body?.min_free_memory_mb;
-        if (!Number.isInteger(mb) || mb < 128 || mb > 65536) { sendJson(res, 400, { error: "invalid_min_free_memory_mb" }); return; }
+        if (!Number.isInteger(mb) || mb < 512 || mb > 65536) { sendJson(res, 400, { error: "invalid_min_free_memory_mb" }); return; }
         const bytes = await provisioningStore.setMinFreeMemoryBytes(mb * 1048576);
         sendJson(res, 200, { updated: true, min_free_memory_bytes: bytes, min_free_memory_mb: Math.round(bytes / 1048576) });
       } catch { sendJson(res, 500, { error: "settings_update_failed" }); }
