@@ -290,8 +290,14 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       try {
         if (agentClaim) {
           if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
-          const job = await provisioningStore.claimNextJob(server.id);
-          sendJson(res, 200, { job });
+          const claimBody = await readJson(req);
+          const capacityAvailable = claimBody.capacity_available !== false;
+          const enoughMemory = Number(server.memory_available_bytes || 0) >= MIN_FREE_MEMORY_BYTES;
+          const allowedTypes = capacityAvailable && enoughMemory
+            ? ["instance_create", "pairing_start", "instance_start", "instance_stop", "instance_restart"]
+            : ["instance_create", "instance_stop", "instance_restart"];
+          const job = await provisioningStore.claimNextJob(server.id, 90, allowedTypes);
+          sendJson(res, 200, { job, paused: enoughMemory ? null : "low_memory" });
           return;
         }
         if (agentListInstances) {
@@ -303,7 +309,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         if (agentInstanceStatus) {
           const instanceId = typeof body?.instance_id === "string" && /^[0-9a-f-]{36}$/i.test(body.instance_id) ? body.instance_id : null;
           const status = body?.status;
-          if (!instanceId || !["offline", "failed"].includes(status)) { sendJson(res, 400, { error: "invalid_instance_status" }); return; }
+          if (!instanceId || !["online", "provisioning", "offline", "failed"].includes(status)) { sendJson(res, 400, { error: "invalid_instance_status" }); return; }
           const updated = await provisioningStore.updateBotStatusForServer({
             instanceId, serverId: server.id, status,
             errorCode: typeof body.error_code === "string" ? body.error_code.slice(0, 80) : null
