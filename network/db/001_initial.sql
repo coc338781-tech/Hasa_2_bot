@@ -109,3 +109,5 @@ CREATE TABLE IF NOT EXISTS server_enrollment_tickets (
 );
 CREATE INDEX IF NOT EXISTS server_enrollment_tickets_expiry_idx
   ON server_enrollment_tickets(expires_at) WHERE consumed_at IS NULL;
+
+ALTER TABLE servers ADD COLUMN IF NOT EXISTS load_average JSONB;
