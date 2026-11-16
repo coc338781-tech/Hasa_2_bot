@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectTelemetry } from "../src/agent.js";
+import { collectTelemetry, getAvailableMemoryBytes } from "../src/agent.js";
 
 test("telemetry reports host capacity without secrets or process data", async () => {
   const data = await collectTelemetry("/");
@@ -19,4 +19,13 @@ test("telemetry reports host capacity without secrets or process data", async ()
   assert.equal("processes" in data, false);
   assert.equal("session" in data, false);
   assert.equal("token" in data, false);
+});
+
+test("Linux telemetry uses MemAvailable rather than raw free pages", async () => {
+  const available = await getAvailableMemoryBytes({
+    readFileImpl: async () => "MemTotal: 4096000 kB\\nMemAvailable: 123456 kB\\n",
+    fallback: () => 1
+  });
+  if (process.platform === "linux") assert.equal(available, 123456 * 1024);
+  else assert.equal(available, 1);
 });
