@@ -21,8 +21,6 @@ const STATIC_FILES = {
   "/customer": "customer.html", "/customer/": "customer.html", "/customer.css": "customer.css", "/customer.js": "customer.js"
 };
 const MAX_BODY_BYTES = 16 * 1024;
-const MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
-if (!Number.isSafeInteger(MIN_FREE_MEMORY_BYTES) || MIN_FREE_MEMORY_BYTES < 0) throw new Error("HASA_MIN_FREE_MEMORY_BYTES must be a non-negative safe integer");
 const enrollmentAttempts = new Map();
 const ownerLoginAttempts = new Map();
 const customerLoginAttempts = new Map();
