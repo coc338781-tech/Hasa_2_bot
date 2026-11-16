@@ -52,7 +52,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
   async function refreshMemoryPolicy() {
     try {
       const settings = await client.getSettings();
-      if (Number.isSafeInteger(settings.minFreeMemoryBytes) && settings.minFreeMemoryBytes >= 128 * 1024 * 1024) {
+      if (Number.isSafeInteger(settings.minFreeMemoryBytes) && settings.minFreeMemoryBytes >= 512 * 1024 * 1024) {
         activeMinFreeMemoryBytes = settings.minFreeMemoryBytes;
       }
     } catch (error) { logger?.warn?.({ error: error?.message }, "Using last known RAM admission policy"); }
