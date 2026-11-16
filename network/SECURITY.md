@@ -11,6 +11,14 @@
 - The agent cannot run arbitrary shell commands. It accepts typed operations from a strict allow-list.
 - Secrets are never stored in source control or emitted in logs.
 
+## Website design and role boundaries
+
+- Website branding, themes, layout, pages, menus, navigation and global settings are editable by the single platform owner only.
+- Customers receive no website-editor or repository/deployment access. They may manage only their own bot using explicitly allowed customer actions.
+- Enforce owner/customer separation on every API request using server-side session identity and tenant scoping. Never trust role or customer identifiers from browser payloads.
+- Owner design-management routes must reject customer sessions even if a customer manually calls the endpoint. Unknown roles and unavailable auth stores fail closed.
+- Audit all owner design and global-setting changes without recording secrets. See [OWNER_DESIGN_POLICY.md](./OWNER_DESIGN_POLICY.md).
+
 ## WhatsApp pairing and sessions
 
 - Pairing requests are short-lived, single-use and bound to the initiating browser session and normalized phone number.
