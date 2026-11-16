@@ -31,11 +31,11 @@ Authorization: Bearer <owner-session>
 - `POST /v1/owner/server-enrollment-tickets` — create a one-use enrollment ticket valid for 10 minutes. JSON body: `{"label":"Oracle primary","provider":"Oracle Cloud"}`. The raw ticket is returned once.
 - `POST /v1/owner/servers/{server_id}/revoke` — disable a server and revoke its agent credential. This action is audited.
 
-The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`. The isolated worker uses that same server agent token over HTTPS for `POST /v1/agent/jobs/claim`, `/v1/agent/jobs/finish`, `/v1/agent/pairing-code` and `/v1/agent/pairing-status`. Every job is bound to the enrolled server identity; workers cannot request arbitrary commands.
+The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sends authenticated heartbeats to `POST /v1/agent/heartbeat`. The isolated worker uses that same server agent token over HTTPS for `POST /v1/agent/jobs/claim`, `/v1/agent/jobs/finish`, `/v1/agent/pairing-code`, `/v1/agent/pairing-status`, `/v1/agent/instances/list` and `/v1/agent/instances/status`. Every job and instance is bound to the enrolled server identity; workers cannot request arbitrary commands.
 
 ## Current limitations
 
-The owner dashboard is available at `/owner`. A PostgreSQL runtime connection is enabled with `DATABASE_URL`; run `npm run db:migrate` from this directory to apply the initial schema. `/readyz` reports whether a persistent store is configured. The owner UI supports server inventory, live telemetry refresh, one-time enrollment ticket creation and credential revocation. The agent supports one-time enrollment and heartbeat reporting. TLS proxy deployment, customer pairing portal, isolated bot provisioning, encrypted session vault and release manager are not yet implemented. Without a configured persistent store, management endpoints fail closed. Do not deploy this API publicly until HTTPS and the deployment secret are configured.
+The owner dashboard is available at `/owner`. A PostgreSQL runtime connection is enabled with `DATABASE_URL`; run `npm run db:migrate` from this directory to apply all numbered migrations. `/readyz` requires the persistent stores and encrypted pairing-code vault to be configured. The owner UI supports server inventory, live telemetry, one-time enrollment tickets, credential revocation, customer bot inventory and server assignment. TLS reverse-proxy deployment, release manager/rollback, production backups, customer quotas and live end-to-end validation remain outstanding. Without configured persistent storage and the pairing-code key, management and worker endpoints fail closed. Do not deploy this API publicly until HTTPS and deployment secrets are configured.
 
 The platform owner retains the credentials and final authority. An assistant can help maintain the code and perform actions only through tools and permissions explicitly made available by the owner; it does not receive permanent independent access to servers.
 
@@ -49,10 +49,12 @@ The customer workspace is served at `/customer`. Public registration accepts an 
 - `GET /v1/customer/me` — return only the authenticated customer's account, bot and latest pairing request.
 - `POST /v1/customer/logout` — revoke the current session.
 - `POST /v1/customer/pairing-requests` — enqueue a pairing request for the authenticated customer's own bot only.
+- `GET /v1/customer/pairing-requests/{pairing_id}/code` — consume the short-lived pairing code once, only for the authenticated customer's latest request.
+- `POST /v1/customer/bots/{bot_id}/actions` — queue `start`, `stop` or `restart` for the authenticated customer's own bot. Server RAM and server ownership are checked.
 
 Customer endpoints fail closed if PostgreSQL is not configured. Login and registration are rate-limited. Customer account and bot lookups are scoped by the authenticated customer ID; no customer-supplied customer ID is trusted.
 
-**Pairing limitation:** request intake is implemented, but the Baileys worker that creates a real WhatsApp pairing code and persists encrypted auth state is not yet connected. The dashboard intentionally never fabricates a pairing code. The request remains queued until the worker and a server runtime are implemented. Do not advertise pairing as live yet.
+**Pairing status:** the Baileys worker, HTTPS job handoff, AES-256-GCM one-time pairing-code vault and isolated per-customer bot process launcher are implemented on the development branch. The worker stores Baileys auth files only on the dedicated encrypted session volume. The dashboard does not fabricate codes. This flow has not yet been verified against a real WhatsApp account on an isolated enrolled server, so do not advertise it as production-live.
 
 
 ## Real pairing-code delivery
