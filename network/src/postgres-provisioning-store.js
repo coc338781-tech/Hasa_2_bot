@@ -36,11 +36,12 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const server = await client.query(
-          `SELECT id, memory_available_bytes FROM servers
+          `SELECT id, memory_available_bytes, worker_last_seen_at FROM servers
             WHERE id = $1 AND status = 'online'
               AND last_heartbeat_at > now() - interval '150 seconds'
             FOR UPDATE`, [serverId]);
         if (server.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "server_not_online" }; }
+        if (!server.rows[0].worker_last_seen_at || Date.now() - new Date(server.rows[0].worker_last_seen_at).getTime() > 90_000) { await client.query("ROLLBACK"); return { ok: false, reason: "worker_not_ready" }; }
         const minFreeMemoryBytes = await readMinFreeMemoryBytes(client);
         if (Number(server.rows[0].memory_available_bytes || 0) < minFreeMemoryBytes) { await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" }; }
         const bot = await client.query(
@@ -93,7 +94,7 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const owned = await client.query(
-          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, b.runtime_provisioned, s.status AS server_status, s.last_heartbeat_at, s.memory_available_bytes
+          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, b.runtime_provisioned, s.status AS server_status, s.last_heartbeat_at, s.worker_last_seen_at, s.memory_available_bytes
              FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
         if (owned.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_found" }; }
@@ -105,6 +106,7 @@ export function createPostgresProvisioningStore(pool) {
             !server.last_heartbeat_at || Date.now() - new Date(server.last_heartbeat_at).getTime() > 150_000) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_unavailable" };
         }
+        if (!server.worker_last_seen_at || Date.now() - new Date(server.worker_last_seen_at).getTime() > 90_000) { await client.query("ROLLBACK"); return { ok: false, reason: "worker_not_ready" }; }
         const minFreeMemoryBytes = await readMinFreeMemoryBytes(client);
         if (Number(server.memory_available_bytes || 0) < minFreeMemoryBytes) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" };
@@ -226,6 +228,7 @@ export function createPostgresProvisioningStore(pool) {
             Date.now() - new Date(bot.last_heartbeat_at).getTime() > 150_000) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_unavailable" };
         }
+        if (!bot.worker_last_seen_at || Date.now() - new Date(bot.worker_last_seen_at).getTime() > 90_000) { await client.query("ROLLBACK"); return { ok: false, reason: "worker_not_ready" }; }
         const allowed = action === "start" ? ["offline", "failed"] : action === "stop" ? ["online", "provisioning"] : ["online"];
         if (!allowed.includes(bot.bot_status)) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_action_not_allowed" }; }
         if (!bot.runtime_provisioned) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
