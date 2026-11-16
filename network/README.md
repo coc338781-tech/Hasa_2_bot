@@ -25,7 +25,7 @@ A separate multi-server hosting and management platform for the single shared HA
 
 - Phase 0: architecture, threat model and operational boundaries.
 - Phase 1: central API, database schema, owner authentication and audit log.
-- Phase 2: server registration and read-only monitoring agent.
+- Phase 2: one-time server registration, authenticated heartbeat and read-only monitoring agent.
 - Phase 3: customer pairing portal and one-time pairing flow.
 - Phase 4: per-customer instance provisioning and encrypted session storage.
 - Phase 5: staged global updates, health checks and rollback.
@@ -33,4 +33,4 @@ A separate multi-server hosting and management platform for the single shared HA
 
 ## Current status
 
-Foundation branch created. This directory is intentionally separate from the existing bot runtime. No server, PM2 process, WhatsApp session or production configuration has been changed.
+Foundation and authenticated heartbeat API are implemented on the development branch. Heartbeat validation, token-hash authentication, replay protection and a PostgreSQL storage adapter are present. The API deliberately returns 503 until a persistent store is explicitly wired into deployment; no database connection or server enrollment is configured yet. This directory is separate from the existing bot runtime. No server, PM2 process, WhatsApp session or production configuration has been changed.
