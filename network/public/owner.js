@@ -52,7 +52,7 @@
       const facts=document.createElement("div"); facts.className="facts";
       const values=[
         ["Provider",server.provider || "—"],["Hostname",server.hostname || "Pending"],["OS",`${server.os_name || "—"} ${server.os_release || ""}`],
-        ["CPU",server.cpu_cores ? `${server.cpu_cores} cores` : "—"],["RAM",server.memory_total_bytes ? `${fmtBytes(server.memory_available_bytes)} free / ${fmtBytes(server.memory_total_bytes)}` : "—"],
+        ["CPU",server.cpu_cores ? `${server.cpu_cores} cores · load ${(server.load_average || []).map(n => Number(n).toFixed(2)).join("/") || "—"}` : "—"],["RAM",server.memory_total_bytes ? `${fmtBytes(server.memory_available_bytes)} free / ${fmtBytes(server.memory_total_bytes)}` : "—"],
         ["Disk",server.disk_total_bytes ? `${fmtBytes(server.disk_available_bytes)} free / ${fmtBytes(server.disk_total_bytes)}` : "—"],
         ["Agent",server.agent_version || "—"],["Heartbeat",ago(server.last_heartbeat_at)],["Server ID",server.id]
       ];
@@ -102,5 +102,6 @@
     try{await navigator.clipboard.writeText($("ticket-value").textContent);notify("Ticket copied. Keep it secret.")}
     catch{notify("Clipboard unavailable. Select and copy the ticket manually.")}
   });
+  setInterval(()=>{if(session)refresh()},30000);
   fetch("/healthz",{cache:"no-store"}).then(r=>r.json()).then(data=>{$("api-state").textContent="API online";$("api-state").classList.add("online");$("version").textContent=data.version || "—"}).catch(()=>{$("api-state").textContent="API unavailable"});
 })();
