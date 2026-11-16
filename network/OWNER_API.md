@@ -33,6 +33,6 @@ The server agent uses `POST /v1/agent/enroll` with the one-time ticket, then sen
 
 ## Current limitations
 
-This is a backend API foundation, not a finished owner web dashboard. Runtime PostgreSQL connection configuration, schema migration execution, owner UI, secure agent-side token installation, TLS proxy deployment and live enrollment are not yet wired together. Without a configured persistent store, management endpoints fail closed. Do not deploy this API publicly until HTTPS and the deployment secret are configured.
+This is a backend API foundation, not a finished owner web dashboard. A PostgreSQL runtime connection is enabled with `DATABASE_URL`; run `npm run db:migrate` from this directory to apply the initial schema. `/readyz` reports whether a persistent store is configured. The owner UI, secure agent-side token installation, TLS proxy deployment and live enrollment are not yet wired together. Without a configured persistent store, management endpoints fail closed. Do not deploy this API publicly until HTTPS and the deployment secret are configured.
 
 The platform owner retains the credentials and final authority. An assistant can help maintain the code and perform actions only through tools and permissions explicitly made available by the owner; it does not receive permanent independent access to servers.
