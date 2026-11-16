@@ -2,6 +2,13 @@
 export function createPostgresAgentStore(pool) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") throw new TypeError("A PostgreSQL Pool-compatible object is required");
   return {
+    async createEnrollmentTicket({ id, ticketHash, label, provider, expiresAt }) {
+      await pool.query(
+        `INSERT INTO server_enrollment_tickets (id, ticket_hash, label, provider, expires_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, ticketHash, label, provider, expiresAt]
+      );
+    },
     async consumeEnrollmentTicket({ ticketHash, serverId, tokenHash, now }) {
       const client = await pool.connect();
       try {
