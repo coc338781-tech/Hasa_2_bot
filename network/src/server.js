@@ -184,7 +184,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
           expiresAt: new Date(clock() + 10 * 60 * 1000).toISOString()
         });
         if (!request) { sendJson(res, 404, { error: "bot_instance_not_found" }); return; }
-        if (!request.ok) { sendJson(res, request.reason === "server_unavailable" ? 503 : ["bot_not_ready", "already_paired", "server_low_memory"].includes(request.reason) ? 409 : 404, { error: request.reason }); return; }
+        if (!request.ok) { sendJson(res, request.reason === "server_unavailable" ? 503 : ["bot_not_ready", "already_paired", "server_low_memory", "worker_not_ready"].includes(request.reason) ? 409 : 404, { error: request.reason }); return; }
         sendJson(res, 202, { accepted: true, request: request.request, worker: "queued" });
       } catch { sendJson(res, 500, { error: "pairing_request_unavailable" }); }
       return;
@@ -200,7 +200,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         const action = body?.action;
         if (!["start", "stop", "restart"].includes(action)) { sendJson(res, 400, { error: "invalid_action" }); return; }
         const result = await customerStore.queueBotAction({ customerId: customerSession.id, botId: botActionMatch[1], action });
-        const status = result.ok ? 202 : ["server_unavailable","server_low_memory","bot_action_not_allowed","action_already_queued","pairing_required"].includes(result.reason) ? 409 : 404;
+        const status = result.ok ? 202 : ["server_unavailable","server_low_memory","worker_not_ready","bot_action_not_allowed","action_already_queued","pairing_required"].includes(result.reason) ? 409 : 404;
         sendJson(res, status, result);
       } catch { sendJson(res, 500, { error: "bot_action_failed" }); }
       return;
@@ -263,7 +263,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         const serverId = typeof body?.server_id === "string" ? body.server_id : "";
         if (!/^[0-9a-f-]{36}$/i.test(serverId)) { sendJson(res, 400, { error: "invalid_server_id" }); return; }
         const result = await customerStore.assignBotToServer({ botId: assignBotMatch[1], serverId });
-        sendJson(res, result.ok ? 200 : ["server_not_online", "server_low_memory"].includes(result.reason) ? 409 : 404, result);
+        sendJson(res, result.ok ? 200 : ["server_not_online", "server_low_memory", "worker_not_ready"].includes(result.reason) ? 409 : 404, result);
       } catch { sendJson(res, 500, { error: "bot_assignment_failed" }); }
       return;
     }
