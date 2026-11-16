@@ -21,6 +21,7 @@ const STATIC_FILES = {
   "/customer": "customer.html", "/customer/": "customer.html", "/customer.css": "customer.css", "/customer.js": "customer.js"
 };
 const MAX_BODY_BYTES = 16 * 1024;
+const MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
 const enrollmentAttempts = new Map();
 const ownerLoginAttempts = new Map();
 const customerLoginAttempts = new Map();
@@ -225,7 +226,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
         const serverId = typeof body?.server_id === "string" ? body.server_id : "";
         if (!/^[0-9a-f-]{36}$/i.test(serverId)) { sendJson(res, 400, { error: "invalid_server_id" }); return; }
         const result = await customerStore.assignBotToServer({ botId: assignBotMatch[1], serverId });
-        sendJson(res, result.ok ? 200 : result.reason === "server_not_online" ? 409 : 404, result);
+        sendJson(res, result.ok ? 200 : ["server_not_online", "server_low_memory"].includes(result.reason) ? 409 : 404, result);
       } catch { sendJson(res, 500, { error: "bot_assignment_failed" }); }
       return;
     }
@@ -279,6 +280,9 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       if (!server) { sendJson(res, 401, { error: "agent_unauthorized" }); return; }
       if (server.status !== "online" || !server.last_heartbeat_at || clock() - Date.parse(server.last_heartbeat_at) > 150_000) {
         sendJson(res, 409, { error: "agent_server_not_online" }); return;
+      }
+      if (Number(server.memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) {
+        sendJson(res, 200, { job: null, paused: "low_memory" }); return;
       }
       try {
         if (agentClaim) {
