@@ -12,6 +12,8 @@ This service runs separately on each enrolled Linux/Oracle server. It does not c
 6. The worker sends the code to the central API over the authenticated HTTPS channel.
 7. The API encrypts the code using AES-256-GCM before storing it in PostgreSQL. The raw code is never logged or stored in plaintext.
 8. The customer API returns the code once, only when the authenticated customer owns the latest pairing request. The encrypted value is deleted on retrieval or expiry.
+9. After WhatsApp confirms the link, the worker saves credentials, closes the temporary pairing socket, and queues an isolated bot start.
+10. The shared HASA bot code runs as a separate child process with its own working directory, `config.json`, `auth_info`, message cache and downloads. The selected WhatsApp number becomes that bot's owner number.
 
 The worker can execute only the job types explicitly exposed by the API. It cannot send remote shell commands, choose file paths, or access another server's jobs.
 
@@ -34,7 +36,7 @@ sudo systemctl status hasa-worker
 sudo journalctl -u hasa-worker -n 100 --no-pager
 ```
 
-The installer refuses to proceed unless the session directory is already a mount point. It creates a dedicated `hasa-worker` account, copies the runtime to `/opt/hasa-network`, and writes the enrolled server's API token into a root-managed, group-restricted service environment file. It does not print the token.
+The installer refuses to proceed unless the session directory is already a mount point. It creates a dedicated `hasa-worker` account, installs the control-plane worker to `/opt/hasa-network`, copies the shared HASA bot source to `/opt/hasa-bot`, installs both dependency sets, and writes the enrolled server's API token into a root-managed, group-restricted service environment file. It does not print the token.
 
 ## Session security
 
@@ -42,11 +44,11 @@ Baileys multi-file auth state is sensitive credential material. File mode `0700`
 
 ## Resource limits
 
-The systemd service is capped at 768 MB and starts with one concurrent pairing session by default. Increase `HASA_WORKER_MAX_SESSIONS` only after measuring real free RAM and testing the server under load. The API/worker service is separate from the existing production `hasa2` PM2 process.
+The systemd service is capped at 768 MB and starts with one active bot/pairing session by default. The API and worker both require at least 768 MiB of currently available host RAM before admitting a new start. Increase `HASA_WORKER_MAX_SESSIONS`, `HASA_MIN_FREE_MEMORY_BYTES` and the systemd `MemoryMax` together only after measuring real free RAM and testing under load. The API/worker service is separate from the existing production `hasa2` PM2 process.
 
 ## Remaining integration gates
 
 - Pairing worker and encrypted one-time code handoff are implemented in this branch, but have not yet been validated against a real WhatsApp account on a live enrolled server.
-- The full HASA bot plugin runtime is not yet provisioned as a per-customer service after WhatsApp pairing.
-- Server-side RAM admission control, instance start/stop/restart, release rollout/rollback, and end-to-end recovery after worker restart still require implementation and tests.
+- Per-customer bot runtime provisioning and customer-owned start/stop/restart controls are implemented, with health-file reporting and worker restart recovery; these paths still require integration tests on an isolated enrolled server.
+- Release rollout/rollback, customer billing/quotas, robust crash-loop policy, and end-to-end tests against real WhatsApp accounts still require implementation.
 - HTTPS reverse-proxy configuration, production database/key setup, and server enrollment are deployment tasks. Do not publish or enable the worker on the production Oracle host until these are complete and explicitly approved.
