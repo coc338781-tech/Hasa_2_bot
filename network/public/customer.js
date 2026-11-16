@@ -38,6 +38,9 @@ async function loadDashboard() {
   $("bot-version").textContent = b?.release_version ? `Version ${b.release_version}` : "Your assigned instance";
   $("bot-id").textContent = b?.id || "Pending";
   $("runtime-status").textContent = b?.status || "Not provisioned";
+  $("bot-start").disabled = !b?.id || !["offline", "failed"].includes(b.status);
+  $("bot-stop").disabled = !b?.id || !["online", "provisioning"].includes(b.status);
+  $("bot-restart").disabled = !b?.id || b.status !== "online";
   $("pair-status").textContent = data.latest_pairing?.status || "None";
   $("pair-result").classList.toggle("hidden", !data.latest_pairing);
   if (data.latest_pairing) {
@@ -115,6 +118,46 @@ async function waitForPairingCode(pairingId) {
     if (token) $("pair-error").textContent = "Connection to the pairing worker was interrupted. Refresh your dashboard to check the status.";
   } finally { pairingPollActive = false; }
 }
+async function runBotAction(action) {
+  const buttons = ["bot-start", "bot-stop", "bot-restart"];
+  for (const id of buttons) $(id).disabled = true;
+  $("action-result").textContent = `Sending ${action} request to your assigned server…`;
+  try {
+    const botId = $("bot-id").textContent;
+    const result = await api(`/v1/customer/bots/${encodeURIComponent(botId)}/actions`, {
+      method: "POST", body: JSON.stringify({ action })
+    });
+    $("action-result").textContent = `Request accepted: ${result.status}. Waiting for your bot…`;
+    for (let attempt = 0; attempt < 45 && token; attempt += 1) {
+      await wait(2000);
+      const data = await api("/v1/customer/me");
+      const bot = data.bot;
+      if (!bot) break;
+      $("bot-status").textContent = bot.status;
+      $("runtime-status").textContent = bot.status;
+      $("bot-start").disabled = !["offline", "failed"].includes(bot.status);
+      $("bot-stop").disabled = !["online", "provisioning"].includes(bot.status);
+      $("bot-restart").disabled = bot.status !== "online";
+      if (["online", "offline", "failed"].includes(bot.status)) {
+        $("action-result").textContent = `Your bot status is now: ${bot.status}.`;
+        return;
+      }
+    }
+    $("action-result").textContent = "Your request is still processing. Refresh this page to check the latest status.";
+  } catch (error) {
+    const messages = {
+      server_unavailable: "Your assigned server is offline.",
+      server_low_memory: "The server does not have enough free RAM to start this bot.",
+      bot_action_not_allowed: "This action is not available in the bot's current state.",
+      action_already_queued: "Another bot action is already processing."
+    };
+    $("action-result").textContent = messages[error.message] || "Could not send the bot action. Please try again.";
+    await loadDashboard().catch(() => {});
+  }
+}
+$("bot-start").addEventListener("click", () => runBotAction("start"));
+$("bot-stop").addEventListener("click", () => runBotAction("stop"));
+$("bot-restart").addEventListener("click", () => runBotAction("restart"));
 $("pair-form").addEventListener("submit", async event => {
   event.preventDefault(); showError("pair-error", "");
   try {
