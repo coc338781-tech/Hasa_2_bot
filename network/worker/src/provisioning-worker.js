@@ -5,6 +5,7 @@ import { createBotRuntime } from "./bot-runtime.js";
 
 export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa-bot", baileys, logger, maxSessions = 2, minFreeMemoryBytes = 768 * 1024 * 1024, pollIntervalMs = 1500 } = {}) {
   if (!client || !dataDir || !codeDir) throw new TypeError("worker_requires_agent_client_and_data_dir");
+  if (!Number.isSafeInteger(minFreeMemoryBytes) || minFreeMemoryBytes < 0) throw new TypeError("invalid_min_free_memory_bytes");
   const activePairs = new Map();
   const botRuntime = createBotRuntime({
     dataDir, codeDir, baileys, logger,
