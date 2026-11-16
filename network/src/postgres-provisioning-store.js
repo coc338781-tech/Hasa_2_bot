@@ -104,9 +104,10 @@ export function createPostgresProvisioningStore(pool) {
         await client.query("BEGIN");
         await client.query(
           `UPDATE provisioning_jobs SET status = $2, result = $3::jsonb, updated_at = now(),
-             completed_at = now(), lease_expires_at = NULL WHERE id = $1`,
-          [jobId, status, result ? JSON.stringify(result) : null]);
+             completed_at = now(), lease_expires_at = NULL WHERE id = $1 AND server_id = $4`,
+          [jobId, status, result ? JSON.stringify(result) : null, serverId]);
         const job = await client.query("SELECT bot_instance_id, customer_id, payload FROM provisioning_jobs WHERE id = $1 AND server_id = $2", [jobId, serverId]);
+        if (!job.rowCount) { await client.query("ROLLBACK"); return false; }
         if (job.rowCount && status === "failed") {
           await client.query(
             `UPDATE pairing_requests SET status = 'failed', failure_code = $2, updated_at = now()
@@ -117,6 +118,7 @@ export function createPostgresProvisioningStore(pool) {
               WHERE id = $1`, [job.rows[0].bot_instance_id, errorCode || "worker_failed"]);
         }
         await client.query("COMMIT");
+        return true;
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
