@@ -101,3 +101,10 @@ test("worker restart jobs are leased only for instances already active on that s
   assert.ok(claim.sql.includes("j.bot_instance_id = ANY($4::uuid[])"));
   assert.deepEqual(claim.params[3], [activeId]);
 });
+
+test("owner cannot assign a bot to a server whose WhatsApp worker is not online", async () => {
+  const pool = fakePool([{ rowCount: 1, rows: [{ id: "server", memory_available_bytes: 2 * 1024 * 1024 * 1024, worker_last_seen_at: null }] }]);
+  const result = await createPostgresProvisioningStore(pool).assignBotToServer({ botId: "bot", serverId: "server" });
+  assert.deepEqual(result, { ok: false, reason: "worker_not_ready" });
+  assert.equal(pool.calls.some(call => call.sql.includes("INSERT INTO provisioning_jobs")), false);
+});
