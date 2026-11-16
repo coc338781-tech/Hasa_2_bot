@@ -7,7 +7,7 @@ export function createPostgresAgentStore(pool) {
         `SELECT id, label, provider, hostname, os_name, os_release, architecture, agent_version,
                 CASE WHEN status = 'online' AND last_heartbeat_at < now() - interval '150 seconds' THEN 'offline' ELSE status END AS status, cpu_cores, load_average, memory_total_bytes, memory_available_bytes,
                 disk_total_bytes, disk_available_bytes, last_heartbeat_at,
-                CASE WHEN worker_last_seen_at > now() - interval '90 seconds' THEN 'online' ELSE 'offline' END AS worker_status,
+                CASE WHEN status = 'online' AND last_heartbeat_at > now() - interval '150 seconds' AND worker_last_seen_at > now() - interval '90 seconds' THEN 'online' ELSE 'offline' END AS worker_status,
                 worker_last_seen_at, worker_version, worker_max_sessions, worker_active_sessions, created_at
            FROM servers ORDER BY created_at DESC LIMIT 500`
       );
