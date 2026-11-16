@@ -1,5 +1,5 @@
 import os from "node:os";
-import { statfs, mkdir, open } from "node:fs/promises";
+import { statfs, mkdir, open, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname } from "node:path";
 import { hostname } from "node:os";
@@ -8,6 +8,20 @@ import { pathToFileURL } from "node:url";
 
 const VERSION = "0.2.0";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function getAvailableMemoryBytes({ readFileImpl = readFile, fallback = os.freemem } = {}) {
+  if (os.platform() === "linux") {
+    try {
+      const meminfo = await readFileImpl("/proc/meminfo", "utf8");
+      const match = /^MemAvailable:\\s+(\\d+)\\s+kB$/m.exec(meminfo);
+      if (match) {
+        const bytes = Number(match[1]) * 1024;
+        if (Number.isSafeInteger(bytes) && bytes >= 0) return bytes;
+      }
+    } catch {}
+  }
+  return fallback();
+}
 
 export async function collectTelemetry(dataPath = process.env.HASA_AGENT_DATA_PATH || "/") {
   const disk = await statfs(dataPath);
@@ -23,7 +37,7 @@ export async function collectTelemetry(dataPath = process.env.HASA_AGENT_DATA_PA
     cpu_cores: os.cpus().length,
     load_average: os.loadavg().map(value => Number(value.toFixed(2))),
     memory_total_bytes: os.totalmem(),
-    memory_available_bytes: os.freemem(),
+    memory_available_bytes: await getAvailableMemoryBytes(),
     disk_total_bytes: totalBlocks * blockSize,
     disk_available_bytes: availableBlocks * blockSize,
     observed_at: new Date().toISOString()
