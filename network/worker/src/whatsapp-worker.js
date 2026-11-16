@@ -1,4 +1,4 @@
-import { mkdir, chmod } from "node:fs/promises";
+import { mkdir, chmod, lstat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import pino from "pino";
@@ -24,7 +24,14 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
     }
     if (sessions.size >= maxSessions) { const error = new Error("worker_capacity_reached"); error.code = "worker_capacity_reached"; throw error; }
     const authDir = safeInstancePath(dataDir, instanceId);
-    await mkdir(authDir, { recursive: true, mode: 0o700 }); await chmod(authDir, 0o700);
+    const rootDir = resolve(dataDir);
+    await mkdir(rootDir, { recursive: true, mode: 0o700 });
+    const rootInfo = await lstat(rootDir);
+    if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) throw new Error("unsafe_worker_data_directory");
+    await mkdir(authDir, { recursive: true, mode: 0o700 });
+    const authInfo = await lstat(authDir);
+    if (authInfo.isSymbolicLink() || !authInfo.isDirectory()) throw new Error("unsafe_instance_auth_directory");
+    await chmod(authDir, 0o700);
     const auth = await baileys.useMultiFileAuthState(authDir);
     const socket = baileys.default({ auth: auth.state, logger: log, printQRInTerminal: false, markOnlineOnConnect: false, syncFullHistory: false, connectTimeoutMs: 60_000, defaultQueryTimeoutMs: 60_000, keepAliveIntervalMs: 25_000, browser: ["HASA BOT NETWORK", "Chrome", "1.0"] });
     const entry = { socket, status: "pairing", pairingCodeIssued: false, timer: null, generation: randomUUID() };
@@ -43,6 +50,7 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
           const code = await socket.requestPairingCode(phone.replace(/\D/g, ""));
           if (sessions.get(instanceId) !== entry || entry.status !== "pairing") return;
           await onPairingCode({ instanceId, code, expiresAt: new Date(Date.now() + pairingTimeoutMs).toISOString() });
+          entry.status = "code_ready";
           await notify(instanceId, "code_ready");
         } catch (error) {
           entry.status = "failed"; clearTimeout(entry.timer);
