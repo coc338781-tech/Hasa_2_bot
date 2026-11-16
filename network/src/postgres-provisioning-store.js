@@ -44,12 +44,13 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const owned = await client.query(
-          `SELECT b.id, b.server_id, b.status AS bot_status, s.status AS server_status, s.last_heartbeat_at
+          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, s.status AS server_status, s.last_heartbeat_at
              FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
         if (owned.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_found" }; }
         const server = owned.rows[0];
         if (server.bot_status !== "offline") { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
+        if (server.whatsapp_registered) { await client.query("ROLLBACK"); return { ok: false, reason: "already_paired" }; }
         if (!server.server_id || server.server_status !== "online" ||
             !server.last_heartbeat_at || Date.now() - new Date(server.last_heartbeat_at).getTime() > 150_000) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_unavailable" };
@@ -154,7 +155,7 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const found = await client.query(
-          `SELECT b.id, b.server_id, b.status AS bot_status, s.status AS server_status,
+          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, s.status AS server_status,
                   s.last_heartbeat_at, s.memory_available_bytes
              FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
@@ -166,6 +167,7 @@ export function createPostgresProvisioningStore(pool) {
         }
         const allowed = action === "start" ? ["offline", "failed"] : action === "stop" ? ["online", "provisioning"] : ["online"];
         if (!allowed.includes(bot.bot_status)) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_action_not_allowed" }; }
+        if (action !== "stop" && !bot.whatsapp_registered) { await client.query("ROLLBACK"); return { ok: false, reason: "pairing_required" }; }
         if (action !== "stop" && Number(bot.memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" };
         }
@@ -211,6 +213,7 @@ export function createPostgresProvisioningStore(pool) {
       if (!["online", "provisioning", "offline", "failed"].includes(status)) return false;
       const result = await pool.query(
         `UPDATE bot_instances SET status = $3, last_error_code = $4,
+           whatsapp_registered = CASE WHEN $4 = 'whatsapp_session_invalid' THEN false ELSE whatsapp_registered END,
            last_started_at = CASE WHEN $3 = 'online' THEN now() ELSE last_started_at END,
            last_stopped_at = CASE WHEN $3 = 'offline' THEN now() ELSE last_stopped_at END,
            updated_at = now()
@@ -259,7 +262,7 @@ export function createPostgresProvisioningStore(pool) {
         const botId = result.rows[0].bot_instance_id;
         if (status === "paired") {
           const bot = await client.query(
-            `UPDATE bot_instances SET status = 'provisioning', last_error_code = NULL, updated_at = now()
+            `UPDATE bot_instances SET status = 'provisioning', whatsapp_registered = true, last_error_code = NULL, updated_at = now()
               WHERE id = $1 RETURNING server_id`, [botId]);
           if (bot.rows[0]?.server_id) {
             await client.query(
