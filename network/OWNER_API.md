@@ -27,7 +27,7 @@ Authorization: Bearer <owner-session>
 
 - `GET /v1/owner/servers` — list up to 500 registered servers and their latest telemetry.
 - `GET /v1/owner/settings` — read the current minimum free RAM reserve.
-- `PUT /v1/owner/settings` — change `min_free_memory_mb` (128–65536 MiB). Default: 768 MiB. This is a free-RAM admission threshold, not total server RAM or a bot memory quota. Existing bots are not stopped when available RAM falls below it.
+- `PUT /v1/owner/settings` — change `min_free_memory_mb` (512–65536 MiB). Default: 768 MiB. This is a free-RAM admission threshold, not total server RAM or a bot memory quota. Existing bots are not stopped when available RAM falls below it.
 - `GET /v1/owner/bots` — list customer bot instances for owner-side allocation.
 - `POST /v1/owner/bots/{bot_id}/assign-server` — assign a bot to an online server. JSON body: `{"server_id":"<registered-server-uuid>"}`. Assignment is audited and rejects offline/stale servers.
 - `POST /v1/owner/server-enrollment-tickets` — create a one-use enrollment ticket valid for 10 minutes. JSON body: `{"label":"Oracle primary","provider":"Oracle Cloud"}`. The raw ticket is returned once.
