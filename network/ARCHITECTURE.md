@@ -1,0 +1,81 @@
+# HASA BOT NETWORK — Architecture
+
+## 1. Topology
+
+```
+Customer Browser
+      |
+      v
+Pairing Portal ---- Central API ---- Owner Console
+                       |
+          +------------+-------------+
+          |            |             |
+       Database    Session Vault  Release Registry
+          |
+     Scheduler / Capacity Allocator
+          |
+    Authenticated outbound agent channel
+          |
+   +------+------+------+
+   |             |      |
+Linux Node 1  Oracle 1  Linux Node N
+   |             |      |
+HASA instance per customer number (isolated)
+```
+
+The control plane is central; bot workloads are distributed across registered Linux servers. The control plane must not require inbound SSH access from the public internet. Agents initiate authenticated outbound connections and accept only signed, allow-listed jobs.
+
+## 2. Identity model
+
+- `customer_id`: internal customer identity.
+- `bot_id`: platform-generated stable ID for one WhatsApp number / bot instance.
+- `server_id`: platform identity for a registered host.
+- `release_id`: immutable version of the shared HASA BOT release.
+- `session_ref`: opaque reference to encrypted credentials; never the credentials themselves.
+
+A phone number is treated as a unique, verified customer resource. The platform stores a normalized number for matching, but logs and dashboards should mask it by default.
+
+## 3. Pairing lifecycle
+
+1. Customer submits their number over HTTPS.
+2. Central API validates format, applies per-IP and per-number rate limits, and creates a short-lived pairing request.
+3. Capacity allocator selects a healthy server with sufficient reserved RAM, disk and process capacity.
+4. Provisioner starts a temporary pairing worker for that request. It asks Baileys for the phone-number pairing code only when the socket is ready.
+5. Portal polls an authenticated request state and displays the code only to the browser session that initiated it.
+6. Customer enters the code in WhatsApp Linked Devices.
+7. On successful registration, the worker writes credentials to the encrypted Session Vault and signals completion.
+8. Provisioner starts the customer's persistent HASA BOT instance using that isolated session.
+9. Pairing code and temporary worker are destroyed; the customer sees the bot ID and status.
+
+Pairing codes are short-lived secrets. Never place them in URLs, analytics, logs, GitHub issues, or shared server reports. A code is displayed in the website; it is not assumed to arrive as an SMS.
+
+## 4. Server scheduling
+
+Capacity is based on measured available memory, CPU load, disk headroom, configured safety reserve and current instance count. Never schedule from total RAM alone. Keep a per-host reserve for OS, agent, control-plane processes and spikes. Do not automatically migrate a live WhatsApp session until a tested, encrypted transfer and single-writer handoff protocol exists.
+
+## 5. Updates
+
+- Build one immutable release artifact from the shared source.
+- Run automated tests and a staging instance first.
+- Deploy to a small canary group.
+- Verify process health, WhatsApp connection state and error rates.
+- Continue in batches only when checks pass.
+- Preserve each instance's data and credentials outside the replaceable release directory.
+- Keep the previous known-good release and provide automatic rollback.
+- Customer `.update` requests only enqueue an update for that customer's instance; owner approval and release policy remain authoritative.
+- Owner global deployment can target all instances, but must be staged and auditable.
+
+## 6. Availability and recovery
+
+A server heartbeat timeout marks a host unavailable; it does not imply its WhatsApp sessions can safely be started elsewhere. The control plane should report the failure, retain the last known state and require a controlled recovery workflow. Prevent two processes from using the same WhatsApp session concurrently.
+
+## 7. Initial technology direction
+
+- Node.js 22 LTS for API and agent, matching the existing bot runtime baseline.
+- PostgreSQL for customer, server, instance, release and audit metadata.
+- Redis or a durable queue for jobs and pairing state.
+- HTTPS for portal/API; outbound mTLS or per-agent certificates for agent communication.
+- Encrypted object storage or encrypted disk-backed vault for session credentials.
+- systemd or a tightly managed process supervisor for agent and bot workloads.
+
+Technology choices are provisional until the first deployable vertical slice is tested on a spare server.
