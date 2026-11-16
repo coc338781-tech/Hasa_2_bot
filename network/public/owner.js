@@ -120,7 +120,7 @@
   async function revoke(id,label) {
     if(!confirm(`Revoke ${label}? Its agent credential will stop working.`))return;
     try{await api(`/v1/owner/servers/${encodeURIComponent(id)}/revoke`,{method:"POST"});notify("Server access revoked.");await refresh()}
-    catch(error){notify(error.message)}
+    catch(error){notify(error.message === "server_has_customer_bots" ? "Cannot revoke this server while it holds paired or running customer bots. Unlink those sessions first." : error.message)}
   }
   $("login-form").addEventListener("submit",async event=>{
     event.preventDefault();$("login-error").textContent="";
