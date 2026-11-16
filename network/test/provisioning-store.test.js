@@ -92,3 +92,12 @@ test("pairing is paused when the assigned server drops below the owner RAM reser
   assert.deepEqual(result, { ok: false, reason: "server_low_memory" });
   assert.equal(pool.calls.some(call => call.sql.includes("INSERT INTO provisioning_jobs")), false);
 });
+
+test("worker restart jobs are leased only for instances already active on that server", async () => {
+  const activeId = "22222222-2222-4222-8222-222222222222";
+  const pool = fakePool([{ rowCount: 1, rows: [{ id: "restart-job", bot_instance_id: activeId, job_type: "instance_restart" }] }]);
+  await createPostgresProvisioningStore(pool).claimNextJob("server", 90, ["instance_restart"], [activeId]);
+  const claim = pool.calls.find(call => call.sql.includes("FOR UPDATE OF j SKIP LOCKED"));
+  assert.ok(claim.sql.includes("j.bot_instance_id = ANY($4::uuid[])"));
+  assert.deepEqual(claim.params[3], [activeId]);
+});
