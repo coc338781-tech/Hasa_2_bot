@@ -37,3 +37,18 @@ test("worker claims jobs with a database lease and skip-locked semantics", async
   assert.equal(job.id, "job");
   assert.ok(pool.calls.some(x => x.sql.includes("FOR UPDATE SKIP LOCKED")));
 });
+
+test("owner assignment requires a live server with the configured RAM reserve", async () => {
+  const pool = fakePool([
+    { rowCount: 1, rows: [{ id: "server", memory_available_bytes: 2 * 1024 * 1024 * 1024 }] },
+    { rowCount: 1, rows: [{ id: "bot", customer_id: "customer", server_id: "server" }] }
+  ]);
+  const result = await createPostgresProvisioningStore(pool).assignBotToServer({ botId: "bot", serverId: "server" });
+  assert.equal(result.ok, true);
+  assert.ok(pool.calls.some(x => x.sql.includes("bot.assign_server")));
+});
+test("owner assignment rejects servers below the RAM safety reserve", async () => {
+  const pool = fakePool([{ rowCount: 1, rows: [{ id: "server", memory_available_bytes: 128 * 1024 * 1024 }] }]);
+  const result = await createPostgresProvisioningStore(pool).assignBotToServer({ botId: "bot", serverId: "server" });
+  assert.deepEqual(result, { ok: false, reason: "server_low_memory" });
+});
