@@ -34,6 +34,13 @@ export function createAgentWorkerClient({ apiUrl, token, fetchImpl = fetch, time
     },
     async updatePairingStatus({ jobId, status, failureCode = null }) {
       return request("/v1/agent/pairing-status", { job_id: jobId, status, failure_code: failureCode });
+    },
+    async listInstances() {
+      const result = await request("/v1/agent/instances/list");
+      return result.instances || [];
+    },
+    async reportInstanceStatus({ instanceId, status, errorCode = null }) {
+      return request("/v1/agent/instances/status", { instance_id: instanceId, status, error_code: errorCode });
     }
   });
 }
