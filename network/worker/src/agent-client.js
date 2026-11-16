@@ -22,8 +22,8 @@ export function createAgentWorkerClient({ apiUrl, token, fetchImpl = fetch, time
     return data;
   }
   return Object.freeze({
-    async getSettings() {
-      const result = await request("/v1/agent/settings");
+    async getSettings({ activeSessions = 0, maxSessions = 1, workerVersion = "0.1.0" } = {}) {
+      const result = await request("/v1/agent/settings", { active_sessions: activeSessions, max_sessions: maxSessions, worker_version: workerVersion });
       return { minFreeMemoryBytes: Number(result.min_free_memory_bytes) };
     },
     async claimNextJob({ capacityAvailable = true, memoryAvailable = true, activeInstanceIds = [] } = {}) {
