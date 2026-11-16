@@ -229,7 +229,15 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         if (status === "offline") {
-          const changed = await client.query(
+          const pending = await client.query(
+            `UPDATE pairing_requests SET status = 'failed', failure_code = $3, updated_at = now()
+              WHERE id = $1 AND customer_id = $2 AND status IN ('queued','generating','code_ready')
+              RETURNING bot_instance_id`, [pairingId, customerId, failureCode || "whatsapp_disconnected"]);
+          if (pending.rowCount) {
+            await client.query("UPDATE bot_instances SET status = 'offline', last_error_code = $2, updated_at = now() WHERE id = $1",
+              [pending.rows[0].bot_instance_id, failureCode || "whatsapp_disconnected"]);
+          }
+          const changed = pending.rowCount ? pending : await client.query(
             `UPDATE bot_instances b SET status = 'offline', last_stopped_at = now(), updated_at = now()
               FROM pairing_requests p
              WHERE p.id = $1 AND p.customer_id = $2 AND p.bot_instance_id = b.id AND p.status = 'paired'
