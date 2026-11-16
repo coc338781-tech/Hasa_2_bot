@@ -1,6 +1,7 @@
 import { mkdir, chmod } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
+import pino from "pino";
 const INSTANCE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PHONE = /^\+[1-9]\d{7,14}$/;
 function safeInstancePath(root, id) {
@@ -12,7 +13,7 @@ function safeInstancePath(root, id) {
 export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode = async () => {}, onStatus = async () => {}, maxSessions = 3, pairingTimeoutMs = 120_000 } = {}) {
   if (!dataDir || !baileys?.default || !baileys?.useMultiFileAuthState) throw new TypeError("worker_requires_data_dir_and_baileys_adapter");
   if (!Number.isInteger(maxSessions) || maxSessions < 1 || maxSessions > 100) throw new TypeError("invalid_max_sessions");
-  const sessions = new Map(), log = logger || { info() {}, warn() {}, error() {} };
+  const sessions = new Map(), log = logger || pino({ level: "silent" });
   async function notify(instanceId, status, extra = {}) { await onStatus({ instanceId, status, ...extra }); }
   async function startPairing({ instanceId, phone }) {
     if (!PHONE.test(phone || "")) throw new TypeError("invalid_phone");
