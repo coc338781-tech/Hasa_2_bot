@@ -35,3 +35,16 @@ test("bot runtime refuses unregistered WhatsApp sessions and unsafe instance ide
     await rm(code, { recursive: true, force: true });
   }
 });
+
+test("bot runtime identifies the registered WhatsApp phone without exposing auth credentials", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hasa-bot-runtime-"));
+  const id = "33333333-3333-4333-8333-333333333333";
+  try {
+    const runtime = createBotRuntime({
+      dataDir: root,
+      codeDir: root,
+      baileys: { async useMultiFileAuthState() { return { state: { creds: { registered: true, me: { id: "94779876543:12@s.whatsapp.net" } } } }; } }
+    });
+    assert.equal(await runtime.getRegisteredPhone(id), "94779876543");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
