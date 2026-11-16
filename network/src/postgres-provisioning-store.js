@@ -137,7 +137,7 @@ export function createPostgresProvisioningStore(pool) {
           if (job.job_type === "instance_create") {
             await client.query("UPDATE bot_instances SET status = 'offline', last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
           } else if (job.job_type === "instance_start" || job.job_type === "instance_restart") {
-            await client.query("UPDATE bot_instances SET status = 'online', last_started_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
+            await client.query("UPDATE bot_instances SET status = 'provisioning', last_started_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
           } else if (job.job_type === "instance_stop") {
             await client.query("UPDATE bot_instances SET status = 'offline', last_stopped_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
           }
@@ -161,14 +161,15 @@ export function createPostgresProvisioningStore(pool) {
     async listInstancesForServer(serverId) {
       const result = await pool.query(
         `SELECT id, status FROM bot_instances
-          WHERE server_id = $1 AND status = 'online'
+          WHERE server_id = $1 AND status IN ('online','provisioning')
           ORDER BY updated_at DESC LIMIT 500`, [serverId]);
       return result.rows;
     },
     async updateBotStatusForServer({ instanceId, serverId, status, errorCode = null }) {
-      if (!["offline", "failed"].includes(status)) return false;
+      if (!["online", "provisioning", "offline", "failed"].includes(status)) return false;
       const result = await pool.query(
         `UPDATE bot_instances SET status = $3, last_error_code = $4,
+           last_started_at = CASE WHEN $3 = 'online' THEN now() ELSE last_started_at END,
            last_stopped_at = CASE WHEN $3 = 'offline' THEN now() ELSE last_stopped_at END,
            updated_at = now()
           WHERE id = $1 AND server_id = $2 RETURNING id`,
