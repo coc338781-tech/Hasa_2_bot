@@ -312,12 +312,12 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
           return;
         }
         const status = body.status;
-        if (!["paired", "expired", "failed"].includes(status)) { sendJson(res, 400, { error: "invalid_pairing_status" }); return; }
+        if (!["paired", "expired", "failed", "offline"].includes(status)) { sendJson(res, 400, { error: "invalid_pairing_status" }); return; }
         const updated = await provisioningStore.updatePairingStatus(
           job.payload?.pairing_request_id, job.customer_id, status,
           typeof body.failure_code === "string" ? body.failure_code.slice(0, 80) : null
         );
-        if (status !== "paired") await pairingCodeStore?.delete(job.payload?.pairing_request_id);
+        await pairingCodeStore?.delete(job.payload?.pairing_request_id);
         sendJson(res, updated ? 200 : 409, { updated });
       } catch (error) {
         sendJson(res, 500, { error: "agent_job_operation_failed" });
