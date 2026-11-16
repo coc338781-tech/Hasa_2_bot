@@ -1,31 +1,52 @@
-# Isolated WhatsApp worker
+# HASA BOT NETWORK — per-server WhatsApp worker
 
-This package contains the first isolated Baileys pairing runtime component for HASA BOT NETWORK.
+This service runs separately on each enrolled Linux/Oracle server. It does not connect directly to PostgreSQL and does not accept arbitrary shell commands. It authenticates to the central API using that server's enrolled agent token over HTTPS.
 
-## Current scope
+## Pairing lifecycle
 
-- Uses the repository's pinned Baileys `7.0.0-rc14` API.
-- Maintains a separate Baileys auth directory for each validated bot-instance UUID.
-- Restricts each auth directory to owner-only permissions (`0700`).
-- Requests the real WhatsApp pairing code only after Baileys emits its pairing-readiness QR event.
-- Delivers the raw pairing code only to the injected `onPairingCode` callback. It never logs the code or includes it in status events.
-- Exposes explicit pairing/paired/offline/expired/stopped states and a configurable in-memory session cap.
-- Never deletes auth state when a socket closes.
+1. Owner assigns a customer's bot instance to an online server through the Owner Console.
+2. Customer submits an international WhatsApp number from their private workspace.
+3. The API creates a tenant-scoped pairing request and an allow-listed `pairing_start` job for the assigned server.
+4. That server's worker claims only jobs leased to its server identity.
+5. Baileys requests a real WhatsApp pairing code after its socket readiness event.
+6. The worker sends the code to the central API over the authenticated HTTPS channel.
+7. The API encrypts the code using AES-256-GCM before storing it in PostgreSQL. The raw code is never logged or stored in plaintext.
+8. The customer API returns the code once, only when the authenticated customer owns the latest pairing request. The encrypted value is deleted on retrieval or expiry.
 
-## Integration contract
+The worker can execute only the job types explicitly exposed by the API. It cannot send remote shell commands, choose file paths, or access another server's jobs.
 
-The host control plane must provide:
-- An authenticated, tenant-scoped callback that delivers a short-lived pairing code only to the owner of that bot instance.
-- A persistent status callback that updates only the matching bot instance and pairing request.
-- A server-side job lease so two workers cannot claim the same pairing request.
-- A configured capacity limit based on measured free RAM before starting sessions.
+## Install on an enrolled server
 
-The worker is not exposed directly to customer browsers. Never send the code through logs, analytics, error telemetry or an unscoped API response.
+Prerequisites:
+- Node.js 22 or newer.
+- The telemetry agent has enrolled successfully and has `/var/lib/hasa-agent/credentials.json`.
+- A dedicated encrypted filesystem is mounted exactly at `/var/lib/hasa-worker/sessions`.
+- The central API is reachable using HTTPS and has the database migrations applied.
+- The API environment has `HASA_PAIRING_CODE_KEY`, generated using `openssl rand -base64 32`. The same key must be protected by the central deployment secret manager; do not copy it to workers.
 
-## Storage and production gate
+Install:
 
-Baileys multi-file auth state is sensitive credential material. The directory permission mode is not encryption. Production workers must place `dataDir` on an encrypted volume (or replace the auth-state adapter with the encrypted vault adapter backed by the existing AES-GCM/KMS design) and must keep encryption keys outside PostgreSQL and Git. Do not use an ordinary unencrypted host directory for production customer sessions.
+```bash
+cd network/worker
+sudo bash install-systemd.sh
+sudo systemctl enable --now hasa-worker
+sudo systemctl status hasa-worker
+sudo journalctl -u hasa-worker -n 100 --no-pager
+```
 
-## Not yet a live customer pairing service
+The installer refuses to proceed unless the session directory is already a mount point. It creates a dedicated `hasa-worker` account, copies the runtime to `/opt/hasa-network`, and writes the enrolled server's API token into a root-managed, group-restricted service environment file. It does not print the token.
 
-This component is not yet connected to the customer API, PostgreSQL job leasing, encrypted auth vault, server agent command channel, customer polling endpoint, or full Hasa bot plugin runtime. The customer website must continue to report pairing as unavailable until those integrations are implemented and tested end-to-end. This module alone does not mean that customer pairing is live.
+## Session security
+
+Baileys multi-file auth state is sensitive credential material. File mode `0700` is not encryption. The configured session directory must be backed by an encrypted volume whose key is not stored on the same filesystem. This first worker implementation relies on that encrypted volume for Baileys auth files. The separate pairing-code vault uses AES-256-GCM with a key held outside PostgreSQL and Git.
+
+## Resource limits
+
+The systemd service is capped at 768 MB and starts with one concurrent pairing session by default. Increase `HASA_WORKER_MAX_SESSIONS` only after measuring real free RAM and testing the server under load. The API/worker service is separate from the existing production `hasa2` PM2 process.
+
+## Remaining integration gates
+
+- Pairing worker and encrypted one-time code handoff are implemented in this branch, but have not yet been validated against a real WhatsApp account on a live enrolled server.
+- The full HASA bot plugin runtime is not yet provisioned as a per-customer service after WhatsApp pairing.
+- Server-side RAM admission control, instance start/stop/restart, release rollout/rollback, and end-to-end recovery after worker restart still require implementation and tests.
+- HTTPS reverse-proxy configuration, production database/key setup, and server enrollment are deployment tasks. Do not publish or enable the worker on the production Oracle host until these are complete and explicitly approved.
