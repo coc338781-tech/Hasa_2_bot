@@ -22,7 +22,7 @@
 </div>
 <div class="grid">
 <section class="card servers"><div class="section-head"><div><h2>Registered servers</h2><p class="muted">Live telemetry from each server agent</p></div><span id="last-updated" class="muted tiny">Not refreshed</span></div><div id="server-list" class="server-list"><div class="empty">Sign in to load server inventory.</div></div></section>
-<aside class="card enroll"><div class="eyebrow">ADD INFRASTRUCTURE</div><h2>Register a server</h2><p class="muted">Create a one-time ticket. Install the read-only agent on the Linux host to connect it.</p>
+<aside class="card enroll"><div class="eyebrow">ADD INFRASTRUCTURE</div><h2>Register a server</h2><p class="muted">Create a one-time ticket. Install the server telemetry agent, then the isolated WhatsApp worker, on the Linux host to connect it.</p>
 <form id="ticket-form"><label for="server-label">Server label</label><input id="server-label" placeholder="e.g. Oracle primary" maxlength="80" required><label for="server-provider">Provider</label><input id="server-provider" placeholder="Oracle Cloud / Linux VPS" maxlength="60" required><button class="primary" type="submit">Generate one-time ticket</button></form>
 <div id="ticket-result" class="ticket hidden"><label>One-time enrollment ticket</label><code id="ticket-value"></code><button id="copy-ticket" class="secondary">Copy ticket</button><small id="ticket-expiry" class="muted"></small><p class="warning">Shown once. Keep it secret. Expires in 10 minutes.</p></div><p id="ticket-error" class="error" role="alert"></p>
 </aside>
