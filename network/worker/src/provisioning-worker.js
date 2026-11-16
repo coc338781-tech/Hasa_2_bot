@@ -86,7 +86,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
   async function runOne() {
     await refreshMemoryPolicy();
     const capacityAvailable = botRuntime.activeCount + whatsapp.activeCount < maxSessions && await getAvailableMemoryBytes() >= activeMinFreeMemoryBytes;
-    const job = await client.claimNextJob({ capacityAvailable });
+    const job = await client.claimNextJob({ capacityAvailable, activeInstanceIds: botRuntime.activeInstanceIds });
     if (!job) return false;
     try {
       if (job.job_type === "instance_create") {
