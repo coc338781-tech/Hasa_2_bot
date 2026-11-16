@@ -73,7 +73,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     const authDir = join(dir, "auth_info");
     await ensureDirectory(authDir);
     const auth = await baileys.useMultiFileAuthState(authDir);
-    if (!auth.state.creds.registered) throw new Error("whatsapp_session_not_registered");
+    if (!auth.state.creds.registered) { const error = new Error("whatsapp_session_not_registered"); error.code = "whatsapp_session_not_registered"; throw error; }
     const indexFile = join(codeRoot, "index.js");
     const packageFile = join(codeRoot, "package.json");
     await readFile(indexFile, "utf8");
