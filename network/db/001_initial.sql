@@ -94,3 +94,17 @@ CREATE TABLE IF NOT EXISTS server_heartbeat_requests (
 );
 CREATE INDEX IF NOT EXISTS server_heartbeat_requests_received_idx
   ON server_heartbeat_requests(received_at);
+
+-- One-time server enrollment tickets. Only SHA-256 hashes are stored.
+CREATE TABLE IF NOT EXISTS server_enrollment_tickets (
+  id UUID PRIMARY KEY,
+  ticket_hash TEXT NOT NULL UNIQUE CHECK (length(ticket_hash) = 64),
+  label TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  CHECK (expires_at > created_at)
+);
+CREATE INDEX IF NOT EXISTS server_enrollment_tickets_expiry_idx
+  ON server_enrollment_tickets(expires_at) WHERE consumed_at IS NULL;
