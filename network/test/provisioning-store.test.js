@@ -16,7 +16,7 @@ function fakePool(responses = []) {
 }
 test("pairing jobs are enqueued only for a fresh online server assigned to the owned bot", async () => {
   const pool = fakePool([
-    { rowCount: 1, rows: [{ id: "bot", server_id: "server", server_status: "online", last_heartbeat_at: new Date().toISOString() }] }
+    { rowCount: 1, rows: [{ id: "bot", server_id: "server", bot_status: "offline", whatsapp_registered: false, server_status: "online", last_heartbeat_at: new Date().toISOString() }] }
   ]);
   const store = createPostgresProvisioningStore(pool);
   const result = await store.enqueuePairing({ customerId: "customer", botId: "bot", phone: "+94771234567", expiresAt: new Date(Date.now()+600000).toISOString() });
@@ -26,7 +26,7 @@ test("pairing jobs are enqueued only for a fresh online server assigned to the o
   assert.ok(pool.calls.some(x => x.sql.includes("INSERT INTO pairing_requests")));
 });
 test("pairing jobs are rejected when the assigned server is unavailable", async () => {
-  const pool = fakePool([{ rowCount: 1, rows: [{ id: "bot", server_id: null, server_status: null, last_heartbeat_at: null }] }]);
+  const pool = fakePool([{ rowCount: 1, rows: [{ id: "bot", server_id: null, bot_status: "offline", whatsapp_registered: false, server_status: null, last_heartbeat_at: null }] }]);
   const result = await createPostgresProvisioningStore(pool).enqueuePairing({ customerId: "customer", botId: "bot", phone: "+94771234567", expiresAt: new Date(Date.now()+600000).toISOString() });
   assert.deepEqual(result, { ok: false, reason: "server_unavailable" });
   assert.equal(pool.calls.some(x => x.sql.includes("INSERT INTO provisioning_jobs")), false);
@@ -55,7 +55,7 @@ test("owner assignment rejects servers below the RAM safety reserve", async () =
 
 test("customer bot actions are tenant-scoped and queued only for an online assigned instance", async () => {
   const pool = fakePool([
-    { rowCount: 1, rows: [{ id: "bot", server_id: "server", bot_status: "online", server_status: "online", last_heartbeat_at: new Date().toISOString(), memory_available_bytes: 2 * 1024 * 1024 * 1024 }] },
+    { rowCount: 1, rows: [{ id: "bot", server_id: "server", bot_status: "online", whatsapp_registered: true, server_status: "online", last_heartbeat_at: new Date().toISOString(), memory_available_bytes: 2 * 1024 * 1024 * 1024 }] },
     { rowCount: 0, rows: [] }
   ]);
   const result = await createPostgresProvisioningStore(pool).queueBotAction({ customerId: "customer", botId: "bot", action: "restart" });
