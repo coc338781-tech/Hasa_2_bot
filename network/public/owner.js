@@ -90,9 +90,9 @@
         if (server.id === bot.server_id) option.selected=true;
         select.append(option);
       }
-      const button=document.createElement("button"); button.className="secondary"; button.textContent=bot.whatsapp_registered ? "Session migration required" : "Assign server"; button.disabled=!online.length || Boolean(bot.whatsapp_registered) || select.value===bot.server_id;
+      const button=document.createElement("button"); button.className="secondary"; button.textContent=bot.whatsapp_registered ? "Session migration required" : bot.status === "failed" && select.value===bot.server_id ? "Reprovision" : "Assign server"; button.disabled=!online.length || Boolean(bot.whatsapp_registered) || (select.value===bot.server_id && bot.status !== "failed");
       select.disabled=Boolean(bot.whatsapp_registered);
-      select.addEventListener("change",()=>{button.disabled=!online.length || Boolean(bot.whatsapp_registered) || select.value===bot.server_id;});
+      select.addEventListener("change",()=>{button.disabled=!online.length || Boolean(bot.whatsapp_registered) || (select.value===bot.server_id && bot.status !== "failed");});
       button.addEventListener("click",()=>assignBot(bot.id,select.value,button));
       actions.append(select,button); card.append(actions); list.append(card);
     }
