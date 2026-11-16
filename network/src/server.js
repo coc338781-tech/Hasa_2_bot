@@ -1,8 +1,7 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { join, extname } from "node:path";
-import { pathToFileURL } from "node:url";
 import { acceptHeartbeat } from "./heartbeat.js";
 import { exchangeEnrollmentTicket, hashSecret } from "./enrollment.js";
 import { createOwnerSession, verifyOwnerSession, createEnrollmentTicketValue } from "./owner-auth.js";
