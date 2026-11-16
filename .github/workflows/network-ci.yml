@@ -35,4 +35,4 @@ jobs:
       - name: Check API syntax and tests
         run: npm run check
       - name: Check agent tests and installer syntax
-        run: npm run check --prefix agent && bash -n agent/install-systemd.sh
+        run: npm run check --prefix agent && bash -n agent/install-systemd.sh && bash -n worker/install-systemd.sh
