@@ -275,6 +275,7 @@ async function main() {
 function shutdown() {
   shuttingDown = true;
   clearTimeout(reconnectTimer);
+  writeBotHealth("stopped");
   console.log("\nStopping Hasa_2_bot...");
   messageCache.flush();
   process.exit(0);
