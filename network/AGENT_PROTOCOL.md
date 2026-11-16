@@ -6,11 +6,11 @@ The first agent release is telemetry-only. It reports host identity and resource
 
 ## Enrollment
 
-1. Owner signs in to the owner console and creates a one-time enrollment ticket for a specific server label/provider.
-2. Ticket expires quickly, is single-use, and is shown only once.
+1. The owner-controlled provisioning layer creates a cryptographically random ticket for a specific server label/provider. The owner login and ticket-issuing UI/API are a subsequent implementation step; do not expose ticket creation through an unauthenticated endpoint.
+2. Store only the SHA-256 ticket hash in `server_enrollment_tickets`; ticket expiry and single-use consumption are enforced transactionally. The raw ticket is shown only once.
 3. Operator installs the signed agent package and supplies the ticket through a protected environment variable or stdin (never command-line arguments).
-4. Agent exchanges the ticket over HTTPS for a unique per-server credential.
-5. Central API stores only a cryptographic hash of the credential. The agent stores the secret in a root-readable file or OS secret store.
+4. Agent exchanges the ticket with `POST /v1/agent/enroll` over HTTPS for a unique per-server credential. The endpoint is rate-limited and returns the credential only in the successful one-time response.
+5. Central API stores only a SHA-256 hash of the credential. The agent must store the secret in a root-readable file or OS secret store. The current API returns the token but does not yet install/configure the agent or persist its local token.
 6. Owner can revoke that server credential at any time.
 
 Enrollment tickets and agent credentials must never be placed in Git, shell history, logs, issue comments or chat reports.
