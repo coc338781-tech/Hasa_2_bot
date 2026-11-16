@@ -99,8 +99,8 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       return;
     }
     if (req.method === "GET" && req.url === "/readyz") {
-      const ready = Boolean(agentStore && customerStore);
-      sendJson(res, ready ? 200 : 503, { service: "hasa-bot-network-api", ready, database: ready ? "configured" : "not_configured" });
+      const ready = Boolean(agentStore && customerStore && provisioningStore && pairingCodeStore);
+      sendJson(res, ready ? 200 : 503, { service: "hasa-bot-network-api", ready, database: agentStore && customerStore ? "configured" : "not_configured", pairing_code_vault: Boolean(pairingCodeStore) });
       return;
     }
 
@@ -282,6 +282,7 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       }
       try {
         if (agentClaim) {
+          if (!pairingCodeStore) { sendJson(res, 503, { error: "pairing_code_vault_unavailable" }); return; }
           const job = await provisioningStore.claimNextJob(server.id);
           sendJson(res, 200, { job });
           return;
