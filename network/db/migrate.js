@@ -26,7 +26,7 @@ try {
   await client.query("COMMIT");
 
   const files = (await readdir(directory))
-    .filter(name => /^\\d{3}_[a-z0-9_-]+\\.sql$/.test(name))
+    .filter(name => /^\d{3}_[a-z0-9_-]+\.sql$/.test(name))
     .sort();
 
   for (const filename of files) {
