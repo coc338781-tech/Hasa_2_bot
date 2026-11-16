@@ -35,7 +35,7 @@ test("worker claims jobs with a database lease and skip-locked semantics", async
   const pool = fakePool([{ rowCount: 1, rows: [{ id: "job", bot_instance_id: "bot", customer_id: "customer", payload: { pairing_request_id: "pair", phone_e164: "+94771234567" }, attempts: 1 }] }]);
   const job = await createPostgresProvisioningStore(pool).claimNextJob("server");
   assert.equal(job.id, "job");
-  assert.ok(pool.calls.some(x => x.sql.includes("FOR UPDATE SKIP LOCKED")));
+  assert.ok(pool.calls.some(x => x.sql.includes("FOR UPDATE OF j SKIP LOCKED")));
 });
 
 test("owner assignment requires a live server with the configured RAM reserve", async () => {
