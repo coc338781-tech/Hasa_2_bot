@@ -34,14 +34,6 @@ function cleanProvider(value) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= 60 ? value.trim() : null;
 }
 
-  const entry = enrollmentAttempts.get(key) || { start: now, count: 0 };
-  if (now - entry.start >= 60_000) { entry.start = now; entry.count = 0; }
-  entry.count += 1;
-  enrollmentAttempts.set(key, entry);
-  if (enrollmentAttempts.size > 5000) enrollmentAttempts.clear();
-  return entry.count > 5;
-}
-
 function sendJson(res, status, body) {
   const encoded = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Content-Length": Buffer.byteLength(encoded) });
