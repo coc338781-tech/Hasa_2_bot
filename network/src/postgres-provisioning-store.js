@@ -20,7 +20,7 @@ export function createPostgresProvisioningStore(pool) {
         if (server.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "server_not_online" }; }
         if (Number(server.rows[0].memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) { await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" }; }
         const bot = await client.query(
-          `UPDATE bot_instances SET server_id = $2, status = 'offline', updated_at = now()
+          `UPDATE bot_instances SET server_id = $2, status = 'offline', runtime_provisioned = false, updated_at = now()
             WHERE id = $1 AND status IN ('offline','failed') AND whatsapp_registered = false
             RETURNING id, customer_id, server_id`, [botId, serverId]);
         if (bot.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_assignable" }; }
@@ -70,13 +70,14 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const owned = await client.query(
-          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, s.status AS server_status, s.last_heartbeat_at
+          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, b.runtime_provisioned, s.status AS server_status, s.last_heartbeat_at
              FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
         if (owned.rowCount !== 1) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_found" }; }
         const server = owned.rows[0];
         if (!["offline", "failed"].includes(server.bot_status)) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
         if (server.whatsapp_registered) { await client.query("ROLLBACK"); return { ok: false, reason: "already_paired" }; }
+        if (!server.runtime_provisioned) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
         if (!server.server_id || server.server_status !== "online" ||
             !server.last_heartbeat_at || Date.now() - new Date(server.last_heartbeat_at).getTime() > 150_000) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_unavailable" };
@@ -153,9 +154,9 @@ export function createPostgresProvisioningStore(pool) {
           [jobId, status, result ? JSON.stringify(result) : null, serverId]);
         if (status === "failed") {
           await client.query(
-            `UPDATE bot_instances SET status = 'failed', last_error_code = $2,
+            `UPDATE bot_instances SET status = 'failed', runtime_provisioned = CASE WHEN $3 = 'instance_create' THEN false ELSE runtime_provisioned END, last_error_code = $2,
                whatsapp_registered = CASE WHEN $2 IN ('whatsapp_session_not_registered','whatsapp_session_invalid') THEN false ELSE whatsapp_registered END,
-               updated_at = now() WHERE id = $1`, [job.bot_instance_id, errorCode || "worker_failed"]);
+               updated_at = now() WHERE id = $1`, [job.bot_instance_id, errorCode || "worker_failed", job.job_type]);
           if (job.job_type === "pairing_start") {
             await client.query(
               `UPDATE pairing_requests SET status = 'failed', failure_code = $2, updated_at = now()
@@ -164,7 +165,7 @@ export function createPostgresProvisioningStore(pool) {
           }
         } else if (status === "succeeded") {
           if (job.job_type === "instance_create") {
-            await client.query("UPDATE bot_instances SET status = 'offline', last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
+            await client.query("UPDATE bot_instances SET status = 'offline', runtime_provisioned = true, last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
           } else if (job.job_type === "instance_start" || job.job_type === "instance_restart") {
             await client.query("UPDATE bot_instances SET status = 'provisioning', last_started_at = now(), last_error_code = NULL, updated_at = now() WHERE id = $1", [job.bot_instance_id]);
           } else if (job.job_type === "instance_stop") {
@@ -183,7 +184,7 @@ export function createPostgresProvisioningStore(pool) {
       try {
         await client.query("BEGIN");
         const found = await client.query(
-          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, s.status AS server_status,
+          `SELECT b.id, b.server_id, b.status AS bot_status, b.whatsapp_registered, b.runtime_provisioned, s.status AS server_status,
                   s.last_heartbeat_at, s.memory_available_bytes
              FROM bot_instances b LEFT JOIN servers s ON s.id = b.server_id
             WHERE b.id = $1 AND b.customer_id = $2 FOR UPDATE OF b`, [botId, customerId]);
@@ -195,6 +196,7 @@ export function createPostgresProvisioningStore(pool) {
         }
         const allowed = action === "start" ? ["offline", "failed"] : action === "stop" ? ["online", "provisioning"] : ["online"];
         if (!allowed.includes(bot.bot_status)) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_action_not_allowed" }; }
+        if (!bot.runtime_provisioned) { await client.query("ROLLBACK"); return { ok: false, reason: "bot_not_ready" }; }
         if (action !== "stop" && !bot.whatsapp_registered) { await client.query("ROLLBACK"); return { ok: false, reason: "pairing_required" }; }
         if (action !== "stop" && Number(bot.memory_available_bytes || 0) < MIN_FREE_MEMORY_BYTES) {
           await client.query("ROLLBACK"); return { ok: false, reason: "server_low_memory" };
@@ -221,7 +223,7 @@ export function createPostgresProvisioningStore(pool) {
     },
     async listBots() {
       const result = await pool.query(
-        `SELECT b.id, b.customer_id, c.display_name, c.phone_e164, b.status, b.whatsapp_registered,
+        `SELECT b.id, b.customer_id, c.display_name, c.phone_e164, b.status, b.whatsapp_registered, b.runtime_provisioned,
                 b.server_id, s.label AS server_label, s.status AS server_status,
                 b.release_version, b.last_started_at, b.last_stopped_at, b.last_error_code
            FROM bot_instances b
