@@ -5,7 +5,7 @@ import { exchangeEnrollmentTicket, hashSecret } from "./enrollment.js";
 import { createOwnerSession, verifyOwnerSession, createEnrollmentTicketValue } from "./owner-auth.js";
 import { randomUUID } from "node:crypto";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const MAX_BODY_BYTES = 16 * 1024;
 const enrollmentAttempts = new Map();
 const ownerLoginAttempts = new Map();
