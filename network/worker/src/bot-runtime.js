@@ -18,6 +18,7 @@ async function ensureDirectory(path) {
 export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, logger, onExit = async () => {} } = {}) {
   if (!dataDir || !codeDir || !baileys?.useMultiFileAuthState) throw new TypeError("bot_runtime_configuration_required");
   const root = resolve(dataDir), codeRoot = resolve(codeDir), children = new Map();
+  const healthStates = new Map(), suppressExit = new Set();
   async function createInstance({ bot_instance_id, payload = {} }) {
     const dir = instancePath(root, bot_instance_id);
     await ensureDirectory(root); await ensureDirectory(dir);
@@ -48,6 +49,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     const dir = instancePath(root, instanceId);
     await ensureDirectory(dir);
     const authDir = join(dir, "auth_info");
+    await ensureDirectory(authDir);
     const auth = await baileys.useMultiFileAuthState(authDir);
     if (!auth.state.creds.registered) throw new Error("whatsapp_session_not_registered");
     const indexFile = join(codeRoot, "index.js");
@@ -62,6 +64,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
         NODE_ENV: "production",
         LOG_LEVEL: process.env.HASA_BOT_LOG_LEVEL || "silent",
         BOT_INSTANCE_ID: instanceId,
+        BOT_HEALTH_FILE: join(dir, "data", "runtime-health.json"),
         ...(process.env.HASA_SHARED_GEMINI_API_KEY ? { GEMINI_API_KEY: process.env.HASA_SHARED_GEMINI_API_KEY } : {})
       },
       stdio: "ignore",
@@ -71,11 +74,13 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     child.once("error", error => {
       logger?.error?.({ instanceId, error: error?.message }, "Bot child process failed to start");
       if (children.get(instanceId) === child) children.delete(instanceId);
-      void onExit({ instanceId, code: null, signal: null, error: "bot_process_start_failed" });
+      healthStates.delete(instanceId);
+      if (!suppressExit.delete(instanceId)) void onExit({ instanceId, code: null, signal: null, error: "bot_process_start_failed" });
     });
     child.once("exit", (code, signal) => {
       if (children.get(instanceId) === child) children.delete(instanceId);
-      void onExit({ instanceId, code, signal, error: code === 0 ? null : "bot_process_exited" });
+      healthStates.delete(instanceId);
+      if (!suppressExit.delete(instanceId)) void onExit({ instanceId, code, signal, error: code === 0 || signal === "SIGTERM" ? null : "bot_process_exited" });
     });
     return { started: true, pid: child.pid };
   }
@@ -98,6 +103,19 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     await stopInstance(instanceId);
     return startInstance(instanceId);
   }
+  async function collectHealthUpdates() {
+    const updates = [];
+    for (const [instanceId] of children) {
+      try {
+        const health = JSON.parse(await readFile(join(instancePath(root, instanceId), "data", "runtime-health.json"), "utf8"));
+        if (!["online", "reconnecting", "failed"].includes(health.status)) continue;
+        if (healthStates.get(instanceId) === health.status) continue;
+        healthStates.set(instanceId, health.status);
+        updates.push({ instanceId, status: health.status === "reconnecting" ? "provisioning" : health.status, errorCode: health.error_code || null });
+      } catch {}
+    }
+    return updates;
+  }
   async function restoreInstances(instanceIds = []) {
     const results = [];
     for (const id of instanceIds) {
@@ -107,7 +125,8 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     return results;
   }
   async function stopAll() {
+    for (const id of children.keys()) suppressExit.add(id);
     await Promise.all([...children.keys()].map(stopInstance));
   }
-  return Object.freeze({ createInstance, startInstance, stopInstance, restartInstance, restoreInstances, stopAll, get activeCount() { return children.size; } });
+  return Object.freeze({ createInstance, startInstance, stopInstance, restartInstance, restoreInstances, collectHealthUpdates, stopAll, get activeCount() { return children.size; } });
 }
