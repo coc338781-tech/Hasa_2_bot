@@ -15,7 +15,7 @@ const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
 const worker = createProvisioningWorker({
   client, dataDir, codeDir: process.env.HASA_BOT_CODE_DIR || "/opt/hasa-bot", baileys, logger,
   maxSessions: Number(process.env.HASA_WORKER_MAX_SESSIONS || 1),
-  minFreeMemoryBytes: Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 805306368)
+  minFreeMemoryBytes: Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 268435456)
 });
 await worker.start();
 logger.info({ activeSessions: worker.activeCount }, "HASA BOT NETWORK worker started");
