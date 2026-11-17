@@ -80,9 +80,10 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
-    if (req.method === "GET" && Object.hasOwn(STATIC_FILES, req.url)) {
+    const requestPath = new URL(req.url, "http://localhost").pathname;
+    if (req.method === "GET" && Object.hasOwn(STATIC_FILES, requestPath)) {
       try {
-        const filename = STATIC_FILES[req.url];
+        const filename = STATIC_FILES[requestPath];
         const content = await readFile(join(PUBLIC_DIR, filename));
         res.writeHead(200, {
           "Content-Type": STATIC_TYPES[extname(filename)],
