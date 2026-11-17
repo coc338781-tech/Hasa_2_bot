@@ -18,9 +18,9 @@ async function getAvailableMemoryBytes() {
   return os.freemem();
 }
 
-export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa-bot", baileys, logger, maxSessions = 2, minFreeMemoryBytes = 768 * 1024 * 1024, pollIntervalMs = 1500 } = {}) {
+export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa-bot", baileys, logger, maxSessions = 2, minFreeMemoryBytes = 256 * 1024 * 1024, pollIntervalMs = 1500 } = {}) {
   if (!client || !dataDir || !codeDir) throw new TypeError("worker_requires_agent_client_and_data_dir");
-  if (!Number.isSafeInteger(minFreeMemoryBytes) || minFreeMemoryBytes < 512 * 1024 * 1024) throw new TypeError("invalid_min_free_memory_bytes");
+  if (!Number.isSafeInteger(minFreeMemoryBytes) || minFreeMemoryBytes < 256 * 1024 * 1024) throw new TypeError("invalid_min_free_memory_bytes");
   if (!Number.isSafeInteger(maxSessions) || maxSessions < 1 || maxSessions > 100) throw new TypeError("invalid_max_sessions");
   const activePairs = new Map();
   const botRuntime = createBotRuntime({
@@ -75,7 +75,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
         maxSessions,
         workerVersion: "0.1.0"
       });
-      if (Number.isSafeInteger(settings.minFreeMemoryBytes) && settings.minFreeMemoryBytes >= 512 * 1024 * 1024) {
+      if (Number.isSafeInteger(settings.minFreeMemoryBytes) && settings.minFreeMemoryBytes >= 256 * 1024 * 1024) {
         activeMinFreeMemoryBytes = settings.minFreeMemoryBytes;
       }
     } catch (error) { logger?.warn?.({ error: error?.message }, "Using last known RAM admission policy"); }
