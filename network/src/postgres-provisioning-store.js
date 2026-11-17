@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-const DEFAULT_MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 768 * 1024 * 1024);
+const DEFAULT_MIN_FREE_MEMORY_BYTES = Number(process.env.HASA_MIN_FREE_MEMORY_BYTES || 256 * 1024 * 1024);
 if (!Number.isSafeInteger(DEFAULT_MIN_FREE_MEMORY_BYTES) || DEFAULT_MIN_FREE_MEMORY_BYTES < 256 * 1024 * 1024) throw new Error("HASA_MIN_FREE_MEMORY_BYTES must be at least 256 MiB");
 async function readMinFreeMemoryBytes(client) {
   const result = await client.query("SELECT setting_value FROM network_settings WHERE setting_key = 'min_free_memory_bytes'");
