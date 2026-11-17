@@ -82,6 +82,17 @@ export function createPostgresCustomerStore(pool) {
           WHERE c.id = $1 LIMIT 1`, [customerId]);
       return result.rows[0] || null;
     },
+    async listCustomers() {
+      const result = await pool.query(
+        `SELECT c.id, c.display_name, c.phone_e164, c.status, c.created_at,
+                a.login_email, a.disabled_at, b.id AS bot_id, b.status AS bot_status,
+                b.whatsapp_registered, b.runtime_provisioned, s.label AS server_label
+           FROM customers c JOIN customer_accounts a ON a.customer_id = c.id
+           LEFT JOIN bot_instances b ON b.customer_id = c.id
+           LEFT JOIN servers s ON s.id = b.server_id
+          ORDER BY c.created_at DESC LIMIT 1000`);
+      return result.rows;
+    },
     async createPairingRequest({ customerId, botId, phone, expiresAt }) {
       return provisioning.enqueuePairing({ customerId, botId, phone, expiresAt });
     }
