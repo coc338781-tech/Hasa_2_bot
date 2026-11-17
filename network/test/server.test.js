@@ -223,6 +223,29 @@ test("customer registration, dashboard and pairing intake stay scoped to the sig
   }
 });
 
+test("owner customer inventory is authenticated and excludes credential hashes", async () => {
+  const previous = process.env.HASA_OWNER_ACCESS_KEY;
+  const ownerKey = "hasa-test-owner-access-key-customers-0123456789";
+  process.env.HASA_OWNER_ACCESS_KEY = ownerKey;
+  const customerStore = { async listCustomers() { return [{ id: "11111111-1111-4111-8111-111111111111", login_email: "person@example.com", phone_e164: "+94771234567", status: "active", bot_status: "offline", whatsapp_registered: false }]; } };
+  const server = createAppServer({ customerStore });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = "http://127.0.0.1:" + server.address().port;
+    assert.equal((await fetch(base + "/v1/owner/customers")).status, 401);
+    const login = await fetch(base + "/v1/owner/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ access_key: ownerKey }) });
+    const { access_token } = await login.json();
+    const response = await fetch(base + "/v1/owner/customers", { headers: { authorization: "Bearer " + access_token } });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.customers[0].login_email, "person@example.com");
+    assert.equal("password_hash" in body.customers[0], false);
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    if (previous === undefined) delete process.env.HASA_OWNER_ACCESS_KEY; else process.env.HASA_OWNER_ACCESS_KEY = previous;
+  }
+});
+
 test("only the owner can read and change the minimum free RAM policy", async () => {
   const previous = process.env.HASA_OWNER_ACCESS_KEY;
   const ownerKey = "hasa-test-owner-access-key-0123456789abcdef";
