@@ -102,7 +102,7 @@
     $("refresh").disabled=true;
     try {
       const [servers,bots,settings]=await Promise.all([api("/v1/owner/servers"),api("/v1/owner/bots"),api("/v1/owner/settings")]);
-      serverCache=servers.servers || []; minFreeMemoryMb=settings.min_free_memory_mb || 768;
+      serverCache=servers.servers || []; minFreeMemoryMb=settings.min_free_memory_mb ?? 256;
       $("min-free-memory").value=String(minFreeMemoryMb);
       $("memory-policy-note").textContent=`Current reserve: ${minFreeMemoryMb} MiB (${fmtBytes(settings.min_free_memory_bytes)}). Servers below this value cannot receive new bot assignments or starts.`;
       renderServers(serverCache); renderBots(bots.bots || []);
