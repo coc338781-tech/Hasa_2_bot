@@ -3,7 +3,7 @@
   let session = null;
   let expiryTimer = null;
   let serverCache = [];
-  let minFreeMemoryMb = 768;
+  let minFreeMemoryMb = 256;
   const $ = id => document.getElementById(id);
   const fmtBytes = value => {
     if (value === null || value === undefined) return "—";
