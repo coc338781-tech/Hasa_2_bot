@@ -23,7 +23,7 @@ test("telemetry reports host capacity without secrets or process data", async ()
 
 test("Linux telemetry uses MemAvailable rather than raw free pages", async () => {
   const available = await getAvailableMemoryBytes({
-    readFileImpl: async () => "MemTotal: 4096000 kB\\nMemAvailable: 123456 kB\\n",
+    readFileImpl: async () => "MemTotal: 4096000 kB\nMemAvailable: 123456 kB\n",
     fallback: () => 1
   });
   if (process.platform === "linux") assert.equal(available, 123456 * 1024);
