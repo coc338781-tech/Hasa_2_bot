@@ -11,7 +11,7 @@ test("owner login issues a short-lived signed session and protects ticket creati
   const store = {
     async createEnrollmentTicket(input) { saved = input; },
     async listServers() { return [{ id: "123e4567-e89b-42d3-a456-426614174000", status: "online" }]; },
-    async revokeServer(id) { return id === "123e4567-e89b-42d3-a456-426614174000"; }
+    async revokeServer(id) { return id === "123e4567-e89b-42d3-a456-426614174000" ? { ok: true } : { ok: false, reason: "server_not_found_or_disabled" }; }
   };
   const server = createAppServer({ agentStore: store, clock: () => Date.parse("2026-11-16T18:00:00.000Z") });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
