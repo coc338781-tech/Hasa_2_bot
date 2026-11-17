@@ -108,6 +108,21 @@ test("public customer website does not expose website editing controls", async (
 });
 
 
+test("website routes ignore analytics query parameters", async () => {
+  const server = createAppServer();
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    for (const path of ["/customer?utm_source=chatgpt.com", "/owner?utm_source=chatgpt.com", "/?utm_source=chatgpt.com"]) {
+      const response = await fetch(`${base}${path}`);
+      assert.equal(response.status, 200, path);
+      assert.match(response.headers.get("content-type"), /text\/html/);
+    }
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
 test("customer workspace is served with restrictive CSP", async () => {
   const server = createAppServer();
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
