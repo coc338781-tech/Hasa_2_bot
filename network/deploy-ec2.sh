@@ -34,6 +34,8 @@ systemctl restart postgresql
 
 install -d -o root -g "$APP_USER" -m 0750 "$APP_DIR" "$ENV_DIR"
 cp -a "$REPO_DIR/network/." "$APP_DIR/"
+# The worker runtime test resolves the root bot template from /opt/config.example.json.
+install -o root -g root -m 0644 "$REPO_DIR/config.example.json" /opt/config.example.json
 chown -R root:"$APP_USER" "$APP_DIR"
 chmod -R o-rwx "$APP_DIR"
 install -d -o "$APP_USER" -g "$APP_USER" -m 0750 "$APP_DIR/node_modules"
