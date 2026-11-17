@@ -98,11 +98,27 @@
       actions.append(select,button); card.append(actions); list.append(card);
     }
   }
+  function renderCustomers(customers) {
+    const list = $("customer-list"); list.replaceChildren();
+    if (!customers.length) { const empty=document.createElement("div"); empty.className="empty"; empty.textContent="No customer accounts have been registered yet."; list.append(empty); return; }
+    for (const customer of customers) {
+      const card=document.createElement("article"); card.className="server";
+      const top=document.createElement("div"); top.className="server-top";
+      const name=document.createElement("div"); name.className="server-name"; name.textContent=customer.display_name || customer.login_email;
+      const status=document.createElement("span"); status.className="pill " + (customer.disabled_at || customer.status !== "active" ? "offline" : "online"); status.textContent=customer.disabled_at ? "login disabled" : customer.status;
+      top.append(name,status); card.append(top);
+      const facts=document.createElement("div"); facts.className="facts";
+      const rows=[["Email",customer.login_email],["WhatsApp",customer.phone_e164],["Bot",customer.bot_status || "not provisioned"],["Hosting server",customer.server_label || "not assigned"],["WhatsApp linked",customer.whatsapp_registered ? "Yes" : "No"],["Created",customer.created_at ? new Date(customer.created_at).toLocaleString() : "—"],["Customer ID",customer.id]];
+      for (const [label,value] of rows) { const item=document.createElement("div"),k=document.createElement("span"),v=document.createElement("b"); k.textContent=label; v.textContent=value || "—"; item.append(k,v); facts.append(item); }
+      card.append(facts); list.append(card);
+    }
+  }
   async function refresh() {
     $("refresh").disabled=true;
     try {
-      const [servers,bots,settings]=await Promise.all([api("/v1/owner/servers"),api("/v1/owner/bots"),api("/v1/owner/settings")]);
+      const [servers,bots,settings,customers]=await Promise.all([api("/v1/owner/servers"),api("/v1/owner/bots"),api("/v1/owner/settings"),api("/v1/owner/customers")]);
       serverCache=servers.servers || []; minFreeMemoryMb=settings.min_free_memory_mb ?? 256;
+      renderCustomers(customers.customers || []);
       $("min-free-memory").value=String(minFreeMemoryMb);
       $("memory-policy-note").textContent=`Current reserve: ${minFreeMemoryMb} MiB (${fmtBytes(settings.min_free_memory_bytes)}). Servers below this value cannot receive new bot assignments or starts.`;
       renderServers(serverCache); renderBots(bots.bots || []);
