@@ -1,0 +1,27 @@
+[Unit]
+Description=HASA BOT NETWORK telemetry agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hasa-agent
+Group=hasa-agent
+EnvironmentFile=/etc/hasa-agent/agent.env
+ExecStart=/usr/bin/node /opt/hasa-agent/src/agent.js
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/hasa-agent
+
+[Install]
+WantedBy=multi-user.target

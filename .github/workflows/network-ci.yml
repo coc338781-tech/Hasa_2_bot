@@ -1,0 +1,38 @@
+name: HASA BOT NETWORK checks
+
+on:
+  pull_request:
+    paths:
+      - "network/**"
+      - ".github/workflows/network-ci.yml"
+  push:
+    branches:
+      - "feature/hasa-bot-network-foundation"
+    paths:
+      - "network/**"
+      - ".github/workflows/network-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  network-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: network
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install network dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Check API syntax and tests
+        run: npm run check
+      - name: Check agent tests and installer syntax
+        run: npm run check --prefix agent && bash -n agent/install-systemd.sh && bash -n worker/install-systemd.sh

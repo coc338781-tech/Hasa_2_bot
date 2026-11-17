@@ -1,0 +1,32 @@
+[Unit]
+Description=HASA BOT NETWORK isolated WhatsApp worker
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/var/lib/hasa-worker/sessions
+
+[Service]
+Type=simple
+User=hasa-worker
+Group=hasa-worker
+WorkingDirectory=/opt/hasa-network
+EnvironmentFile=/etc/hasa-worker/worker.env
+ExecStart=/usr/bin/node /opt/hasa-network/worker/src/main.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hasa-worker/sessions
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=768M
+OOMScoreAdjust=250
+
+[Install]
+WantedBy=multi-user.target
