@@ -101,7 +101,7 @@ test("public customer website does not expose website editing controls", async (
     const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
     const html = await response.text();
     assert.doesNotMatch(html, /edit website|change theme|website editor/i);
-    assert.match(html, /No customer website editor/);
+    assert.match(html, /No customer-facing design controls/);
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
