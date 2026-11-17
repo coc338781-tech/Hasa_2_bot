@@ -100,7 +100,7 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
             entry.completionRetryTimer.unref?.();
           }
         };
-        void finalize();
+        await finalize();
       }
       else if (update.connection === "close") {
         clearTimeout(entry.timer);
