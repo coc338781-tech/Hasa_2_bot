@@ -65,7 +65,7 @@ else
 fi
 
 chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
-su - "$APP_USER" -c "cd '$APP_DIR' && '$NPM_BIN' install --omit=dev --no-audit --no-fund"
+su - "$APP_USER" -c "cd '$APP_DIR' && '$NPM_BIN' install --omit=dev --no-audit --no-fund && '$NPM_BIN' run check"
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
