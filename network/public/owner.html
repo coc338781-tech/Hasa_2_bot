@@ -22,8 +22,8 @@
 </div>
 <section class="card policy">
 <div class="eyebrow">RESOURCE SAFETY</div><h2>Minimum free RAM before new work</h2>
-<p class="muted">This is the RAM that must remain available on a server before a new bot is assigned or started. It is not the server's total RAM. We use Linux MemAvailable, the same figure shown under the available column in free -h. The default is 768 MiB (about 0.75 GiB). Existing bots are not stopped when RAM drops below this limit.</p>
-<form id="memory-policy-form" class="policy-form"><label for="min-free-memory">Minimum free RAM (MiB)</label><input id="min-free-memory" type="number" min="512" max="65536" step="128" value="768" required><button class="secondary" type="submit">Save RAM limit</button></form>
+<p class="muted">This is the RAM that must remain available on a server before a new bot is assigned or started. It is not the server's total RAM. We use Linux MemAvailable, the same figure shown under the available column in free -h. The default is 256 MiB (about 0.25 GiB). Existing bots are not stopped when RAM drops below this limit.</p>
+<form id="memory-policy-form" class="policy-form"><label for="min-free-memory">Minimum free RAM (MiB)</label><input id="min-free-memory" type="number" min="256" max="65536" step="128" value="256" required><button class="secondary" type="submit">Save RAM limit</button></form>
 <p id="memory-policy-note" class="muted tiny">Loading current policy…</p><p id="memory-policy-error" class="error" role="alert"></p>
 </section>
 <div class="grid">
