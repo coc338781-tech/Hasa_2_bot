@@ -1,0 +1,92 @@
+name: Oracle Safe Control
+
+on:
+  push:
+    branches:
+      - assistant-workflow
+    paths:
+      - '.github/oracle-safe/request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hasa2-oracle-safe-control
+  cancel-in-progress: false
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Validate request and prepare SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
+          SSH_USER: ${{ secrets.ORACLE_SSH_USER }}
+          SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          ACTION="$(jq -r '.action // empty' .github/oracle-safe/request.json)"
+          REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-safe/request.json)"
+          case "$ACTION" in status|deploy|restart) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_HOST"
+          test -n "$SSH_USER"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          echo "ACTION=$ACTION" >> "$GITHUB_ENV"
+          echo "REQUEST_ID=$REQUEST_ID" >> "$GITHUB_ENV"
+          echo "SSH_HOST=$SSH_HOST" >> "$GITHUB_ENV"
+          echo "SSH_USER=$SSH_USER" >> "$GITHUB_ENV"
+
+      - name: Execute fixed Oracle operation
+        run: |
+          set -euo pipefail
+          echo "Request: $REQUEST_ID"
+          echo "Operation: $ACTION"
+          ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 "$SSH_USER@$SSH_HOST" "bash -s -- '$ACTION'" <<'REMOTE'
+          set -Eeuo pipefail
+          ACTION="$1"
+          APP=/home/opc/Hasa_2_bot
+          case "$ACTION" in
+            status)
+              cd "$APP"
+              echo "=== BRANCH / COMMIT ==="
+              git branch --show-current
+              git rev-parse HEAD
+              echo "=== WORKTREE ==="
+              git status --short
+              echo "=== DIFF SUMMARY ==="
+              git diff --stat
+              echo "=== UNTRACKED ==="
+              git ls-files --others --exclude-standard
+              echo "=== DEPLOY GUARD ==="
+              if [ -f /home/opc/bin/hasa2-deploy ]; then
+                sed -n '1,260p' /home/opc/bin/hasa2-deploy
+              else
+                echo "Deploy guard missing"
+              fi
+              echo "=== PM2 ==="
+              pm2 status
+              ;;
+            deploy)
+              cd "$APP"
+              test -x /home/opc/bin/hasa2-deploy
+              echo "Starting guarded deployment; WhatsApp auth/session files are not modified."
+              SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
+              sleep 8
+              pm2 status
+              ;;
+            restart)
+              pm2 restart hasa2 --update-env
+              sleep 8
+              pm2 status
+              ;;
+          esac
+          REMOTE
