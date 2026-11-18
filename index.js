@@ -17,10 +17,12 @@ import { loadPlugins } from "./lib/plugin-loader.js";
 import { PersistentMessageCache } from "./lib/message-cache.js";
 import { isMessageAllowedByMode } from "./lib/bot-mode.js";
 import { restoreSubbots } from "./lib/subbot-manager.js";
+import { createStatusRecovery } from "./lib/status-recovery.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
 const authDir = "./auth_info";
 const messageCache = new PersistentMessageCache({ file: "./data/message-cache.bin", maxEntries: 2000, ttlMs: 24 * 60 * 60 * 1000 });
+const statusRecovery = createStatusRecovery();
 let config;
 let plugins;
 let socketGeneration = 0;
@@ -54,15 +56,6 @@ function remember(message) {
 }
 
 async function handleStatusMessage(sock, message) {
-  if (config.autoStatusSeen && message.key) {
-    // Do not let a slow/failing read receipt block status reactions or other messages.
-    try {
-      Promise.resolve(sock.readMessages([message.key])).catch(error =>
-        console.error("Auto status seen failed:", error.message));
-    } catch (error) {
-      console.error("Auto status seen failed:", error.message);
-    }
-  }
   const mode = String(config.statusReact || "off").toLowerCase();
   const owner = message.key?.participant;
   if (!owner || !["green", "random"].includes(mode)) return;
@@ -71,6 +64,15 @@ async function handleStatusMessage(sock, message) {
   try {
     await sock.sendMessage("status@broadcast", { react: { text: reaction, key: message.key } }, { statusJidList: [owner] });
   } catch (error) { console.error("Status reaction failed:", error.message); }
+}
+
+async function captureStatusMessages(messages, sock) {
+  if (!config.autoStatusSeen) return;
+  for (const message of messages || []) {
+    if (message?.key?.remoteJid !== "status@broadcast" || !message.key.id || !message.message) continue;
+    await statusRecovery.enqueue(message);
+  }
+  await statusRecovery.flush(sock);
 }
 
 async function requestPairingCode(sock, state, generation) {
@@ -120,6 +122,7 @@ async function startBot(authState = null) {
     if (connection === "open") {
       reconnectAttempts = 0;
       console.log("✅ Hasa_2_bot connected. Pairing-code login only.");
+      if (config.autoStatusSeen) void statusRecovery.flush(sock);
       void plugins.onConnection?.(sock, config).catch(error => console.error("Plugin connection hook failed:", error.message));
       if (restoredSubbotsGeneration !== generation) {
         restoredSubbotsGeneration = generation;
@@ -152,8 +155,13 @@ async function startBot(authState = null) {
   });
 
 
+  sock.ev.on("messaging-history.set", async ({ messages }) => {
+    await captureStatusMessages(messages, sock);
+  });
+
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify" && type !== "append") return;
+    if (type !== "notify" && type !== "append" && type !== "prepend") return;
+    await captureStatusMessages(messages, sock);
     for (const msg of messages || []) {
       if (!msg?.key?.remoteJid || !msg.message) continue;
       // Preserve the original wrapper before Baileys normalization for view-once extraction.
