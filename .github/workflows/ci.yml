@@ -81,7 +81,20 @@ jobs:
       - name: Run read-only health check
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$ORACLE_USER@$ORACLE_HOST" health
+          SSH_TARGET="$ORACLE_USER@$ORACLE_HOST"
+          SSH_OK=0
+          for attempt in 1 2 3; do
+            echo "Read-only Oracle SSH health attempt $attempt/3"
+            if ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 "$SSH_TARGET" health; then
+              SSH_OK=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Oracle SSH health probe failed; retrying in 10 seconds."
+              sleep 10
+            fi
+          done
+          test "$SSH_OK" -eq 1 || { echo "::error::Oracle SSH health check failed after 3 attempts."; exit 1; }
 
   deploy:
     name: Deploy to Oracle with rollback
