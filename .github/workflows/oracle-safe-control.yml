@@ -77,9 +77,12 @@ jobs:
               echo "=== SESSION REGISTRATION ==="
               node -e 'try { const c=JSON.parse(require("fs").readFileSync("./auth_info/creds.json","utf8")); console.log("WHATSAPP_SESSION_REGISTERED="+Boolean(c.registered)); if (!c.registered) process.exitCode=2; } catch(e) { console.log("WHATSAPP_SESSION_REGISTERED=UNKNOWN"); process.exitCode=2; }'
               echo "=== RECENT WHATSAPP CONNECTION EVENTS ==="
-              grep -Ei 'connection open|connected|connection closed|logged out|pairing code|session is' /home/opc/.pm2/logs/hasa2-out.log | tail -n 25 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
+              echo "OUT_LOG_MTIME=$(stat -c %y /home/opc/.pm2/logs/hasa2-out.log)"
+              echo "ERROR_LOG_MTIME=$(stat -c %y /home/opc/.pm2/logs/hasa2-error.log)"
+              echo "--- Last 120 stdout lines: connection events ---"
+              tail -n 120 /home/opc/.pm2/logs/hasa2-out.log | grep -Ei 'connection open|connected|connection closed|logged out|pairing code|session is' | tail -n 25 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
               echo "=== RECENT RUNTIME ERRORS ==="
-              grep -Ei 'fatal|logged out|connection failure|uncaught|unhandled' /home/opc/.pm2/logs/hasa2-error.log | tail -n 15 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
+              tail -n 120 /home/opc/.pm2/logs/hasa2-error.log | grep -Ei 'fatal|logged out|connection failure|uncaught|unhandled' | tail -n 15 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
               echo "=== PM2 ==="
               pm2 status
               pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2"); if(!p||p.pm2_env?.status!=="online") process.exit(2); console.log("HASA2_PM2_ONLINE=true");});'
