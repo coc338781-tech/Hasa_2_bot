@@ -1,0 +1,2 @@
+Read-only Oracle SSH connectivity probe trigger.
+No production files, PM2 processes, or WhatsApp session data are modified.
