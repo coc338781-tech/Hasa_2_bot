@@ -741,14 +741,35 @@ jobs:
           esac
           SCRIPT
           )"
-          set +e
-          RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
-          REMOTE_EXIT=$?
-          set -e
+          REMOTE_EXIT=255
+          RESULT=""
+          for attempt in 1 2 3; do
+            echo "Oracle SSH attempt $attempt/3"
+            set +e
+            RESULT="$(printf '%s\\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=25 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
+            REMOTE_EXIT=$?
+            set -e
+            if [ "$REMOTE_EXIT" -eq 0 ]; then
+              break
+            fi
+            case "$RESULT" in
+              *"Connection timed out"*|*"banner exchange"*|*"Connection refused"*|*"No route to host"*|*"Operation timed out"*)
+                if [ "$attempt" -lt 3 ]; then
+                  echo "Transient SSH transport failure; waiting 10 seconds before retry."
+                  sleep 10
+                fi
+                ;;
+              *)
+                echo "Remote command failed for a non-transport reason; not retrying."
+                break
+                ;;
+            esac
+          done
           echo "Remote operation exit code: $REMOTE_EXIT"
+          echo "exit_code=$REMOTE_EXIT" >> "$GITHUB_OUTPUT"
           {
             echo 'result<<ORACLE_RESULT'
-            printf '%s\n' "$RESULT"
+            printf '%s\\n' "$RESULT"
             echo "Remote operation exit code: $REMOTE_EXIT"
             echo 'ORACLE_RESULT'
           } >> "$GITHUB_OUTPUT"
@@ -769,3 +790,10 @@ jobs:
           URL="$(printf '%s' "$RESPONSE" | jq -r '.html_url // empty')"
           test -n "$URL"
           echo "Private Oracle report created."
+
+      - name: Mark remote operation failures correctly
+        if: steps.oracle.outputs.exit_code != '0'
+        shell: bash
+        run: |
+          echo "::error::Oracle remote operation failed with exit code ${{ steps.oracle.outputs.exit_code }}. See the private report created above."
+          exit 1
