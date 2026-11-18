@@ -1,4 +1,4 @@
 {
-  "action": "restart",
-  "request_id": "hasa2-controlled-restart-20261118-08"
+  "action": "connection-audit",
+  "request_id": "hasa2-post-restart-connection-20261118-09"
 }
