@@ -13,10 +13,12 @@ import fs from "node:fs";
 import readline from "node:readline";
 import { loadPlugins } from "./lib/plugin-loader.js";
 import { restoreSavedSubbots } from "./lib/subbot-manager.js";
+import { createStatusRecovery } from "./lib/status-recovery.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
 const authDir = "./auth_info";
 const messageCache = new Map();
+const statusRecovery = createStatusRecovery();
 let config;
 let plugins;
 let socketGeneration = 0;
@@ -101,6 +103,7 @@ async function startBot(authState = null) {
       void restoreSavedSubbots({ mainSock: sock, config, plugins }).catch(error =>
         console.error("Saved Subbot restoration failed:", error.message)
       );
+      if (config.autoStatusSeen) void statusRecovery.flush(sock);
     }
     if (connection === "close") {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -124,41 +127,40 @@ async function startBot(authState = null) {
   });
 
 
+  const captureStatusMessages = async (messages, sockForRead) => {
+    for (const msg of messages || []) {
+      if (msg?.key?.remoteJid !== "status@broadcast" || !msg.key.id || !msg.message) continue;
+      if (!config.autoStatusSeen) continue;
+      await statusRecovery.enqueue(msg);
+      await statusRecovery.flush(sockForRead);
+    }
+  };
+
+  sock.ev.on("messaging-history.set", async ({ messages }) => {
+    await captureStatusMessages(messages, sock);
+  });
+
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify" && type !== "append") return;
+    if (type !== "notify" && type !== "append" && type !== "prepend") return;
+    await captureStatusMessages(messages, sock);
     for (const msg of messages || []) {
       if (!msg?.key?.remoteJid || !msg.message) continue;
-      // Unwrap ephemeral/view-once containers before plugins inspect command text.
       msg.message = normalizeMessageContent(msg.message) || msg.message;
       remember(msg);
-      // Append events can populate the cache, but only live notifications run plugins.
       if (type !== "notify") continue;
       const jid = msg.key.remoteJid;
       if (jid === "status@broadcast") {
-        if (config.autoStatusSeen) {
-          await sock.readMessages([msg.key]).catch(error =>
-            console.error("Auto status seen failed:", error.message)
-          );
-        }
-
         const statusReactMode = String(config.statusReact || "off").toLowerCase();
         const statusOwner = msg.key.participant;
         if (statusOwner && ["green", "random"].includes(statusReactMode)) {
           const emojis = ["👍", "❤️", "🔥", "💯", "😊", "💚"];
-          const reaction = statusReactMode === "green"
-            ? "💚"
-            : emojis[Math.floor(Math.random() * emojis.length)];
-          await sock.sendMessage(
-            jid,
-            { react: { text: reaction, key: msg.key } },
-            { statusJidList: [statusOwner] }
-          ).catch(error =>
+          const reaction = statusReactMode === "green" ? "💚" : emojis[Math.floor(Math.random() * emojis.length)];
+          await sock.sendMessage(jid, { react: { text: reaction, key: msg.key } }, { statusJidList: [statusOwner] }).catch(error =>
             console.error("Status reaction failed:", error.message)
           );
         }
         continue;
       }
-
       const viewOnceContent = msg.message.viewOnceMessageV2?.message ||
         msg.message.viewOnceMessage?.message ||
         msg.message.viewOnceMessageV2Extension?.message;

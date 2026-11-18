@@ -9,3 +9,4 @@ replies.json
 *.log
 
 data/daily-message-stats.json*
+status-seen-recovery.json*
