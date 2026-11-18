@@ -1,0 +1,43 @@
+name: Validate Hasa control agents
+
+on:
+  push:
+    branches:
+      - assistant-workflow
+    paths:
+      - ".github/workflows/agent-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout bot repository
+        uses: actions/checkout@v4
+      - name: Checkout private control agents
+        uses: actions/checkout@v4
+        with:
+          repository: coc338781-tech/hasa-bot-test-reports
+          ref: main
+          path: control-agents
+          token: ${{ secrets.BOT_TEST_REPORT_TOKEN }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate Termux and Oracle agent syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s control-agents/termux-agent/agent.mjs
+          test -s control-agents/oracle-agent/agent.mjs
+          echo "Checking Termux Agent..."
+          node --check control-agents/termux-agent/agent.mjs
+          echo "TERMUX_AGENT_SYNTAX=PASS"
+          echo "Checking Oracle Agent..."
+          node --check control-agents/oracle-agent/agent.mjs
+          echo "ORACLE_AGENT_SYNTAX=PASS"
