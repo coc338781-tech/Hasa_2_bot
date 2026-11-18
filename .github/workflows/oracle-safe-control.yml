@@ -87,6 +87,9 @@ jobs:
               free -h
               echo "--- uptime ---"
               uptime
+              echo "--- dnf makecache process age/state ---"
+              DNF_PID="$(pgrep -fo '/usr/bin/python3.9 /usr/bin/dnf makecache --timer' || true)"
+              if [ -n "$DNF_PID" ]; then ps -p "$DNF_PID" -o pid,etime,stat,%cpu,%mem,rss,wchan:24,args; else echo "No dnf makecache process"; fi
               echo "--- top memory processes ---"
               ps -eo pid,ppid,user,%mem,%cpu,rss,comm,args --sort=-%mem | head -n 16
               echo "--- top CPU processes ---"
