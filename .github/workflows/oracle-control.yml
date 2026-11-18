@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -673,6 +673,23 @@ jobs:
               echo "Starting guarded Oracle deployment; local AI code will be preserved."
               SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
               sleep 5
+              print_status
+              ;;
+            sshd-restart)
+              echo "Restarting only the SSH daemon; Hasa_2_bot and WhatsApp session are not touched."
+              sudo -n systemctl restart sshd
+              sleep 2
+              systemctl is-active sshd
+              ss -lnt 2>/dev/null | grep -E '(:22[[:space:]]|:22$)'
+              print_status
+              ;;
+            oracle-agent-restart)
+              echo "Restarting only the Oracle control agent; Hasa_2_bot and WhatsApp session are not touched."
+              pm2 describe hasa-oracle-agent >/dev/null 2>&1 || { echo "Oracle agent PM2 process not found."; exit 2; }
+              pm2 restart hasa-oracle-agent --update-env
+              sleep 6
+              pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa-oracle-agent");console.log("hasa-oracle-agent="+(p?.pm2_env?.status||"NOT FOUND"));if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
+              pm2 save
               print_status
               ;;
             restart)
