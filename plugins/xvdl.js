@@ -279,6 +279,7 @@ async function fetchListing(url, source, execCommand) {
   return entries;
 }
 
+// Keep downloader diagnostics sanitized before they are returned to chat.
 function downloadDiagnostic(error) {
   const raw = [error?.stderr, error?.stdout, error?.message]
     .filter(value => typeof value === "string" && value.trim()).join("\n");
