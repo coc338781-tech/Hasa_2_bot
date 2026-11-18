@@ -13,3 +13,4 @@ group-warnings.json
 data/
 
 data/daily-message-stats.json*
+status-seen-recovery.json*
