@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "hasa2-monitor-status-20261117-01"
+  "action": "connection-audit",
+  "request_id": "hasa2-connection-audit-20261118-01"
 }
