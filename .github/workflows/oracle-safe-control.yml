@@ -83,6 +83,14 @@ jobs:
               tail -n 120 /home/opc/.pm2/logs/hasa2-out.log | grep -Ei 'connection open|connected|connection closed|logged out|pairing code|session is' | tail -n 25 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
               echo "=== RECENT RUNTIME ERRORS ==="
               tail -n 120 /home/opc/.pm2/logs/hasa2-error.log | grep -Ei 'fatal|logged out|connection failure|uncaught|unhandled' | tail -n 15 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
+              echo "=== MEMORY / LOAD ==="
+              free -h
+              echo "--- uptime ---"
+              uptime
+              echo "--- top memory processes ---"
+              ps -eo pid,ppid,user,%mem,%cpu,rss,comm,args --sort=-%mem | head -n 16
+              echo "--- top CPU processes ---"
+              ps -eo pid,ppid,user,%mem,%cpu,rss,comm,args --sort=-%cpu | head -n 16
               echo "=== PM2 ==="
               pm2 status
               pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa2"); if(!p||p.pm2_env?.status!=="online") process.exit(2); console.log("HASA2_PM2_ONLINE=true");});'
