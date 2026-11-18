@@ -1,0 +1,65 @@
+name: OCI direct control capability audit
+
+on:
+  push:
+    branches:
+      - assistant-workflow
+    paths:
+      - ".github/workflows/oci-access-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+      OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
+      OCI_INSTANCE_OCID: ${{ secrets.OCI_INSTANCE_OCID }}
+      OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+    steps:
+      - name: Check whether direct OCI API access is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT OCI_CLI_REGION OCI_INSTANCE_OCID OCI_COMPARTMENT_OCID; do
+            if [ -n "${!name:-}" ]; then
+              echo "${name}=SET"
+            else
+              echo "${name}=MISSING"
+            fi
+          done
+          if [ -z "$OCI_CLI_USER" ] || [ -z "$OCI_CLI_TENANCY" ] || [ -z "$OCI_CLI_FINGERPRINT" ] || [ -z "$OCI_CLI_KEY_CONTENT" ] || [ -z "$OCI_CLI_REGION" ]; then
+            echo "OCI_API_READY=no"
+            exit 0
+          fi
+          mkdir -p "$HOME/.oci"
+          chmod 700 "$HOME/.oci"
+          printf '%s\n' "$OCI_CLI_KEY_CONTENT" > "$HOME/.oci/oci_api_key.pem"
+          chmod 600 "$HOME/.oci/oci_api_key.pem"
+          cat > "$HOME/.oci/config" <<EOF
+          [DEFAULT]
+          user=$OCI_CLI_USER
+          fingerprint=$OCI_CLI_FINGERPRINT
+          tenancy=$OCI_CLI_TENANCY
+          region=$OCI_CLI_REGION
+          key_file=$HOME/.oci/oci_api_key.pem
+          EOF
+          chmod 600 "$HOME/.oci/config"
+          python3 -m pip install --user --quiet oci-cli
+          export PATH="$HOME/.local/bin:$PATH"
+          if [ -n "$OCI_INSTANCE_OCID" ]; then
+            oci compute instance get --instance-id "$OCI_INSTANCE_OCID" --query 'data.{name:"display-name",state:"lifecycle-state"}' --raw-output
+          elif [ -n "$OCI_COMPARTMENT_OCID" ]; then
+            oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all --query "data[?\"display-name\"=='instance-20260921-1610'].{name:\"display-name\",state:\"lifecycle-state\",id:id}" --raw-output
+          else
+            echo "OCI_API_READY=credentials-present-but-no-instance-or-compartment-id"
+            exit 0
+          fi
+          echo "OCI_API_READY=yes"
