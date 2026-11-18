@@ -64,15 +64,18 @@ jobs:
               let s = "";
               process.stdin.on("data", d => s += d);
               process.stdin.on("end", () => {
-                const p = JSON.parse(s).find(x => x.name === "hasa2");
-                if (!p) { console.log("PM2 process hasa2: NOT FOUND"); process.exitCode = 1; return; }
-                const e = p.pm2_env || {};
-                const m = p.monit || {};
-                console.log("PM2 status: " + (e.status || "unknown"));
-                console.log("Restart count: " + (e.restart_time ?? "unknown"));
-                console.log("Uptime: " + (e.pm_uptime ? Math.floor((Date.now()-e.pm_uptime)/1000) + " seconds" : "unknown"));
-                console.log("Memory: " + (m.memory != null ? Math.round(m.memory/1048576) + " MB" : "unknown"));
-                console.log("CPU: " + (m.cpu != null ? m.cpu + "%" : "unknown"));
+                const apps = JSON.parse(s);
+                for (const name of ["hasa2", "hasa-oracle-agent"]) {
+                  const p = apps.find(x => x.name === name);
+                  if (!p) { console.log("PM2 process " + name + ": NOT FOUND"); if (name === "hasa2") process.exitCode = 1; continue; }
+                  const e = p.pm2_env || {};
+                  const m = p.monit || {};
+                  console.log(name + " status: " + (e.status || "unknown"));
+                  console.log(name + " restart count: " + (e.restart_time ?? "unknown"));
+                  console.log(name + " uptime: " + (e.pm_uptime ? Math.floor((Date.now()-e.pm_uptime)/1000) + " seconds" : "unknown"));
+                  console.log(name + " memory: " + (m.memory != null ? Math.round(m.memory/1048576) + " MB" : "unknown"));
+                  console.log(name + " CPU: " + (m.cpu != null ? m.cpu + "%" : "unknown"));
+                }
               });
             '
           }
