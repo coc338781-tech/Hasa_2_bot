@@ -1,4 +1,4 @@
 {
-  "action": "deploy",
-  "request_id": "fb-downloader-fix-deploy-20261119-a1"
+  "action": "status",
+  "request_id": "fb-downloader-postdeploy-20261119-a1"
 }
