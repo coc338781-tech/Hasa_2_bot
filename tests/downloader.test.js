@@ -146,6 +146,38 @@ test("safe downloader diagnostic falls back to sanitized error messages", () => 
   assert.doesNotMatch(output, /secret-value|facebook.com/);
 });
 
+
+test("Facebook downloads use the configured Facebook cookies file", async () => {
+  const state = fixture();
+  state.message.message.conversation = ".fb https://www.facebook.com/share/r/example/";
+  const cookieFile = path.join(state.dir, "facebook-cookies.txt");
+  fs.writeFileSync(cookieFile, "# Netscape HTTP Cookie File\\n");
+  const previous = process.env.FACEBOOK_COOKIES_FILE;
+  process.env.FACEBOOK_COOKIES_FILE = cookieFile;
+  let downloadArgs;
+  const execCommand = async (command, args) => {
+    if (args.includes("--version") || args[0] === "-version") return { stdout: "ok" };
+    downloadArgs = args;
+    const template = args[args.indexOf("-o") + 1];
+    fs.writeFileSync(template.replace("%(ext)s", "mp4"), Buffer.from("video-data"));
+    return { stdout: "" };
+  };
+  try {
+    await downloader({ ...state, execCommand });
+    assert.equal(downloadArgs[downloadArgs.indexOf("--cookies") + 1], cookieFile);
+    assert.ok(state.sent[1].payload.video.url.startsWith(state.dir));
+  } finally {
+    if (previous === undefined) delete process.env.FACEBOOK_COOKIES_FILE;
+    else process.env.FACEBOOK_COOKIES_FILE = previous;
+    fs.rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
+test("Facebook age-restricted errors explain the authentication requirement", () => {
+  const error = new Error("ERROR: [facebook] This video is age-restricted and requires authentication.");
+  assert.match(explainDownloadError(error), /Facebook.*Login/i);
+});
+
 test("Facebook downloads do not force unsupported browser impersonation", async () => {
   const state = fixture();
   state.message.message.conversation = ".fb https://www.facebook.com/share/r/example/";
