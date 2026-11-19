@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "fb-downloader-runtime-20261119-e1"
+  "action": "update-ytdlp",
+  "request_id": "fb-yt-dlp-nightly-20261119-a1"
 }
