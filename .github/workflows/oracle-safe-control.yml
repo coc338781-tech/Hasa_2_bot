@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-safe/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-safe/request.json)"
-          case "$ACTION" in status|deploy|restart) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|deploy|restart|update-ytdlp) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
