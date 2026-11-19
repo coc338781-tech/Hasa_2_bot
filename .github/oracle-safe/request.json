@@ -1,4 +1,4 @@
 {
-  "action": "update-ytdlp",
-  "request_id": "fb-yt-dlp-nightly-20261119-a2"
+  "action": "deploy",
+  "request_id": "fb-downloader-fix-deploy-20261119-a1"
 }
