@@ -67,7 +67,7 @@ function facebookOptions(target, fileSystem = fs) {
 }
 
 function extractorOptions(target, fileSystem = fs) {
-  return [...extractorOptions(target, fileSystem), ...facebookOptions(target, fileSystem)];
+  return [...youtubeOptions(target, fileSystem), ...facebookOptions(target, fileSystem)];
 }
 
 export default async function downloader({ sock, message, config, execCommand = exec, fileSystem = fs }) {
@@ -126,7 +126,7 @@ export default async function downloader({ sock, message, config, execCommand = 
     await execCommand("ffmpeg", ["-version"], { timeout: 15000, maxBuffer: 1024 * 1024 });
     const downloadArgs = [
       "--no-playlist", "--no-warnings",
-      ...youtubeOptions(target, fileSystem),
+      ...extractorOptions(target, fileSystem),
       ...(isAudio
         ? ["--max-filesize", "32M", "-x", "--audio-format", "mp3", "--audio-quality", "5"]
         : ["-f", "best[ext=mp4][height<=480]/best[height<=480]/best[height<=720]/best", "--merge-output-format", "mp4"]),
