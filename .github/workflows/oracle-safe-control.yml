@@ -83,6 +83,15 @@ jobs:
               tail -n 120 /home/opc/.pm2/logs/hasa2-out.log | grep -Ei 'connection open|connected|connection closed|logged out|pairing code|session is' | tail -n 25 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
               echo "=== RECENT RUNTIME ERRORS ==="
               tail -n 120 /home/opc/.pm2/logs/hasa2-error.log | grep -Ei 'fatal|logged out|connection failure|uncaught|unhandled' | tail -n 15 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
+              echo "=== DOWNLOADER RUNTIME ==="
+              command -v yt-dlp || true
+              yt-dlp --version 2>&1 || true
+              YTDLP_BIN="$(command -v yt-dlp || true)"
+              if [ -n "$YTDLP_BIN" ]; then readlink -f "$YTDLP_BIN" || true; ls -l "$YTDLP_BIN" || true; fi
+              python3 -m pip show yt-dlp 2>&1 | head -n 8 || true
+              python3.11 -m pip show yt-dlp 2>&1 | head -n 8 || true
+              python3.12 -m pip show yt-dlp 2>&1 | head -n 8 || true
+              pipx list 2>&1 | head -n 25 || true
               echo "=== MEMORY / LOAD ==="
               free -h
               echo "--- uptime ---"
