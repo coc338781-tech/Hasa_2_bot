@@ -67,7 +67,7 @@ function facebookOptions(target, fileSystem = fs) {
 }
 
 function extractorOptions(target, fileSystem = fs) {
-  return [...youtubeOptions(target, fileSystem), ...facebookOptions(target, fileSystem)];
+  return [...extractorOptions(target, fileSystem), ...facebookOptions(target, fileSystem)];
 }
 
 export default async function downloader({ sock, message, config, execCommand = exec, fileSystem = fs }) {
