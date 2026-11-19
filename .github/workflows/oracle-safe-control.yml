@@ -120,5 +120,18 @@ jobs:
               sleep 8
               pm2 status
               ;;
+            update-ytdlp)
+              cd "$APP"
+              YTDLP_BIN="$(command -v yt-dlp)"
+              test -n "$YTDLP_BIN"
+              PYTHON_BIN="$(head -n 1 "$YTDLP_BIN" | sed 's/^#!//')"
+              if [ ! -x "$PYTHON_BIN" ]; then PYTHON_BIN=python3.11; fi
+              echo "Updating yt-dlp to latest nightly using $PYTHON_BIN"
+              "$PYTHON_BIN" -m pip install --upgrade --pre yt-dlp
+              echo "=== INSTALLED VERSION ==="
+              yt-dlp --version
+              echo "=== FACEBOOK URL TEST ==="
+              timeout 100s yt-dlp --simulate --skip-download --print "%(title)s" --no-warnings --no-playlist "https://www.facebook.com/share/r/1evsS2kzGQ/"
+              ;;
           esac
           REMOTE
