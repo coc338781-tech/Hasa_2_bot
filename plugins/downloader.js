@@ -40,8 +40,10 @@ export function explainDownloadError(error) {
     return "Download එකට වැඩි වෙලාවක් ගත වූ නිසා නවතා දැමුවා. පසුව නැවත උත්සාහ කරන්න.";
   }
   if (/unsupported url|not a valid url|no suitable extractor/i.test(details)) return "මේ Link එක හඳුනාගන්න බැහැ. නිවැරදි Public වීඩියෝ Link එකක් යවන්න.";
+  if (/age-restricted|requires authentication|log in to view this .*content/i.test(details)) return "මේ Facebook වීඩියෝ එකට වයස් සීමාවක් හෝ Facebook Login එකක් අවශ්‍යයි. Public වීඩියෝ එකක් නම් Facebook එකෙන් logout වෙලා browser එකේ play වෙනවද බලන්න. Login අවශ්‍ය නම් server එකට Facebook cookies file එකක් secureව configure කළ යුතුයි.";
+  if (/cannot parse data/i.test(details)) return "Facebook එකෙන් ලබාදුන් පිටුව yt-dlpට කියවගන්න බැරි වුණා. මෙය Facebook login wall, age restriction හෝ site වෙනස්කමක් විය හැකියි. Browser එකේ logout වෙලා play වෙනවද පරීක්ෂා කරන්න.";
   if (/sign in to confirm|confirm you.re not a bot|not a bot|login_required/i.test(details)) return "YouTube එක Oracle server IP එකෙන් bot verification ඉල්ලනවා. Authorized YouTube session cookies file එකක් secureව configure කළ යුතුයි; PO Token එක පමණක් IP restriction එක ඉවත් කරන්නේ නැහැ.";
-  if (/private|login required|sign in|authentication|cookies/i.test(details)) return "මේ වීඩියෝ එක Private හෝ Login අවශ්‍ය එකක්. Public Link එකක් යවන්න."
+  if (/private|login required|sign in|authentication|cookies/i.test(details)) return "මේ වීඩියෝ එක Private හෝ Login අවශ්‍ය එකක්. Public Link එකක් යවන්න.";
   if (/geo.?restricted|not available in your country/i.test(details)) return "මේ වීඩියෝ එක ඔබේ ප්‍රදේශයෙන් ලබාගත නොහැක.";
   if (/max-filesize|file is larger|larger than/i.test(details)) return "ගොනුවේ ප්‍රමාණය අවසර ලත් සීමාව ඉක්මවා ඇත (Video 200 MB / Audio 32 MB).";
   if (/429|too many requests|rate.?limit/i.test(details)) return "වෙබ් අඩවියෙන් තාවකාලික සීමාවක් දමා තිබෙනවා. ටික වේලාවකින් නැවත උත්සාහ කරන්න.";
@@ -56,6 +58,16 @@ function youtubeOptions(target, fileSystem = fs) {
   const cookieFile = process.env.YOUTUBE_COOKIES_FILE;
   const cookies = cookieFile && fileSystem.existsSync(cookieFile) ? ["--cookies", cookieFile] : [];
   return [...(isYoutube ? ["--extractor-args", "youtube:player_client=tv,web_safari"] : []), ...cookies];
+}
+
+function facebookOptions(target, fileSystem = fs) {
+  const isFacebook = /^https?:\/\/(?:www\.|m\.)?(?:facebook\.com|fb\.watch)\//i.test(String(target));
+  const cookieFile = isFacebook ? process.env.FACEBOOK_COOKIES_FILE : "";
+  return cookieFile && fileSystem.existsSync(cookieFile) ? ["--cookies", cookieFile] : [];
+}
+
+function extractorOptions(target, fileSystem = fs) {
+  return [...extractorOptions(target, fileSystem), ...facebookOptions(target, fileSystem)];
 }
 
 export default async function downloader({ sock, message, config, execCommand = exec, fileSystem = fs }) {
@@ -73,7 +85,7 @@ export default async function downloader({ sock, message, config, execCommand = 
       const results = [];
       for (const link of links.slice(0, 3)) {
         try {
-          const result = await exec("yt-dlp", ["--simulate", "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", ...youtubeOptions(link, fileSystem), link], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+          const result = await exec("yt-dlp", ["--simulate", "--skip-download", "--dump-single-json", "--no-warnings", "--no-playlist", ...extractorOptions(link, fileSystem), link], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
           const info = JSON.parse(result.stdout || "{}");
           results.push("✅ " + (info.extractor_key || info.extractor || "Extractor") + " | " + String(info.title || "Title unavailable").slice(0, 90) + " | " + (Array.isArray(info.formats) ? info.formats.length + " formats" : "metadata received"));
         } catch (error) {
