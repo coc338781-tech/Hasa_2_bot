@@ -84,7 +84,9 @@ jobs:
               echo "=== RECENT RUNTIME ERRORS ==="
               tail -n 120 /home/opc/.pm2/logs/hasa2-error.log | grep -Ei 'fatal|logged out|connection failure|uncaught|unhandled' | tail -n 15 | sed -E 's/[0-9]{10,}/[REDACTED]/g' || true
               echo "=== FACEBOOK COOKIE CONFIG ==="
-              COOKIE_PATH="$(grep '^FACEBOOK_COOKIES_FILE=' .env 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d "\\"'" || true)"
+              COOKIE_LINE="$(grep '^FACEBOOK_COOKIES_FILE=' .env 2>/dev/null | tail -n 1 || true)"
+              COOKIE_PATH="${COOKIE_LINE#*=}"
+              if [ -n "$COOKIE_PATH" ] && [ -f "$COOKIE_PATH" ]; then echo "FACEBOOK_COOKIES_FILE_READY=true"; else echo "FACEBOOK_COOKIES_FILE_READY=false"; fi
               if [ -n "$COOKIE_PATH" ] && [ -f "$COOKIE_PATH" ]; then echo "FACEBOOK_COOKIES_FILE_READY=true"; else echo "FACEBOOK_COOKIES_FILE_READY=false"; fi
               echo "=== DOWNLOADER RUNTIME ==="
               command -v yt-dlp || true
