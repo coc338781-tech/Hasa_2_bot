@@ -56,6 +56,7 @@ function collectContextInfo(content, depth = 0, seen = new Set()) {
   seen.add(content);
   const found = [];
   if (content.contextInfo && typeof content.contextInfo === "object") found.push(content.contextInfo);
+  if (content.messageContextInfo && typeof content.messageContextInfo === "object") found.push(content.messageContextInfo);
   for (const value of Object.values(content)) {
     if (value && typeof value === "object") found.push(...collectContextInfo(value, depth + 1, seen));
   }
