@@ -766,7 +766,7 @@ jobs:
           for attempt in 1 2 3; do
             echo "Oracle SSH attempt $attempt/3"
             set +e
-            RESULT="$(printf '%s\\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=25 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
+            RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=25 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
             REMOTE_EXIT=$?
             set -e
             if [ "$REMOTE_EXIT" -eq 0 ]; then
