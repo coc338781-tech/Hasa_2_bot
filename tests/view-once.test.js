@@ -76,6 +76,32 @@ test("extracts a View Once video from a V1 wrapper", () => {
   assert.equal(found.media, media);
 });
 
+test("recovers full View Once media from cache when quoted copy has no URL or directPath", () => {
+  const quotedMedia = { mimetype: "image/jpeg", mediaKey: Buffer.from("quoted") };
+  const originalMedia = {
+    mimetype: "image/jpeg",
+    mediaKey: Buffer.from("original"),
+    url: "https://mmg.whatsapp.net/test",
+    directPath: "/v/t62.7118-24/test"
+  };
+  const message = replyTo({
+    viewOnceMessageV2: { message: { imageMessage: quotedMedia } }
+  });
+  message.message.extendedTextMessage.contextInfo.stanzaId = "original-view-once-id";
+  const cache = new Map([[
+    "test@s.whatsapp.net:original-view-once-id",
+    {
+      key: { remoteJid: "test@s.whatsapp.net", id: "original-view-once-id" },
+      message: { viewOnceMessageV2: { message: { imageMessage: originalMedia } } }
+    }
+  ]]);
+
+  const found = findQuotedViewOnceMedia(message, cache);
+  assert.equal(found.kind, "image");
+  assert.equal(found.media, originalMedia);
+  assert.ok(found.media.url || found.media.directPath);
+});
+
 test("does not treat an ordinary photo as View Once", () => {
   const found = findQuotedViewOnceMedia(replyTo({
     imageMessage: { mimetype: "image/jpeg" }
