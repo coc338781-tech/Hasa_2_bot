@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "vv-post-deploy-status-20261121"
+  "action": "logs",
+  "request_id": "vv-live-failure-logs-20261121"
 }
