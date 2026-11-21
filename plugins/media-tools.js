@@ -76,6 +76,42 @@ export function commandOf(body, prefix) {
   return body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase();
 }
 
+export async function handleViewOnceCommand({ sock, message, jid, found, downloadMedia = download }) {
+  if (!found) {
+    return sock.sendMessage(jid, {
+      text: "📎 View Once Photo/Video එකකට Reply කර .vv හෝ .Vv යවන්න."
+    }, { quoted: message });
+  }
+
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-view-once-"));
+  const input = path.join(work, found.kind === "image" ? "view-once.jpg" : "view-once.mp4");
+  try {
+    await sock.sendMessage(jid, { text: "♻️ View Once media එක සාමාන්‍ය " + (found.kind === "image" ? "Photo" : "Video") + " එකක් ලෙස සකස් කරමින්..." }, { quoted: message });
+    await downloadMedia(found.media, found.kind, input);
+    const data = fs.readFileSync(input);
+    if (found.kind === "image") {
+      return await sock.sendMessage(jid, {
+        image: data,
+        mimetype: found.media.mimetype || "image/jpeg",
+        caption: "✅ *VIEW ONCE PHOTO SAVED • HASA 2 BOT*"
+      }, { quoted: message });
+    }
+    return await sock.sendMessage(jid, {
+      video: data,
+      mimetype: found.media.mimetype || "video/mp4",
+      caption: "✅ *VIEW ONCE VIDEO SAVED • HASA 2 BOT*"
+    }, { quoted: message });
+  } catch (error) {
+    console.error("View Once save failed:", error?.message || error);
+    const reason = /ENOENT/.test(String(error?.code))
+      ? "Media download එකට අවශ්‍ය file එක සොයාගත නොහැක."
+      : error.message || "නැවත උත්සාහ කරන්න.";
+    return sock.sendMessage(jid, { text: "❌ View Once Save Error: " + reason }, { quoted: message });
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+}
+
 export default async function mediaTools({ sock, message, config }) {
   const jid = message.key?.remoteJid;
   if (!jid || jid === "status@broadcast") return;
@@ -84,40 +120,7 @@ export default async function mediaTools({ sock, message, config }) {
   const command = commandOf(body, prefix);
 
   if (command === "vv") {
-    const found = findQuotedViewOnceMedia(message);
-    if (!found) {
-      return sock.sendMessage(jid, {
-        text: "📎 View Once Photo/Video එකකට Reply කර .vv හෝ .Vv යවන්න."
-      }, { quoted: message });
-    }
-
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-view-once-"));
-    const input = path.join(work, found.kind === "image" ? "view-once.jpg" : "view-once.mp4");
-    try {
-      await sock.sendMessage(jid, { text: "♻️ View Once media එක සාමාන්‍ය " + (found.kind === "image" ? "Photo" : "Video") + " එකක් ලෙස සකස් කරමින්..." }, { quoted: message });
-      await download(found.media, found.kind, input);
-      const data = fs.readFileSync(input);
-      if (found.kind === "image") {
-        return await sock.sendMessage(jid, {
-          image: data,
-          mimetype: found.media.mimetype || "image/jpeg",
-          caption: "✅ *VIEW ONCE PHOTO SAVED • HASA 2 BOT*"
-        }, { quoted: message });
-      }
-      return await sock.sendMessage(jid, {
-        video: data,
-        mimetype: found.media.mimetype || "video/mp4",
-        caption: "✅ *VIEW ONCE VIDEO SAVED • HASA 2 BOT*"
-      }, { quoted: message });
-    } catch (error) {
-      console.error("View Once save failed:", error?.message || error);
-      const reason = /ENOENT/.test(String(error?.code))
-        ? "Media download එකට අවශ්‍ය file එක සොයාගත නොහැක."
-        : error.message || "නැවත උත්සාහ කරන්න.";
-      return sock.sendMessage(jid, { text: "❌ View Once Save Error: " + reason }, { quoted: message });
-    } finally {
-      fs.rmSync(work, { recursive: true, force: true });
-    }
+    return handleViewOnceCommand({ sock, message, jid, found: findQuotedViewOnceMedia(message) });
   }
 
   if (!["sticker", "s", "toaudio", "compress"].includes(command)) return;
