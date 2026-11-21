@@ -61,13 +61,36 @@ export function findQuotedViewOnceMedia(message, cache) {
   // Recover the original full message by stanza ID from the incoming-message cache.
   const stanzaId = context?.stanzaId;
   const chatJid = context?.remoteJid || message.key?.remoteJid;
-  if (stanzaId && chatJid && cache?.get) {
-    const original = cache.get(chatJid + ":" + stanzaId);
-    const cachedFound = extractViewOnceMedia(original?.message);
-    if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
+
+  // Prefer the exact chat + stanza key. WhatsApp can quote using a different
+  // JID representation (PN/LID), so fall back to the cached message ID.
+  if (stanzaId && cache?.get) {
+    const exactKeys = [
+      chatJid && chatJid + ":" + stanzaId,
+      message.key?.remoteJid && message.key.remoteJid + ":" + stanzaId,
+      context?.remoteJid && context.remoteJid + ":" + stanzaId
+    ].filter(Boolean);
+    for (const key of new Set(exactKeys)) {
+      const original = cache.get(key);
+      const cachedFound = extractViewOnceMedia(original?.message);
+      if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
+    }
+
+    if (typeof cache.values === "function") {
+      for (const original of cache.values()) {
+        if (original?.key?.id !== stanzaId) continue;
+        if (chatJid && original.key.remoteJid !== chatJid &&
+            original.key.remoteJid !== message.key?.remoteJid &&
+            original.key.remoteJid !== context?.remoteJid) continue;
+        const cachedFound = extractViewOnceMedia(original.message);
+        if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
+      }
+    }
   }
 
-  return quotedFound;
+  // Never pass a reduced quoted payload to Baileys: it throws
+  // "No valid media URL or directPath present in message".
+  return hasDownloadLocation(quotedFound.media) ? quotedFound : null;
 }
 
 function findMedia(message) {
