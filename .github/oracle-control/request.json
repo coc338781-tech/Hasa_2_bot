@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "vv-deploy-live-status-20261121"
+  "action": "deploy",
+  "request_id": "vv-directpath-fix-20261121"
 }
