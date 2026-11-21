@@ -39,13 +39,35 @@ function isViewOnceContent(content, depth = 0) {
   return false;
 }
 
-export function findQuotedViewOnceMedia(message) {
-  const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-  if (!quoted || !isViewOnceContent(quoted)) return null;
-  const normalized = unwrapMessageContent(quoted);
+function extractViewOnceMedia(content) {
+  if (!content || !isViewOnceContent(content)) return null;
+  const normalized = unwrapMessageContent(content);
   if (normalized.imageMessage) return { media: normalized.imageMessage, kind: "image" };
   if (normalized.videoMessage) return { media: normalized.videoMessage, kind: "video" };
   return null;
+}
+
+function hasDownloadLocation(media) {
+  return Boolean(media?.url || media?.directPath);
+}
+
+export function findQuotedViewOnceMedia(message, cache) {
+  const context = message.message?.extendedTextMessage?.contextInfo;
+  const quoted = context?.quotedMessage;
+  const quotedFound = extractViewOnceMedia(quoted);
+  if (!quotedFound) return null;
+
+  // WhatsApp's quotedMessage can be a reduced copy without url/directPath.
+  // Recover the original full message by stanza ID from the incoming-message cache.
+  const stanzaId = context?.stanzaId;
+  const chatJid = context?.remoteJid || message.key?.remoteJid;
+  if (stanzaId && chatJid && cache?.get) {
+    const original = cache.get(chatJid + ":" + stanzaId);
+    const cachedFound = extractViewOnceMedia(original?.message);
+    if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
+  }
+
+  return quotedFound;
 }
 
 function findMedia(message) {
@@ -112,7 +134,7 @@ export async function handleViewOnceCommand({ sock, message, jid, found, downloa
   }
 }
 
-export default async function mediaTools({ sock, message, config }) {
+export default async function mediaTools({ sock, message, config, cache }) {
   const jid = message.key?.remoteJid;
   if (!jid || jid === "status@broadcast") return;
   const prefix = config.prefix || ".";
@@ -120,7 +142,7 @@ export default async function mediaTools({ sock, message, config }) {
   const command = commandOf(body, prefix);
 
   if (command === "vv") {
-    return handleViewOnceCommand({ sock, message, jid, found: findQuotedViewOnceMedia(message) });
+    return handleViewOnceCommand({ sock, message, jid, found: findQuotedViewOnceMedia(message, cache) });
   }
 
   if (!["sticker", "s", "toaudio", "compress"].includes(command)) return;
