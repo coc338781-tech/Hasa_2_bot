@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "vv-final-health-20261121"
+  "action": "deploy",
+  "request_id": "vv-stripped-wrapper-fix-20261121"
 }
