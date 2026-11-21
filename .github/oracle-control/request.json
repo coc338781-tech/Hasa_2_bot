@@ -1,4 +1,4 @@
 {
-  "action": "deploy",
-  "request_id": "deploy-vv-command-20261121"
+  "action": "status",
+  "request_id": "vv-deploy-live-status-20261121"
 }
