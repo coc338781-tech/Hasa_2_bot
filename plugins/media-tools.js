@@ -52,22 +52,19 @@ function hasDownloadLocation(media) {
 }
 
 export function findQuotedViewOnceMedia(message, cache) {
-  const context = message.message?.extendedTextMessage?.contextInfo;
+  const context = message.message?.extendedTextMessage?.contextInfo ||
+    message.message?.imageMessage?.contextInfo ||
+    message.message?.videoMessage?.contextInfo;
   const quoted = context?.quotedMessage;
   const quotedFound = extractViewOnceMedia(quoted);
-  if (!quotedFound) return null;
-
-  // WhatsApp's quotedMessage can be a reduced copy without url/directPath.
-  // Recover the original full message by stanza ID from the incoming-message cache.
   const stanzaId = context?.stanzaId;
-  const chatJid = context?.remoteJid || message.key?.remoteJid;
+  const chatJid = message.key?.remoteJid;
 
-  // Prefer the exact chat + stanza key. WhatsApp can quote using a different
-  // JID representation (PN/LID), so fall back to the cached message ID.
+  // Quoted payloads are frequently stripped by WhatsApp/Baileys and may no
+  // longer contain the View Once wrapper. Resolve the original stanza first.
   if (stanzaId && cache?.get) {
     const exactKeys = [
       chatJid && chatJid + ":" + stanzaId,
-      message.key?.remoteJid && message.key.remoteJid + ":" + stanzaId,
       context?.remoteJid && context.remoteJid + ":" + stanzaId
     ].filter(Boolean);
     for (const key of new Set(exactKeys)) {
@@ -76,21 +73,19 @@ export function findQuotedViewOnceMedia(message, cache) {
       if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
     }
 
+    // Message IDs are unique enough to recover PN/LID aliases where the JID
+    // stored with the original message differs from the reply's JID.
     if (typeof cache.values === "function") {
       for (const original of cache.values()) {
         if (original?.key?.id !== stanzaId) continue;
-        if (chatJid && original.key.remoteJid !== chatJid &&
-            original.key.remoteJid !== message.key?.remoteJid &&
-            original.key.remoteJid !== context?.remoteJid) continue;
         const cachedFound = extractViewOnceMedia(original.message);
         if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
       }
     }
   }
 
-  // Never pass a reduced quoted payload to Baileys: it throws
-  // "No valid media URL or directPath present in message".
-  return hasDownloadLocation(quotedFound.media) ? quotedFound : null;
+  // Only use the quoted copy when it still contains a usable media URL/path.
+  return quotedFound && hasDownloadLocation(quotedFound.media) ? quotedFound : null;
 }
 
 function findMedia(message) {
