@@ -102,6 +102,40 @@ test("recovers full View Once media from cache when quoted copy has no URL or di
   assert.ok(found.media.url || found.media.directPath);
 });
 
+test("recovers cached View Once media when quoted JID format differs", () => {
+  const quotedMedia = { mimetype: "image/jpeg", mediaKey: Buffer.from("quoted") };
+  const originalMedia = {
+    mimetype: "image/jpeg",
+    mediaKey: Buffer.from("original"),
+    url: "https://mmg.whatsapp.net/test",
+    directPath: "/v/t62.7118-24/test"
+  };
+  const message = replyTo({
+    viewOnceMessageV2: { message: { imageMessage: quotedMedia } }
+  });
+  message.message.extendedTextMessage.contextInfo.stanzaId = "jid-format-mismatch-id";
+  message.message.extendedTextMessage.contextInfo.remoteJid = "12345@lid";
+  const cache = new Map([[
+    "test@s.whatsapp.net:jid-format-mismatch-id",
+    {
+      key: { remoteJid: "test@s.whatsapp.net", id: "jid-format-mismatch-id" },
+      message: { viewOnceMessageV2: { message: { imageMessage: originalMedia } } }
+    }
+  ]]);
+  const found = findQuotedViewOnceMedia(message, cache);
+  assert.equal(found.media, originalMedia);
+  assert.ok(found.media.url || found.media.directPath);
+});
+
+test("does not return a reduced quoted media payload without download location", () => {
+  const found = findQuotedViewOnceMedia(replyTo({
+    viewOnceMessageV2: {
+      message: { imageMessage: { mimetype: "image/jpeg", mediaKey: Buffer.from("quoted") } }
+    }
+  }));
+  assert.equal(found, null);
+});
+
 test("does not treat an ordinary photo as View Once", () => {
   const found = findQuotedViewOnceMedia(replyTo({
     imageMessage: { mimetype: "image/jpeg" }
