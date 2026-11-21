@@ -39,7 +39,7 @@ function isViewOnceContent(content, depth = 0) {
   return false;
 }
 
-function findQuotedViewOnceMedia(message) {
+export function findQuotedViewOnceMedia(message) {
   const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
   if (!quoted || !isViewOnceContent(quoted)) return null;
   const normalized = unwrapMessageContent(quoted);
@@ -71,7 +71,7 @@ async function download(media, kind, destination) {
   fs.writeFileSync(destination, Buffer.concat(chunks));
 }
 
-function commandOf(body, prefix) {
+export function commandOf(body, prefix) {
   if (!body.startsWith(prefix)) return "";
   return body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase();
 }
