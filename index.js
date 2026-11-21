@@ -176,8 +176,10 @@ async function startBot(authState = null) {
         normalizedMessage.viewOnceMessageV2?.message ||
         normalizedMessage.viewOnceMessage?.message ||
         normalizedMessage.viewOnceMessageV2Extension?.message;
+      // Keep the untouched incoming wrapper in the cache: quoted View Once
+      // messages may omit media URL/directPath, while the original upsert has them.
+      remember({ ...msg, message: originalMessage });
       msg.message = normalizedMessage;
-      remember(msg);
       // Append events can populate the cache, but only live notifications run plugins.
       if (type !== "notify") continue;
       const jid = msg.key.remoteJid;
