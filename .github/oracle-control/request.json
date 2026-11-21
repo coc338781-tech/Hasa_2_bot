@@ -1,4 +1,4 @@
 {
-  "action": "inspect-guard-script",
-  "request_id": "vv-guard-inspect-20261121"
+  "action": "inspect-changes",
+  "request_id": "vv-predeploy-diff-20261121"
 }
