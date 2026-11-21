@@ -59,7 +59,7 @@ test(".vv appears in the numbered Media Downloads menu, .list and .help", () => 
 });
 
 test("extracts a View Once photo from a V2 wrapper", () => {
-  const media = { mimetype: "image/jpeg", mediaKey: Buffer.from("test") };
+  const media = { mimetype: "image/jpeg", mediaKey: Buffer.from("test"), url: "https://mmg.whatsapp.net/image" };
   const found = findQuotedViewOnceMedia(replyTo({
     viewOnceMessageV2: { message: { imageMessage: media } }
   }));
@@ -68,7 +68,7 @@ test("extracts a View Once photo from a V2 wrapper", () => {
 });
 
 test("extracts a View Once video from a V1 wrapper", () => {
-  const media = { mimetype: "video/mp4", mediaKey: Buffer.from("test") };
+  const media = { mimetype: "video/mp4", mediaKey: Buffer.from("test"), url: "https://mmg.whatsapp.net/video" };
   const found = findQuotedViewOnceMedia(replyTo({
     viewOnceMessage: { message: { videoMessage: media } }
   }));
@@ -144,7 +144,7 @@ test("does not treat an ordinary photo as View Once", () => {
 });
 
 test("supports an ephemeral wrapper around View Once media", () => {
-  const media = { mimetype: "image/jpeg", mediaKey: Buffer.from("test") };
+  const media = { mimetype: "image/jpeg", mediaKey: Buffer.from("test"), url: "https://mmg.whatsapp.net/ephemeral" };
   const found = findQuotedViewOnceMedia(replyTo({
     ephemeralMessage: {
       message: { viewOnceMessageV2: { message: { imageMessage: media } } }
