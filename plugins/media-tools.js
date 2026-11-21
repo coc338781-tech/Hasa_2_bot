@@ -73,7 +73,7 @@ async function download(media, kind, destination) {
 
 function commandOf(body, prefix) {
   if (!body.startsWith(prefix)) return "";
-  return body.slice(prefix.length).trim().split(/\\s+/)[0].toLowerCase();
+  return body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase();
 }
 
 export default async function mediaTools({ sock, message, config }) {
