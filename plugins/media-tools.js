@@ -63,17 +63,23 @@ function collectContextInfo(content, depth = 0, seen = new Set()) {
 }
 
 export function findQuotedViewOnceMedia(message, cache) {
-  const contexts = collectContextInfo(message.message);
-  const context = contexts.find(item => item.quotedMessage || item.stanzaId) || {};
+  // Baileys v7 can place messageContextInfo/contextInfo either inside the
+  // normalized content or on the message envelope. Search both structures.
+  const contexts = collectContextInfo(message);
+  const orderedContexts = [
+    ...contexts.filter(item => item.stanzaId),
+    ...contexts.filter(item => !item.stanzaId && item.quotedMessage)
+  ];
+  const context = orderedContexts[0] || {};
   const quoted = context.quotedMessage;
   const quotedFound = extractViewOnceMedia(quoted);
-  const stanzaId = context.stanzaId;
+  const stanzaId = context.stanzaId || context.quotedMessage?.key?.id;
   const chatJid = message.key?.remoteJid;
   let sameIdMatches = 0;
   let cachedViewOnceMatches = 0;
 
-  // Quoted payloads are frequently stripped by WhatsApp/Baileys and may no
-  // longer contain the View Once wrapper. Resolve the original stanza first.
+  // Prefer the exact original stanza; this is reliable even when WhatsApp
+  // strips the quoted media payload or changes PN/LID JID representation.
   if (stanzaId && cache?.get) {
     const exactKeys = [
       chatJid && chatJid + ":" + stanzaId,
@@ -84,9 +90,6 @@ export function findQuotedViewOnceMedia(message, cache) {
       const cachedFound = extractViewOnceMedia(original?.message);
       if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
     }
-
-    // Message IDs are unique enough to recover PN/LID aliases where the JID
-    // stored with the original message differs from the reply's JID.
     if (typeof cache.values === "function") {
       for (const original of cache.values()) {
         if (original?.key?.id !== stanzaId) continue;
@@ -98,7 +101,18 @@ export function findQuotedViewOnceMedia(message, cache) {
     }
   }
 
-  // Private diagnostics deliberately omit message IDs, JIDs, URLs and media keys.
+  // Last-resort recovery for Baileys reply envelopes that omit stanzaId:
+  // only inspect View Once messages from this same chat, newest first.
+  // This is intentionally restricted to an actual quoted-reply context.
+  if (contexts.length && typeof cache?.values === "function" && chatJid) {
+    const entries = Array.from(cache.values()).reverse();
+    for (const original of entries) {
+      if (original?.key?.remoteJid !== chatJid) continue;
+      const cachedFound = extractViewOnceMedia(original.message);
+      if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
+    }
+  }
+
   if (!quotedFound || !hasDownloadLocation(quotedFound.media)) {
     console.warn("VV_DIAGNOSTIC", JSON.stringify({
       hasContextInfo: contexts.length > 0,
@@ -111,8 +125,6 @@ export function findQuotedViewOnceMedia(message, cache) {
       quotedHasDownloadLocation: Boolean(quotedFound && hasDownloadLocation(quotedFound.media))
     }));
   }
-
-  // Only use the quoted copy when it still contains a usable media URL/path.
   return quotedFound && hasDownloadLocation(quotedFound.media) ? quotedFound : null;
 }
 
