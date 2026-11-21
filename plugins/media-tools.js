@@ -51,21 +51,33 @@ function hasDownloadLocation(media) {
   return Boolean(media?.url || media?.directPath);
 }
 
+function collectContextInfo(content, depth = 0, seen = new Set()) {
+  if (!content || typeof content !== "object" || depth > 8 || seen.has(content)) return [];
+  seen.add(content);
+  const found = [];
+  if (content.contextInfo && typeof content.contextInfo === "object") found.push(content.contextInfo);
+  for (const value of Object.values(content)) {
+    if (value && typeof value === "object") found.push(...collectContextInfo(value, depth + 1, seen));
+  }
+  return found;
+}
+
 export function findQuotedViewOnceMedia(message, cache) {
-  const context = message.message?.extendedTextMessage?.contextInfo ||
-    message.message?.imageMessage?.contextInfo ||
-    message.message?.videoMessage?.contextInfo;
-  const quoted = context?.quotedMessage;
+  const contexts = collectContextInfo(message.message);
+  const context = contexts.find(item => item.quotedMessage || item.stanzaId) || {};
+  const quoted = context.quotedMessage;
   const quotedFound = extractViewOnceMedia(quoted);
-  const stanzaId = context?.stanzaId;
+  const stanzaId = context.stanzaId;
   const chatJid = message.key?.remoteJid;
+  let sameIdMatches = 0;
+  let cachedViewOnceMatches = 0;
 
   // Quoted payloads are frequently stripped by WhatsApp/Baileys and may no
   // longer contain the View Once wrapper. Resolve the original stanza first.
   if (stanzaId && cache?.get) {
     const exactKeys = [
       chatJid && chatJid + ":" + stanzaId,
-      context?.remoteJid && context.remoteJid + ":" + stanzaId
+      context.remoteJid && context.remoteJid + ":" + stanzaId
     ].filter(Boolean);
     for (const key of new Set(exactKeys)) {
       const original = cache.get(key);
@@ -78,10 +90,26 @@ export function findQuotedViewOnceMedia(message, cache) {
     if (typeof cache.values === "function") {
       for (const original of cache.values()) {
         if (original?.key?.id !== stanzaId) continue;
+        sameIdMatches++;
         const cachedFound = extractViewOnceMedia(original.message);
+        if (cachedFound) cachedViewOnceMatches++;
         if (cachedFound && hasDownloadLocation(cachedFound.media)) return cachedFound;
       }
     }
+  }
+
+  // Private diagnostics deliberately omit message IDs, JIDs, URLs and media keys.
+  if (!quotedFound || !hasDownloadLocation(quotedFound.media)) {
+    console.warn("VV_DIAGNOSTIC", JSON.stringify({
+      hasContextInfo: contexts.length > 0,
+      hasQuotedMessage: Boolean(quoted),
+      hasStanzaId: Boolean(stanzaId),
+      cacheSize: Number.isFinite(cache?.size) ? cache.size : null,
+      sameIdMatches,
+      cachedViewOnceMatches,
+      quotedViewOnceDetected: Boolean(quotedFound),
+      quotedHasDownloadLocation: Boolean(quotedFound && hasDownloadLocation(quotedFound.media))
+    }));
   }
 
   // Only use the quoted copy when it still contains a usable media URL/path.
