@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "vv-fix-postdeploy-check-20261121"
+  "action": "deploy",
+  "request_id": "vv-cache-jid-fix-20261121"
 }
