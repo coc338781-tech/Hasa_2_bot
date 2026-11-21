@@ -1,4 +1,4 @@
 {
-  "action": "inspect-changes",
-  "request_id": "vv-predeploy-diff-20261121"
+  "action": "deploy",
+  "request_id": "deploy-vv-command-20261121"
 }
