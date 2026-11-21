@@ -158,6 +158,48 @@ test("finds reply context when Baileys nests it inside an ephemeral message", ()
   assert.equal(found.media, originalMedia);
 });
 
+test("finds reply context on the outer Baileys message envelope", () => {
+  const media = {
+    mimetype: "image/jpeg",
+    mediaKey: Buffer.from("envelope"),
+    url: "https://mmg.whatsapp.net/envelope-context"
+  };
+  const message = {
+    key: { remoteJid: "test@s.whatsapp.net" },
+    message: { extendedTextMessage: { text: ".vv" } },
+    messageContextInfo: {
+      stanzaId: "outer-context-id",
+      quotedMessage: { viewOnceMessageV2: { message: { imageMessage: media } } }
+    }
+  };
+  const found = findQuotedViewOnceMedia(message, new Map());
+  assert.equal(found.kind, "image");
+  assert.equal(found.media, media);
+});
+
+test("recovers latest same-chat View Once when reply envelope omits stanzaId", () => {
+  const media = {
+    mimetype: "image/jpeg",
+    mediaKey: Buffer.from("fallback"),
+    url: "https://mmg.whatsapp.net/same-chat-fallback"
+  };
+  const message = {
+    key: { remoteJid: "test@s.whatsapp.net" },
+    message: { extendedTextMessage: { text: ".vv" } },
+    messageContextInfo: { quotedMessage: {} }
+  };
+  const cache = new Map([[
+    "test@s.whatsapp.net:cached-view-once",
+    {
+      key: { remoteJid: "test@s.whatsapp.net", id: "cached-view-once" },
+      message: { viewOnceMessageV2: { message: { imageMessage: media } } }
+    }
+  ]]);
+  const found = findQuotedViewOnceMedia(message, cache);
+  assert.equal(found.kind, "image");
+  assert.equal(found.media, media);
+});
+
 test("recovers cached View Once media when quoted wrapper is stripped", () => {
   const originalMedia = {
     mimetype: "image/jpeg",
