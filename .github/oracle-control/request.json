@@ -1,4 +1,4 @@
 {
-  "action": "deploy",
-  "request_id": "vv-diagnostic-context-fix-20261121"
+  "action": "status",
+  "request_id": "vv-post-deploy-status-20261121"
 }
