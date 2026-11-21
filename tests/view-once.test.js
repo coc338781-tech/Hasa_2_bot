@@ -127,6 +127,28 @@ test("recovers cached View Once media when quoted JID format differs", () => {
   assert.ok(found.media.url || found.media.directPath);
 });
 
+test("recovers cached View Once media when quoted wrapper is stripped", () => {
+  const originalMedia = {
+    mimetype: "image/jpeg",
+    mediaKey: Buffer.from("original"),
+    url: "https://mmg.whatsapp.net/stripped-wrapper"
+  };
+  const message = replyTo({
+    imageMessage: { mimetype: "image/jpeg", mediaKey: Buffer.from("reduced") }
+  });
+  message.message.extendedTextMessage.contextInfo.stanzaId = "stripped-wrapper-id";
+  const cache = new Map([[
+    "test@s.whatsapp.net:stripped-wrapper-id",
+    {
+      key: { remoteJid: "test@s.whatsapp.net", id: "stripped-wrapper-id" },
+      message: { viewOnceMessageV2: { message: { imageMessage: originalMedia } } }
+    }
+  ]]);
+  const found = findQuotedViewOnceMedia(message, cache);
+  assert.equal(found.kind, "image");
+  assert.equal(found.media, originalMedia);
+});
+
 test("does not return a reduced quoted media payload without download location", () => {
   const found = findQuotedViewOnceMedia(replyTo({
     viewOnceMessageV2: {
