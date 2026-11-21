@@ -127,6 +127,37 @@ test("recovers cached View Once media when quoted JID format differs", () => {
   assert.ok(found.media.url || found.media.directPath);
 });
 
+test("finds reply context when Baileys nests it inside an ephemeral message", () => {
+  const originalMedia = {
+    mimetype: "image/jpeg",
+    mediaKey: Buffer.from("original"),
+    url: "https://mmg.whatsapp.net/nested-context"
+  };
+  const message = {
+    key: { remoteJid: "test@s.whatsapp.net" },
+    message: {
+      ephemeralMessage: {
+        message: {
+          extendedTextMessage: {
+            text: ".vv",
+            contextInfo: { stanzaId: "nested-context-id" }
+          }
+        }
+      }
+    }
+  };
+  const cache = new Map([[
+    "test@s.whatsapp.net:nested-context-id",
+    {
+      key: { remoteJid: "test@s.whatsapp.net", id: "nested-context-id" },
+      message: { viewOnceMessageV2: { message: { imageMessage: originalMedia } } }
+    }
+  ]]);
+  const found = findQuotedViewOnceMedia(message, cache);
+  assert.equal(found.kind, "image");
+  assert.equal(found.media, originalMedia);
+});
+
 test("recovers cached View Once media when quoted wrapper is stripped", () => {
   const originalMedia = {
     mimetype: "image/jpeg",
