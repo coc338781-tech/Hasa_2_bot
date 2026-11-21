@@ -3,10 +3,50 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { downloadContentFromMessage } from "@whiskeysockets/baileys";
+import { downloadContentFromMessage, normalizeMessageContent } from "@whiskeysockets/baileys";
 
 const exec = promisify(execFile);
-const MAX_INPUT = 48 * 1024 * 1024;
+const MAX_INPUT = 64 * 1024 * 1024;
+
+export const commands = [
+  {
+    name: "vv",
+    category: "3",
+    usage: "vv (reply to View Once photo/video)",
+    description: "Save View Once media as a normal photo or video"
+  }
+];
+
+function unwrapMessageContent(content) {
+  let current = normalizeMessageContent(content) || content || {};
+  for (let depth = 0; depth < 5; depth++) {
+    const nested = current.ephemeralMessage?.message ||
+      current.viewOnceMessage?.message ||
+      current.viewOnceMessageV2?.message ||
+      current.viewOnceMessageV2Extension?.message ||
+      current.documentWithCaptionMessage?.message;
+    if (!nested) break;
+    current = normalizeMessageContent(nested) || nested;
+  }
+  return current;
+}
+
+function isViewOnceContent(content, depth = 0) {
+  if (!content || depth > 5) return false;
+  if (content.viewOnceMessage || content.viewOnceMessageV2 || content.viewOnceMessageV2Extension) return true;
+  if (content.imageMessage?.viewOnce || content.videoMessage?.viewOnce) return true;
+  if (content.ephemeralMessage?.message) return isViewOnceContent(content.ephemeralMessage.message, depth + 1);
+  return false;
+}
+
+function findQuotedViewOnceMedia(message) {
+  const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+  if (!quoted || !isViewOnceContent(quoted)) return null;
+  const normalized = unwrapMessageContent(quoted);
+  if (normalized.imageMessage) return { media: normalized.imageMessage, kind: "image" };
+  if (normalized.videoMessage) return { media: normalized.videoMessage, kind: "video" };
+  return null;
+}
 
 function findMedia(message) {
   const current = message.message || {};
@@ -24,7 +64,7 @@ async function download(media, kind, destination) {
   let size = 0;
   for await (const chunk of stream) {
     size += chunk.length;
-    if (size > MAX_INPUT) throw new Error("48 MB සීමාව ඉක්මවා ඇත.");
+    if (size > MAX_INPUT) throw new Error("64 MB සීමාව ඉක්මවා ඇත.");
     chunks.push(chunk);
   }
   if (!size) throw new Error("Media data ලබාගත නොහැක.");
@@ -33,7 +73,7 @@ async function download(media, kind, destination) {
 
 function commandOf(body, prefix) {
   if (!body.startsWith(prefix)) return "";
-  return body.slice(prefix.length).trim().split(/\s+/)[0].toLowerCase();
+  return body.slice(prefix.length).trim().split(/\\s+/)[0].toLowerCase();
 }
 
 export default async function mediaTools({ sock, message, config }) {
@@ -42,6 +82,44 @@ export default async function mediaTools({ sock, message, config }) {
   const prefix = config.prefix || ".";
   const body = (message.message?.conversation || message.message?.extendedTextMessage?.text || "").trim();
   const command = commandOf(body, prefix);
+
+  if (command === "vv") {
+    const found = findQuotedViewOnceMedia(message);
+    if (!found) {
+      return sock.sendMessage(jid, {
+        text: "📎 View Once Photo/Video එකකට Reply කර .vv හෝ .Vv යවන්න."
+      }, { quoted: message });
+    }
+
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-view-once-"));
+    const input = path.join(work, found.kind === "image" ? "view-once.jpg" : "view-once.mp4");
+    try {
+      await sock.sendMessage(jid, { text: "♻️ View Once media එක සාමාන්‍ය " + (found.kind === "image" ? "Photo" : "Video") + " එකක් ලෙස සකස් කරමින්..." }, { quoted: message });
+      await download(found.media, found.kind, input);
+      const data = fs.readFileSync(input);
+      if (found.kind === "image") {
+        return await sock.sendMessage(jid, {
+          image: data,
+          mimetype: found.media.mimetype || "image/jpeg",
+          caption: "✅ *VIEW ONCE PHOTO SAVED • HASA 2 BOT*"
+        }, { quoted: message });
+      }
+      return await sock.sendMessage(jid, {
+        video: data,
+        mimetype: found.media.mimetype || "video/mp4",
+        caption: "✅ *VIEW ONCE VIDEO SAVED • HASA 2 BOT*"
+      }, { quoted: message });
+    } catch (error) {
+      console.error("View Once save failed:", error?.message || error);
+      const reason = /ENOENT/.test(String(error?.code))
+        ? "Media download එකට අවශ්‍ය file එක සොයාගත නොහැක."
+        : error.message || "නැවත උත්සාහ කරන්න.";
+      return sock.sendMessage(jid, { text: "❌ View Once Save Error: " + reason }, { quoted: message });
+    } finally {
+      fs.rmSync(work, { recursive: true, force: true });
+    }
+  }
+
   if (!["sticker", "s", "toaudio", "compress"].includes(command)) return;
 
   const found = findMedia(message);
