@@ -123,3 +123,19 @@ for (const kind of ["image", "video"]) {
     assert.equal(output.options.quoted, message);
   });
 }
+
+test("extracts View Once media marked on the image/video node", () => {
+  const image = { mimetype: "image/jpeg", viewOnce: true };
+  const video = { mimetype: "video/mp4", viewOnce: true };
+  assert.equal(findQuotedViewOnceMedia(replyTo({ imageMessage: image })).media, image);
+  assert.equal(findQuotedViewOnceMedia(replyTo({ videoMessage: video })).media, video);
+});
+
+test("extracts View Once media from the V2 extension wrapper", () => {
+  const media = { mimetype: "video/mp4", mediaKey: Buffer.from("test") };
+  const found = findQuotedViewOnceMedia(replyTo({
+    viewOnceMessageV2Extension: { message: { videoMessage: media } }
+  }));
+  assert.equal(found.kind, "video");
+  assert.equal(found.media, media);
+});
