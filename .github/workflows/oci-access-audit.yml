@@ -18,7 +18,7 @@ concurrency:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,17 +60,41 @@ jobs:
           unset OCI_PRIVATE_KEY OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_REGION
           echo "OCI CLI configured. Secret values were not printed."
 
-      - name: Run read-only OCI access checks
+      - name: Audit A1 quota and capacity (no VM changes)
         env:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
         run: |
           set -euo pipefail
           test -n "$OCI_COMPARTMENT_OCID"
-          echo "===== AUTHENTICATION AND REGION ====="
-          oci iam region list --output table
-          echo "===== AVAILABILITY DOMAINS ====="
-          oci iam availability-domain list --compartment-id "$OCI_COMPARTMENT_OCID" --output table
-          echo "===== EXISTING COMPUTE INSTANCES ====="
-          oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all --query 'data[].{Name:"display-name",Shape:shape,State:"lifecycle-state"}' --output table
-          echo "===== READ-ONLY AUDIT COMPLETE ====="
-          echo "No cloud resources were created, changed, or deleted."
+          AD="dxtt:AP-MUMBAI-1-AD-1"
+
+          echo "===== A1 OCPU QUOTA / USAGE ====="
+          oci limits resource-availability get \
+            --compartment-id "$OCI_COMPARTMENT_OCID" \
+            --service-name compute \
+            --limit-name standard-a1-core-count \
+            --availability-domain "$AD" \
+            --output json
+
+          echo "===== A1 MEMORY QUOTA / USAGE ====="
+          oci limits resource-availability get \
+            --compartment-id "$OCI_COMPARTMENT_OCID" \
+            --service-name compute \
+            --limit-name standard-a1-memory-count \
+            --availability-domain "$AD" \
+            --output json
+
+          echo "===== REQUESTING A1 2 OCPU / 12 GB CAPACITY REPORT ====="
+          echo "This requests a capacity report only; it does NOT launch, stop, resize, or delete any VM."
+          oci compute compute-capacity-report create \
+            --availability-domain "$AD" \
+            --compartment-id "$OCI_COMPARTMENT_OCID" \
+            --shape-availabilities '[{"instanceShape":"VM.Standard.A1.Flex","instanceShapeConfig":{"ocpus":2,"memoryInGBs":12}}]' \
+            --output json
+
+          echo "===== CURRENT VM INVENTORY (UNCHANGED) ====="
+          oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all \
+            --query 'data[].{Name:"display-name",Shape:shape,State:"lifecycle-state"}' --output table
+
+          echo "===== A1 QUOTA AND CAPACITY AUDIT COMPLETE ====="
+          echo "No compute instances were created, changed, stopped, or deleted."
