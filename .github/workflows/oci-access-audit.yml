@@ -86,12 +86,12 @@ jobs:
             --availability-domain "$AD" \
             --output json
 
-          echo "===== SUBSCRIBED ASIA-PACIFIC REGIONS ====="
+          echo "===== ALL READY SUBSCRIBED REGIONS ====="
           oci iam region-subscription list --tenancy-id "$OCI_TENANCY_OCID" --output json > /tmp/regions.json
-          jq -r '.data[] | select(.status == "READY") | ."region-name"' /tmp/regions.json | grep '^ap-' | sort -u > /tmp/ap-regions.txt
-          cat /tmp/ap-regions.txt
+          jq -r '.data[] | select(.status == "READY") | ."region-name"' /tmp/regions.json | sort -u > /tmp/regions-ready.txt
+          cat /tmp/regions-ready.txt
 
-          echo "===== A1 2 OCPU / 12 GB CAPACITY CHECK ACROSS SUBSCRIBED ASIA-PACIFIC REGIONS ====="
+          echo "===== A1 FLEX 2 OCPU / 12 GB CAPACITY IN EVERY SUBSCRIBED REGION ====="
           while IFS= read -r REGION; do
             [ -n "$REGION" ] || continue
             echo "--- REGION: $REGION ---"
@@ -103,15 +103,19 @@ jobs:
             while IFS= read -r AD; do
               [ -n "$AD" ] || continue
               echo "Checking $REGION / $AD"
-              oci compute compute-capacity-report create \
+              if oci compute compute-capacity-report create \
                 --availability-domain "$AD" \
                 --compartment-id "$OCI_COMPARTMENT_OCID" \
                 --region "$REGION" \
                 --shape-availabilities '[{"instanceShape":"VM.Standard.A1.Flex","instanceShapeConfig":{"ocpus":2,"memoryInGBs":12}}]' \
-                --query 'data.shape-availabilities[].{Shape:"instance-shape",OCPU:"instance-shape-config".ocpus,RAM_GB:"instance-shape-config"."memory-in-gbs",Status:"availability-status",Available:"available-count"}' \
-                --output table || echo "Capacity API check failed for $REGION / $AD"
+                --output json > /tmp/capacity.json 2>/tmp/capacity-error.txt; then
+                jq -r '.data."shape-availabilities"[] | "Shape: " + ."instance-shape" + " | OCPU: " + (."instance-shape-config".ocpus|tostring) + " | RAM: " + (."instance-shape-config"."memory-in-gbs"|tostring) + "GB | Status: " + ."availability-status" + " | Available: " + ((."available-count" // "unknown")|tostring)' /tmp/capacity.json
+              else
+                echo "Capacity API check failed for $REGION / $AD:"
+                cat /tmp/capacity-error.txt
+              fi
             done < <(jq -r '.data[].name' /tmp/ads.json)
-          done < /tmp/ap-regions.txt
+          done < /tmp/regions-ready.txt
 
           echo "===== CURRENT VM INVENTORY (UNCHANGED) ====="
           oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all \
