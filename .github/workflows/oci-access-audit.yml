@@ -1,65 +1,84 @@
-name: OCI direct control capability audit
+name: OCI Read-only Access Audit
 
 on:
   push:
     branches:
       - assistant-workflow
     paths:
-      - ".github/workflows/oci-access-audit.yml"
-  workflow_dispatch:
+      - '.github/oracle-control/oci-request.json'
 
 permissions:
   contents: read
 
+concurrency:
+  group: hasa2-oci-readonly-audit
+  cancel-in-progress: false
+
 jobs:
-  inspect:
+  audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
-      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
-      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
-      OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
-      OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
-      OCI_INSTANCE_OCID: ${{ secrets.OCI_INSTANCE_OCID }}
-      OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+    timeout-minutes: 10
     steps:
-      - name: Check whether direct OCI API access is configured
-        shell: bash
+      - name: Checkout approved request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate request
         run: |
           set -euo pipefail
-          for name in OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT OCI_CLI_REGION OCI_INSTANCE_OCID OCI_COMPARTMENT_OCID; do
-            if [ -n "${!name:-}" ]; then
-              echo "${name}=SET"
-            else
-              echo "${name}=MISSING"
+          ACTION="$(jq -r '.action // empty' .github/oracle-control/oci-request.json)"
+          REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/oci-request.json)"
+          test "$ACTION" = "identity-audit"
+          [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
+          echo "REQUEST_ID=$REQUEST_ID" >> "$GITHUB_ENV"
+
+      - name: Install OCI CLI
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user --disable-pip-version-check oci-cli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/oci" --version
+
+      - name: Configure OCI API key securely
+        env:
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+        run: |
+          set -euo pipefail
+          for name in OCI_PRIVATE_KEY OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_REGION; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required repository secret: $name"
+              exit 1
             fi
           done
-          if [ -z "$OCI_CLI_USER" ] || [ -z "$OCI_CLI_TENANCY" ] || [ -z "$OCI_CLI_FINGERPRINT" ] || [ -z "$OCI_CLI_KEY_CONTENT" ] || [ -z "$OCI_CLI_REGION" ]; then
-            echo "OCI_API_READY=no"
-            exit 0
-          fi
-          mkdir -p "$HOME/.oci"
-          chmod 700 "$HOME/.oci"
-          printf '%s\n' "$OCI_CLI_KEY_CONTENT" > "$HOME/.oci/oci_api_key.pem"
-          chmod 600 "$HOME/.oci/oci_api_key.pem"
+          install -m 700 -d "$HOME/.oci"
+          umask 077
+          printf '%s\n' "$OCI_PRIVATE_KEY" > "$HOME/.oci/oci_api_key.pem"
           cat > "$HOME/.oci/config" <<EOF
           [DEFAULT]
-          user=$OCI_CLI_USER
-          fingerprint=$OCI_CLI_FINGERPRINT
-          tenancy=$OCI_CLI_TENANCY
-          region=$OCI_CLI_REGION
+          user=$OCI_USER_OCID
+          fingerprint=$OCI_FINGERPRINT
+          tenancy=$OCI_TENANCY_OCID
+          region=$OCI_REGION
           key_file=$HOME/.oci/oci_api_key.pem
           EOF
-          chmod 600 "$HOME/.oci/config"
-          python3 -m pip install --user --quiet oci-cli
-          export PATH="$HOME/.local/bin:$PATH"
-          if [ -n "$OCI_INSTANCE_OCID" ]; then
-            oci compute instance get --instance-id "$OCI_INSTANCE_OCID" --query 'data.{name:"display-name",state:"lifecycle-state"}' --raw-output
-          elif [ -n "$OCI_COMPARTMENT_OCID" ]; then
-            oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all --query "data[?\"display-name\"=='instance-20260921-1610'].{name:\"display-name\",state:\"lifecycle-state\",id:id}" --raw-output
-          else
-            echo "OCI_API_READY=credentials-present-but-no-instance-or-compartment-id"
-            exit 0
-          fi
-          echo "OCI_API_READY=yes"
+          chmod 600 "$HOME/.oci/config" "$HOME/.oci/oci_api_key.pem"
+          unset OCI_PRIVATE_KEY OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_REGION
+          echo "OCI CLI configuration created; secret values were not printed."
+
+      - name: Run read-only identity and compute access checks
+        env:
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+        run: |
+          set -euo pipefail
+          test -n "$OCI_COMPARTMENT_OCID"
+          echo "===== OCI REGION AUTHENTICATION ====="
+          oci iam region list --output table
+          echo "===== AVAILABILITY DOMAINS ====="
+          oci iam availability-domain list --compartment-id "$OCI_COMPARTMENT_OCID" --output table
+          echo "===== COMPUTE INSTANCES (READ ONLY) ====="
+          oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all --query 'data[].{Name:"display-name",Shape:shape,State:"lifecycle-state"}' --output table
+          echo "===== AUDIT COMPLETE ====="
+          echo "No cloud resources were created, changed, or deleted."
