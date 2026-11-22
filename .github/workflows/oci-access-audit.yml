@@ -63,9 +63,11 @@ jobs:
       - name: Audit A1 quota and capacity (no VM changes)
         env:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
         run: |
           set -euo pipefail
           test -n "$OCI_COMPARTMENT_OCID"
+          test -n "$OCI_TENANCY_OCID"
           AD="dxtt:AP-MUMBAI-1-AD-1"
 
           echo "===== A1 OCPU QUOTA / USAGE ====="
@@ -84,13 +86,32 @@ jobs:
             --availability-domain "$AD" \
             --output json
 
-          echo "===== REQUESTING A1 2 OCPU / 12 GB CAPACITY REPORT ====="
-          echo "This requests a capacity report only; it does NOT launch, stop, resize, or delete any VM."
-          oci compute compute-capacity-report create \
-            --availability-domain "$AD" \
-            --compartment-id "$OCI_COMPARTMENT_OCID" \
-            --shape-availabilities '[{"instanceShape":"VM.Standard.A1.Flex","instanceShapeConfig":{"ocpus":2,"memoryInGBs":12}}]' \
-            --output json
+          echo "===== SUBSCRIBED ASIA-PACIFIC REGIONS ====="
+          oci iam region-subscription list --tenancy-id "$OCI_TENANCY_OCID" --output json > /tmp/regions.json
+          jq -r '.data[] | select(.status == "READY") | ."region-name"' /tmp/regions.json | grep '^ap-' | sort -u > /tmp/ap-regions.txt
+          cat /tmp/ap-regions.txt
+
+          echo "===== A1 2 OCPU / 12 GB CAPACITY CHECK ACROSS SUBSCRIBED ASIA-PACIFIC REGIONS ====="
+          while IFS= read -r REGION; do
+            [ -n "$REGION" ] || continue
+            echo "--- REGION: $REGION ---"
+            if ! oci iam availability-domain list --compartment-id "$OCI_COMPARTMENT_OCID" --region "$REGION" --output json > /tmp/ads.json 2>/tmp/ad-error.txt; then
+              echo "Could not list availability domains in $REGION:"
+              cat /tmp/ad-error.txt
+              continue
+            fi
+            while IFS= read -r AD; do
+              [ -n "$AD" ] || continue
+              echo "Checking $REGION / $AD"
+              oci compute compute-capacity-report create \
+                --availability-domain "$AD" \
+                --compartment-id "$OCI_COMPARTMENT_OCID" \
+                --region "$REGION" \
+                --shape-availabilities '[{"instanceShape":"VM.Standard.A1.Flex","instanceShapeConfig":{"ocpus":2,"memoryInGBs":12}}]' \
+                --query 'data.shape-availabilities[].{Shape:"instance-shape",OCPU:"instance-shape-config".ocpus,RAM_GB:"instance-shape-config"."memory-in-gbs",Status:"availability-status",Available:"available-count"}' \
+                --output table || echo "Capacity API check failed for $REGION / $AD"
+            done < <(jq -r '.data[].name' /tmp/ads.json)
+          done < /tmp/ap-regions.txt
 
           echo "===== CURRENT VM INVENTORY (UNCHANGED) ====="
           oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all \
