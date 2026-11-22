@@ -225,6 +225,16 @@ jobs:
               echo "===== HOST AND RUNTIME ====="
               printf 'hostname: '; hostname
               printf 'kernel: '; uname -sr
+              echo "===== OCI INSTANCE METADATA (NON-SECRET FIELDS ONLY) ====="
+              if command -v curl >/dev/null 2>&1; then
+                OCI_META="$(curl --noproxy '*' -fsS --connect-timeout 2 --max-time 4 -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/instance/ 2>/dev/null || true)"
+                if [ -n "$OCI_META" ]; then
+                  printf '%s' "$OCI_META" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{const x=JSON.parse(s);for(const k of ["id","displayName","shape","region","canonicalRegionName","availabilityDomain","faultDomain","compartmentId","shapeConfig","platformConfig"])if(x[k]!==undefined)console.log(k+"="+(typeof x[k]==="object"?JSON.stringify(x[k]):x[k]));}catch{console.log("OCI metadata response was not JSON")}});'
+                else
+                  echo "OCI instance metadata endpoint unavailable"
+                fi
+              fi
+              printf 'oci_cli: '; command -v oci || echo unavailable
               printf 'os: '; . /etc/os-release 2>/dev/null && printf '%s\\n' "${PRETTY_NAME:-unknown}" || true
               printf 'node: '; node --version 2>/dev/null || echo unavailable
               printf 'npm: '; npm --version 2>/dev/null || echo unavailable
