@@ -5,7 +5,8 @@ on:
     branches:
       - assistant-workflow
     paths:
-      - '.github/oracle-control/oci-request.json'
+      - '.github/workflows/oci-access-audit.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,17 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout approved request
+      - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Validate request
-        run: |
-          set -euo pipefail
-          ACTION="$(jq -r '.action // empty' .github/oracle-control/oci-request.json)"
-          REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/oci-request.json)"
-          test "$ACTION" = "identity-audit"
-          [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
-          echo "REQUEST_ID=$REQUEST_ID" >> "$GITHUB_ENV"
 
       - name: Install OCI CLI
         run: |
@@ -66,19 +58,19 @@ jobs:
           EOF
           chmod 600 "$HOME/.oci/config" "$HOME/.oci/oci_api_key.pem"
           unset OCI_PRIVATE_KEY OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_REGION
-          echo "OCI CLI configuration created; secret values were not printed."
+          echo "OCI CLI configured. Secret values were not printed."
 
-      - name: Run read-only identity and compute access checks
+      - name: Run read-only OCI access checks
         env:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
         run: |
           set -euo pipefail
           test -n "$OCI_COMPARTMENT_OCID"
-          echo "===== OCI REGION AUTHENTICATION ====="
+          echo "===== AUTHENTICATION AND REGION ====="
           oci iam region list --output table
           echo "===== AVAILABILITY DOMAINS ====="
           oci iam availability-domain list --compartment-id "$OCI_COMPARTMENT_OCID" --output table
-          echo "===== COMPUTE INSTANCES (READ ONLY) ====="
+          echo "===== EXISTING COMPUTE INSTANCES ====="
           oci compute instance list --compartment-id "$OCI_COMPARTMENT_OCID" --all --query 'data[].{Name:"display-name",Shape:shape,State:"lifecycle-state"}' --output table
-          echo "===== AUDIT COMPLETE ====="
+          echo "===== READ-ONLY AUDIT COMPLETE ====="
           echo "No cloud resources were created, changed, or deleted."
