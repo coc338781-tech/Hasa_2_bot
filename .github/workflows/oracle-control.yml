@@ -783,7 +783,7 @@ jobs:
               break
             fi
             case "$RESULT" in
-              *"Connection timed out"*|*"banner exchange"*|*"Connection refused"*|*"No route to host"*|*"Operation timed out"*)
+              *"Connection timed out"*|*"banner exchange"*|*"Connection refused"*|*"Connection reset by peer"*|*"kex_exchange_identification"*|*"No route to host"*|*"Operation timed out"*)
                 if [ "$attempt" -lt 3 ]; then
                   echo "Transient SSH transport failure; waiting 10 seconds before retry."
                   sleep 10
