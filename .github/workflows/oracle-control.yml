@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -313,6 +313,19 @@ jobs:
               echo "--- System reboot / OOM evidence ---"
               (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
               (last -x 2>/dev/null | head -n 12 || true)
+             dnf-cache-audit)
+              echo "Read-only DNF cache timer and memory audit; no services changed."
+              for unit in dnf-makecache.timer dnf-makecache.service dnf-automatic.timer dnf-automatic.service; do
+                echo "--- $unit ---"
+                systemctl show "$unit" -p LoadState -p UnitFileState -p ActiveState -p SubState -p Result -p ExecMainStatus --no-pager 2>&1 || true
+              done
+              echo "--- DNF timers ---"
+              systemctl list-timers --all --no-pager 2>&1 | grep -i dnf || true
+              echo "--- Top memory consumers ---"
+              ps -eo pid,comm,rss,args --sort=-rss | head -n 12 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g'
+              echo "--- Memory ---"
+              free -m
+              print_status
               ;;
             crash-audit)
               echo "Read-only crash diagnosis; no process/session changes."
