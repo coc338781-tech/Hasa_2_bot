@@ -313,7 +313,8 @@ jobs:
               echo "--- System reboot / OOM evidence ---"
               (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
               (last -x 2>/dev/null | head -n 12 || true)
-             dnf-cache-audit)
+              ;;
+            dnf-cache-audit)
               echo "Read-only DNF cache timer and memory audit; no services changed."
               for unit in dnf-makecache.timer dnf-makecache.service dnf-automatic.timer dnf-automatic.service; do
                 echo "--- $unit ---"
