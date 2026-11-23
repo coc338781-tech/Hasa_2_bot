@@ -1,4 +1,4 @@
 {
-  "action": "dnf-cache-mitigate",
-  "request_id": "hasa2-dnf-mitigate-20261123-01"
+  "action": "connection-audit",
+  "request_id": "hasa2-final-check-20261123-01"
 }
