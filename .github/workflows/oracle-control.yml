@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit|dnf-cache-mitigate) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -327,6 +327,24 @@ jobs:
               echo "--- Memory ---"
               free -m
               print_status
+              ;;
+            dnf-cache-mitigate)
+              echo "Mitigate verified DNF cache OOM on the 1 GB Oracle VM; bot and WhatsApp session will not be restarted."
+              systemctl show dnf-makecache.timer -p LoadState -p UnitFileState -p ActiveState -p SubState --no-pager
+              systemctl show dnf-makecache.service -p LoadState -p ActiveState -p SubState -p Result --no-pager
+              test "$(systemctl show dnf-makecache.timer -p LoadState --value)" = "loaded"
+              test "$(systemctl show dnf-makecache.timer -p ActiveState --value)" = "active"
+              sudo -n systemctl disable --now dnf-makecache.timer
+              sudo -n systemctl stop dnf-makecache.service || true
+              sudo -n systemctl reset-failed dnf-makecache.service
+              echo "--- Verification ---"
+              systemctl show dnf-makecache.timer -p UnitFileState -p ActiveState -p SubState --no-pager
+              systemctl show dnf-makecache.service -p ActiveState -p SubState -p Result --no-pager
+              systemctl --failed --no-legend --no-pager
+              free -m
+              print_status
+              echo "BOT_RESTARTED=NO"
+              echo "WHATSAPP_SESSION_TOUCHED=NO"
               ;;
             crash-audit)
               echo "Read-only crash diagnosis; no process/session changes."
