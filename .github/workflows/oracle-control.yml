@@ -311,8 +311,15 @@ jobs:
                   console.log(JSON.stringify(out, null, 2));
                 });
               '
-              echo "--- User crontab (commands only) ---"
-              (crontab -l 2>/dev/null | grep -vE '^[[:space:]]*#|^[[:space:]]*              echo "--- PM2 daemon event log ---"
+              echo "--- User cron entries related to process control ---"
+              (crontab -l 2>/dev/null | grep -Ei 'restart|kill|pm2|node|hasa|bot' | sed -E 's/[0-9]{8,}/[REDACTED]/g' || true)
+              echo "--- System cron references to process control ---"
+              (grep -RInE 'pm2|hasa2|hasamd|node index|killall|pkill|systemctl restart' /etc/crontab /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly 2>/dev/null | sed -E 's/[0-9]{8,}/[REDACTED]/g' || true)
+              echo "--- All system timers ---"
+              systemctl list-timers --all --no-pager 2>/dev/null || true
+              echo "--- Recent scheduler/service events ---"
+              (journalctl --since '-2 hours' --no-pager 2>/dev/null | grep -Ei 'cron|crond|pm2|hasa|node|restart|stopping|started|SIGINT|SIGTERM|kill' | tail -n 100 || true)
+              echo "--- PM2 daemon event log ---"
               if [ -f "$HOME/.pm2/pm2.log" ]; then
                 stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
                 grep -n -Ei 'hasa2|exited|exit code|errored|restart|online|stopped|SIG(INT|TERM|KILL)|unstable|launching' "$HOME/.pm2/pm2.log" | tail -n 180 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
