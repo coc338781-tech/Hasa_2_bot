@@ -317,7 +317,7 @@ jobs:
               echo "--- PM2 daemon event log ---"
               if [ -f "$HOME/.pm2/pm2.log" ]; then
                 stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
-                grep -n -Ei 'hasa2|exited|exit code|errored|restart|online|stopped|SIG(INT|TERM|KILL)|unstable|launching' "$HOME/.pm2/pm2.log" | tail -n 180 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+                grep -n -Ei 'hasa2|exited|exit code|errored|restart|online|stopped|SIG(INT|TERM|KILL)|unstable|launching|memory|heap|rss|threshold' "$HOME/.pm2/pm2.log" | tail -n 180 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
               else
                 echo "PM2 daemon log missing"
               fi
@@ -330,6 +330,28 @@ jobs:
               echo "--- System reboot / OOM evidence ---"
               (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
               (last -x 2>/dev/null | head -n 12 || true)
+              ;;
+            scheduler-audit)
+              echo "Read-only audit of scheduled process restarts."
+              echo "--- opc crontab process-control entries ---"
+              (crontab -l 2>/dev/null | grep -Ei 'pm2|hasa|node|kill|restart|bot' || true)
+              echo "--- root crontab process-control entries ---"
+              (sudo -n crontab -l -u root 2>/dev/null | grep -Ei 'pm2|hasa|node|kill|restart|bot' || true)
+              echo "--- system cron process-control entries ---"
+              (grep -RInE 'pm2|hasa2|hasamd|node index|killall|pkill|systemctl restart' /etc/crontab /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly 2>/dev/null || true)
+              echo "--- all system timers ---"
+              (systemctl list-timers --all --no-pager 2>/dev/null || true)
+              echo "--- timer service commands related to process control ---"
+              while read -r timer _; do
+                [ -n "$timer" ] || continue
+                service="${timer%.timer}.service"
+                command="$(systemctl show "$service" -p ExecStart --value --no-pager 2>/dev/null || true)"
+                case "$command" in
+                  *pm2*|*hasa*|*node*|*kill*|*restart*) echo "$timer -> $service -> $command" ;;
+                esac
+              done < <(systemctl list-unit-files --type=timer --no-legend --no-pager 2>/dev/null)
+              echo "--- recent cron/systemd process-control events ---"
+              (journalctl --since '-2 hours' --no-pager 2>/dev/null | grep -Ei 'cron|crond|pm2|hasa|node|restart|stopping|started|SIGINT|SIGTERM|kill' | tail -n 100 || true)
               ;;
             dnf-cache-audit)
               echo "Read-only DNF cache timer and memory audit; no services changed."
