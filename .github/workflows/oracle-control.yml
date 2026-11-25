@@ -478,11 +478,11 @@ jobs:
             inspect-baileys-source)
               echo "Read-only Baileys rc14 source inspection; no session data."
               echo "--- LID mapping store implementation ---"
-              grep -n -A125 -B8 "storeLIDPNMappings" node_modules/@whiskeysockets/baileys/lib/Signal/lid-mapping.js | head -n 145
+              sed -n '1,95p' node_modules/@whiskeysockets/baileys/lib/Signal/lid-mapping.js
               echo "--- Device lookup session assertion call ---"
-              grep -n -A45 -B8 "storeLIDPNMappings(lidResults" node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js
-              echo "--- Mutex export ---"
-              grep -n -A25 -B5 "makeMutex" node_modules/@whiskeysockets/baileys/lib/Utils/make-mutex.js | head -n 40
+              grep -n -A18 -B20 "assertSessions(lids" node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js || true
+              echo "--- Mutex implementation ---"
+              sed -n '1,90p' node_modules/@whiskeysockets/baileys/lib/Utils/make-mutex.js
               ;;
             inspect-changes)
               echo "Tracked and untracked file names only; file contents are not shown."
