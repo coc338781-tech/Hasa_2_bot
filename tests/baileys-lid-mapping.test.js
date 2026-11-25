@@ -22,7 +22,8 @@ const makeStore = () => {
 }
 
 test('new PN/LID mapping is stored and reported once', async () => {
-  const { store, db, writes } = makeStore()
+  const context = makeStore()
+  const { store, db } = context
   const pair = { lid: '111@lid', pn: '222@s.whatsapp.net' }
 
   const first = await store.storeLIDPNMappings([pair])
@@ -31,7 +32,7 @@ test('new PN/LID mapping is stored and reported once', async () => {
   assert.deepEqual(first, [{ pnUser: '222', lidUser: '111' }])
   assert.deepEqual(second, [])
   assert.deepEqual(db, { '222': '111', '111_reverse': '222' })
-  assert.equal(writes, 1)
+  assert.equal(context.writes, 1)
 })
 
 test('concurrent mapping writes report a new mapping to only one caller', async () => {
