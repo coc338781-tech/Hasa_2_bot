@@ -5,21 +5,28 @@ import fs from 'node:fs'
 const patch = fs.readFileSync(new URL('../scripts/patch-baileys.js', import.meta.url), 'utf8')
 const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 
-test('Baileys rc14 patch targets the ordinary LID session refresh', () => {
-  assert.match(patch, /Socket', 'messages-send\.js/)
-  assert.ok(patch.includes('const forceRefresh = /await assertSessions'))
-  assert.match(patch, /await assertSessions\(lids\)/)
+test('Baileys rc14 mapping store reports only new or changed mappings', () => {
+  assert.match(patch, /Signal', 'lid-mapping\.js/)
+  assert.match(patch, /storeMutex = makeMutex/)
+  assert.match(patch, /return Object\.entries\(pairMap\)\.map/)
+  assert.match(patch, /serialize LID mapping updates and return newly mapped pairs/)
 })
 
-test('session patch removes force refresh without deleting or resetting auth state', () => {
-  assert.match(patch, /do not force-refresh already mapped LID sessions/)
+test('Baileys rc14 refreshes only new LIDs and validates known LIDs normally', () => {
+  assert.match(patch, /const newLidUsers = new Set\(stored\.map\(p => p\.lidUser\)\)/)
+  assert.match(patch, /assertSessions\(newLids, true\)/)
+  assert.match(patch, /assertSessions\(knownLids\)/)
+  assert.match(patch, /force-refresh only newly mapped LIDs/)
+})
+
+test('session patch preserves auth state and is version-gated', () => {
   assert.doesNotMatch(patch, /auth_info|rmSync|unlinkSync|rmdirSync/)
+  assert.match(patch, /packageJson\.version !== '7\.0\.0-rc14'/)
 })
 
-test('session patch is version-gated and idempotent', () => {
-  assert.match(patch, /packageJson\.version !== '7\.0\.0-rc14'/)
-  assert.match(patch, /if \(sendSource\.includes\(sessionMarker\)\)/)
-  assert.match(patch, /matches\.length !== 1/)
+test('session patch is idempotent for both Baileys modules', () => {
+  assert.match(patch, /lidSource\.includes\(mappingMarker\)/)
+  assert.match(patch, /sendSource\.includes\(sessionMarker\)/)
 })
 
 test('production validation applies Baileys patches before running tests', () => {
