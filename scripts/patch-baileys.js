@@ -98,8 +98,8 @@ if (sendSource.includes(sessionMarker)) {
   console.log('Baileys rc14 LID session-refresh guard already applied.')
 } else {
   const forceRefresh = /await assertSessions\(lids,\s*true\)/
-  const matches = sendSource.match(forceRefresh)
-  if (!matches || matches.length !== 1) {
+  const matches = [...sendSource.matchAll(/await assertSessions\\(lids,\\s*true\\)/g)]
+  if (matches.length !== 1) {
     throw new Error('Could not find exactly one expected Baileys rc14 forced LID session refresh; no session patch applied')
   }
   sendSource = sendSource.replace(
