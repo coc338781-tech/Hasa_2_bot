@@ -297,6 +297,23 @@ jobs:
               ;;
             pm2-event-audit)
               echo "Read-only PM2 exit/restart timeline."
+              echo "--- Active PM2 restart policy ---"
+              pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasa2");
+                  if (!p) { console.log("hasa2 process missing"); process.exitCode = 1; return; }
+                  const e = p.pm2_env || {};
+                  const keys = ["status","cron_restart","autorestart","restart_delay","max_restarts","min_uptime","kill_timeout","max_memory_restart","watch","restart_time","unstable_restarts","exit_code","pm_uptime","created_at"];
+                  const out = {};
+                  for (const key of keys) out[key] = e[key] ?? null;
+                  console.log(JSON.stringify(out, null, 2));
+                });
+              '
+              echo "--- Matching scheduled jobs ---"
+              (crontab -l 2>/dev/null | grep -Ei 'hasa|pm2' || true)
+              (systemctl list-timers --all --no-pager 2>/dev/null | grep -Ei 'hasa|pm2' || true)
               echo "--- PM2 daemon event log ---"
               if [ -f "$HOME/.pm2/pm2.log" ]; then
                 stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
