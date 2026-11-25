@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "hasa2-postpatch-status-20261125-02"
+  "action": "crash-audit",
+  "request_id": "hasa2-badmac-postpatch-20261125-02"
 }
