@@ -7,7 +7,7 @@ const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import
 
 test('Baileys rc14 patch targets the ordinary LID session refresh', () => {
   assert.match(patch, /Socket', 'messages-send\.js/)
-  assert.match(patch, /await assertSessions\(lids,\s*true\)/)
+  assert.ok(patch.includes(String.raw`const forceRefresh = /await assertSessions\(lids,\s*true\)/g`))
   assert.match(patch, /await assertSessions\(lids\)/)
 })
 
