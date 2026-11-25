@@ -68,6 +68,7 @@ case 'msg': {
       })
       console.warn('[Hasa_2_bot] Alternate PN/LID decrypt retry succeeded.')
     } catch {
+      // Preserve the original failure (for example, Bad MAC).
       console.warn('[Hasa_2_bot] Alternate PN/LID decrypt retry failed.')
       throw err
     }
