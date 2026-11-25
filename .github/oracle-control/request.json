@@ -1,4 +1,4 @@
 {
-  "action": "inspect-changes",
-  "request_id": "hasa2-predeploy-inspect-20261125-02"
+  "action": "inspect-guard-script",
+  "request_id": "hasa2-deploy-guard-inspect-20261125-01"
 }
