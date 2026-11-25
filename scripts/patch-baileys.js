@@ -104,17 +104,17 @@ if (lidSource.includes(mappingMarker)) {
     if (!lidSource.includes(importAnchor)) {
       throw new Error('Could not find the Baileys LID mapping import anchor; no LID mapping patch applied')
     }
-    lidSource = lidSource.replace(importAnchor, importAnchor + '\\n' + mutexImport)
+    lidSource = lidSource.replace(importAnchor, importAnchor + '\n' + mutexImport)
   }
 
-  const constructorAnchor = '        this.logger = logger;\\n    }'
+  const constructorAnchor = '        this.logger = logger;\n    }'
   if (!lidSource.includes('this.storeMutex = makeMutex();')) {
     if (!lidSource.includes(constructorAnchor)) {
       throw new Error('Could not find the Baileys LID mapping constructor anchor; no LID mapping patch applied')
     }
     lidSource = lidSource.replace(
       constructorAnchor,
-      '        this.logger = logger;\\n        this.storeMutex = makeMutex();\\n    }'
+      '        this.logger = logger;\n        this.storeMutex = makeMutex();\n    }'
     )
   }
 
