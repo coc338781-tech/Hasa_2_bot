@@ -30,3 +30,8 @@ test('retry diagnostics are visible without logging private identifiers', () => 
   assert.match(patch, /console\.warn\('\[Hasa_2_bot\] Alternate PN\/LID decrypt retry failed\.'/)
   assert.doesNotMatch(patch, /logger\.debug\(\s*\{\s*key:\s*fullMessage\.key/)
 })
+
+test('patch recognizes the legacy deployed decrypt retry marker', () => {
+  assert.match(patch, /legacyDecryptMarker/)
+  assert.match(patch, /decryptSource\.includes\(legacyDecryptMarker\)/)
+})
