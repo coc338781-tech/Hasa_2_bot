@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "hasa2-postpatch-status-20261125-01"
+  "action": "remove-stale-cron",
+  "request_id": "hasa2-remove-retired-hasamd-cron-20261125-01"
 }
