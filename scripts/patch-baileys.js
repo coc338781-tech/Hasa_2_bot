@@ -204,6 +204,11 @@ if (lidSource.includes(mappingMarker)) {
   console.log('Applied Baileys rc14 LID mapping concurrency patch.')
 }
 
+const sendFile = join(libDir, 'Socket', 'messages-send.js')
+if (!fs.existsSync(sendFile)) {
+  throw new Error(`Baileys send module not found: ${sendFile}`)
+}
+
 let sendSource = fs.readFileSync(sendFile, 'utf8')
 const sessionMarker = 'const newLidUsers = new Set(stored.map(p => p.lidUser))'
 if (sendSource.includes(sessionMarker)) {
