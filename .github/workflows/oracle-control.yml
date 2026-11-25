@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit|dnf-cache-mitigate|scheduler-audit) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit|dnf-cache-mitigate|scheduler-audit|remove-stale-cron) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -330,6 +330,24 @@ jobs:
               echo "--- System reboot / OOM evidence ---"
               (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
               (last -x 2>/dev/null | head -n 12 || true)
+              ;;
+            remove-stale-cron)
+              echo "Remove only the obsolete six-hour PM2 restart for the retired hasamd process."
+              BACKUP_DIR=/home/opc/hasa-deploy-backups
+              mkdir -p "$BACKUP_DIR"
+              chmod 700 "$BACKUP_DIR"
+              BACKUP="$BACKUP_DIR/opc-crontab-$(date +%Y%m%d-%H%M%S).bak"
+              TMP="$(mktemp)"
+              crontab -l > "$BACKUP" 2>/dev/null || true
+              if grep -Fq '/usr/local/bin/pm2 restart hasamd > /dev/null 2>&1' "$BACKUP"; then
+                grep -Fv '/usr/local/bin/pm2 restart hasamd > /dev/null 2>&1' "$BACKUP" > "$TMP" || true
+                crontab "$TMP"
+                echo "REMOVED_STALE_HASAMD_CRON"
+                echo "CRONTAB_BACKUP=$BACKUP"
+              else
+                echo "STALE_HASAMD_CRON_NOT_FOUND"
+              fi
+              rm -f "$TMP"
               ;;
             scheduler-audit)
               echo "Read-only audit of scheduled process restarts."
