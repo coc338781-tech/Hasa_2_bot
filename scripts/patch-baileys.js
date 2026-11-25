@@ -86,28 +86,161 @@ case 'msg': {
   console.log('Applied isolated Baileys rc14 LID/PN decrypt retry patch.')
 }
 
-// Stop Baileys rc14 from force-recreating every known contact's Signal session
-// during ordinary device lookups. New/missing sessions still pass validateSession
-// and are created normally; only the unnecessary force=true refresh is removed.
-const sendFile = join(libDir, 'Socket', 'messages-send.js')
-if (!fs.existsSync(sendFile)) {
-  throw new Error(`Baileys send module not found: ${sendFile}`)
+// Apply the upstream Baileys LID session fix: only force-refresh sessions for
+// newly created or changed PN↔LID mappings. Known LIDs use normal validation.
+const lidFile = join(libDir, 'Signal', 'lid-mapping.js')
+if (!fs.existsSync(lidFile)) {
+  throw new Error(`Baileys LID mapping module not found: ${lidFile}`)
+}
+
+let lidSource = fs.readFileSync(lidFile, 'utf8')
+const mappingMarker = 'Hasa_2_bot: serialize LID mapping updates and return newly mapped pairs'
+if (lidSource.includes(mappingMarker)) {
+  console.log('Baileys rc14 LID mapping concurrency patch already applied.')
+} else {
+  const mutexImport = "import { makeMutex } from '../Utils/make-mutex.js';"
+  if (!lidSource.includes(mutexImport)) {
+    const importAnchor = "import { LRUCache } from 'lru-cache';"
+    if (!lidSource.includes(importAnchor)) {
+      throw new Error('Could not find the Baileys LID mapping import anchor; no LID mapping patch applied')
+    }
+    lidSource = lidSource.replace(importAnchor, importAnchor + '\\n' + mutexImport)
+  }
+
+  const constructorAnchor = '        this.logger = logger;\\n    }'
+  if (!lidSource.includes('this.storeMutex = makeMutex();')) {
+    if (!lidSource.includes(constructorAnchor)) {
+      throw new Error('Could not find the Baileys LID mapping constructor anchor; no LID mapping patch applied')
+    }
+    lidSource = lidSource.replace(
+      constructorAnchor,
+      '        this.logger = logger;\\n        this.storeMutex = makeMutex();\\n    }'
+    )
+  }
+
+  const methodStart = lidSource.indexOf('    async storeLIDPNMappings(pairs) {')
+  const methodEnd = lidSource.indexOf('    async getLIDForPN(pn) {', methodStart)
+  if (methodStart < 0 || methodEnd < 0) {
+    throw new Error('Could not locate the Baileys storeLIDPNMappings method; no LID mapping patch applied')
+  }
+
+  const method = `    async storeLIDPNMappings(pairs) {
+        // ${mappingMarker}
+        if (pairs.length === 0)
+            return [];
+        const validatedPairs = [];
+        for (const { lid, pn } of pairs) {
+            if (!((isLidUser(lid) && isPnUser(pn)) || (isPnUser(lid) && isLidUser(pn)))) {
+                this.logger.warn('Invalid LID-PN mapping: ' + lid + ', ' + pn);
+                continue;
+            }
+            const lidDecoded = jidDecode(lid);
+            const pnDecoded = jidDecode(pn);
+            if (!lidDecoded || !pnDecoded)
+                continue;
+            validatedPairs.push({ pnUser: pnDecoded.user, lidUser: lidDecoded.user });
+        }
+        if (validatedPairs.length === 0)
+            return [];
+        if (validatedPairs.every(({ pnUser, lidUser }) => this.mappingCache.get('pn:' + pnUser) === lidUser)) {
+            return [];
+        }
+        return this.storeMutex.mutex(async () => {
+            const cacheMissSet = new Set();
+            const existingMappings = new Map();
+            for (const { pnUser } of validatedPairs) {
+                const cached = this.mappingCache.get('pn:' + pnUser);
+                if (cached) {
+                    existingMappings.set(pnUser, cached);
+                }
+                else {
+                    cacheMissSet.add(pnUser);
+                }
+            }
+            if (cacheMissSet.size > 0) {
+                const cacheMisses = [...cacheMissSet];
+                this.logger.trace('Batch fetching ' + cacheMisses.length + ' LID mappings from database');
+                const stored = await this.keys.get('lid-mapping', cacheMisses);
+                for (const pnUser of cacheMisses) {
+                    const existingLidUser = stored[pnUser];
+                    if (existingLidUser) {
+                        existingMappings.set(pnUser, existingLidUser);
+                        this.mappingCache.set('pn:' + pnUser, existingLidUser);
+                        this.mappingCache.set('lid:' + existingLidUser, pnUser);
+                    }
+                }
+            }
+            const pairMap = {};
+            for (const { pnUser, lidUser } of validatedPairs) {
+                const existingLidUser = existingMappings.get(pnUser);
+                if (existingLidUser === lidUser) {
+                    this.logger.debug({ pnUser, lidUser }, 'LID mapping already exists, skipping');
+                    continue;
+                }
+                pairMap[pnUser] = lidUser;
+            }
+            if (Object.keys(pairMap).length === 0)
+                return [];
+            this.logger.trace({ pairMap }, 'Storing ' + Object.keys(pairMap).length + ' pn mappings');
+            const batchData = {};
+            for (const [pnUser, lidUser] of Object.entries(pairMap)) {
+                batchData[pnUser] = lidUser;
+                batchData[lidUser + '_reverse'] = pnUser;
+            }
+            await this.keys.transaction(async () => {
+                await this.keys.set({ 'lid-mapping': batchData });
+            }, 'lid-mapping');
+            for (const [pnUser, lidUser] of Object.entries(pairMap)) {
+                this.mappingCache.set('pn:' + pnUser, lidUser);
+                this.mappingCache.set('lid:' + lidUser, pnUser);
+            }
+            return Object.entries(pairMap).map(([pnUser, lidUser]) => ({ pnUser, lidUser }));
+        });
+    }
+`
+
+  lidSource = lidSource.slice(0, methodStart) + method + lidSource.slice(methodEnd)
+  fs.writeFileSync(lidFile, lidSource)
+  console.log('Applied Baileys rc14 LID mapping concurrency patch.')
 }
 
 let sendSource = fs.readFileSync(sendFile, 'utf8')
-const sessionMarker = 'Hasa_2_bot: do not force-refresh already mapped LID sessions'
+const sessionMarker = 'const newLidUsers = new Set(stored.map(p => p.lidUser))'
 if (sendSource.includes(sessionMarker)) {
-  console.log('Baileys rc14 LID session-refresh guard already applied.')
+  console.log('Baileys rc14 new-LID-only session refresh patch already applied.')
 } else {
-  const forceRefresh = /await assertSessions\(lids,\s*true\)/g
-  const matches = [...sendSource.matchAll(forceRefresh)]
-  if (matches.length !== 1) {
-    throw new Error('Could not find exactly one expected Baileys rc14 forced LID session refresh; no session patch applied')
+  const callStart = sendSource.indexOf('                await signalRepository.lidMapping.storeLIDPNMappings(')
+  const extractedMarker = '            const extracted = extractDeviceJids'
+  const callEnd = sendSource.indexOf(extractedMarker, callStart)
+  if (callStart < 0 || callEnd < 0) {
+    throw new Error('Could not locate the Baileys device LID mapping/session assertion block; no send patch applied')
   }
-  sendSource = sendSource.replace(
-    forceRefresh,
-    `// ${sessionMarker}\n\t\t\t\t\tawait assertSessions(lids)`
-  )
+
+  const newBlock = `                const stored = await signalRepository.lidMapping.storeLIDPNMappings(lidResults.map(a => ({ lid: a.lid, pn: a.id })));
+                // Hasa_2_bot: force-refresh only newly mapped LIDs; validate known LIDs normally.
+                ${sessionMarker};
+                const isNewlyMapped = lid => newLidUsers.has(jidDecode(lid)?.user ?? '');
+                const lids = lidResults.map(a => a.lid);
+                const newLids = lids.filter(isNewlyMapped);
+                const knownLids = lids.filter(lid => !isNewlyMapped(lid));
+                if (newLids.length) {
+                    try {
+                        await assertSessions(newLids, true);
+                    }
+                    catch (err) {
+                        logger.warn({ err, count: newLids.length }, 'failed to assert sessions for newly mapped LIDs');
+                    }
+                }
+                if (knownLids.length) {
+                    try {
+                        await assertSessions(knownLids);
+                    }
+                    catch (err) {
+                        logger.warn({ err, count: knownLids.length }, 'failed to assert sessions for known LIDs');
+                    }
+                }
+`
+  sendSource = sendSource.slice(0, callStart) + newBlock + sendSource.slice(callEnd)
   fs.writeFileSync(sendFile, sendSource)
-  console.log('Applied Baileys rc14 LID session-refresh guard.')
+  console.log('Applied Baileys rc14 new-LID-only session refresh patch.')
 }
