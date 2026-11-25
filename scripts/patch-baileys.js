@@ -244,6 +244,7 @@ if (sendSource.includes(sessionMarker)) {
                         logger.warn({ err, count: knownLids.length }, 'failed to assert sessions for known LIDs');
                     }
                 }
+            }
 `
   sendSource = sendSource.slice(0, callStart) + newBlock + sendSource.slice(callEnd)
   fs.writeFileSync(sendFile, sendSource)
