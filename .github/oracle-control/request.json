@@ -1,4 +1,4 @@
 {
-  "action": "remove-stale-cron",
-  "request_id": "hasa2-remove-retired-hasamd-cron-20261125-01"
+  "action": "scheduler-audit",
+  "request_id": "hasa2-scheduler-after-cleanup-20261125-01"
 }
