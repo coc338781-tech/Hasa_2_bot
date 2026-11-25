@@ -311,9 +311,576 @@ jobs:
                   console.log(JSON.stringify(out, null, 2));
                 });
               '
-              echo "--- Matching scheduled jobs ---"
-              (crontab -l 2>/dev/null | grep -Ei 'hasa|pm2' || true)
-              (systemctl list-timers --all --no-pager 2>/dev/null | grep -Ei 'hasa|pm2' || true)
+              echo "--- User crontab (commands only) ---"
+              (crontab -l 2>/dev/null | grep -vE '^[[:space:]]*#|^[[:space:]]*              echo "--- PM2 daemon event log ---"
+              if [ -f "$HOME/.pm2/pm2.log" ]; then
+                stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
+                grep -n -Ei 'hasa2|exited|exit code|errored|restart|online|stopped|SIG(INT|TERM|KILL)|unstable|launching' "$HOME/.pm2/pm2.log" | tail -n 180 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              else
+                echo "PM2 daemon log missing"
+              fi
+              echo "--- Bot error log: last 180 lines ---"
+              if [ -f "$HOME/.pm2/logs/hasa2-error.log" ]; then
+                tail -n 180 "$HOME/.pm2/logs/hasa2-error.log" | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g'
+              fi
+              echo "--- PM2 process describe ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- System reboot / OOM evidence ---"
+              (journalctl -k --no-pager 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 25 || true)
+              (last -x 2>/dev/null | head -n 12 || true)
+              ;;
+            dnf-cache-audit)
+              echo "Read-only DNF cache timer and memory audit; no services changed."
+              for unit in dnf-makecache.timer dnf-makecache.service dnf-automatic.timer dnf-automatic.service; do
+                echo "--- $unit ---"
+                systemctl show "$unit" -p LoadState -p UnitFileState -p ActiveState -p SubState -p Result -p ExecMainStatus --no-pager 2>&1 || true
+              done
+              echo "--- DNF timers ---"
+              systemctl list-timers --all --no-pager 2>&1 | grep -i dnf || true
+              echo "--- Top memory consumers ---"
+              ps -eo pid,comm,rss,args --sort=-rss | head -n 12 | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g'
+              echo "--- Memory ---"
+              free -m
+              print_status
+              ;;
+            dnf-cache-mitigate)
+              echo "Mitigate verified DNF cache OOM on the 1 GB Oracle VM; bot and WhatsApp session will not be restarted."
+              systemctl show dnf-makecache.timer -p LoadState -p UnitFileState -p ActiveState -p SubState --no-pager
+              systemctl show dnf-makecache.service -p LoadState -p ActiveState -p SubState -p Result --no-pager
+              test "$(systemctl show dnf-makecache.timer -p LoadState --value)" = "loaded"
+              test "$(systemctl show dnf-makecache.timer -p ActiveState --value)" = "active"
+              sudo -n systemctl disable --now dnf-makecache.timer
+              sudo -n systemctl stop dnf-makecache.service || true
+              sudo -n systemctl reset-failed dnf-makecache.service
+              echo "--- Verification ---"
+              systemctl show dnf-makecache.timer -p UnitFileState -p ActiveState -p SubState --no-pager
+              systemctl show dnf-makecache.service -p ActiveState -p SubState -p Result --no-pager
+              systemctl --failed --no-legend --no-pager
+              free -m
+              print_status
+              echo "BOT_RESTARTED=NO"
+              echo "WHATSAPP_SESSION_TOUCHED=NO"
+              ;;
+            crash-audit)
+              echo "Read-only crash diagnosis; no process/session changes."
+              echo "--- PM2 process metadata ---"
+              pm2 describe hasa2 2>&1 | grep -Ei 'status|script path|exec cwd|pid|restarts|unstable|exit code|created at|uptime|memory|error' | tail -n 35 || true
+              echo "--- PM2 log file metadata ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  stat -c '%n | bytes=%s | modified=%y' "$f"
+                  printf 'lines='; wc -l < "$f"
+                else
+                  echo "$f: MISSING"
+                fi
+              done
+              echo "--- Historical disconnect / crypto errors with stack context ---"
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  echo "FILE: $(basename "$f")"
+                  grep -n -A 12 -E 'Bad MAC|Session error|Disconnect details|uncaughtException|UnhandledPromiseRejection|heap out of memory|ENOMEM|SIGKILL|Killed' "$f" | tail -n 100 | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' || true
+                fi
+              done
+              echo "--- Kernel OOM evidence ---"
+              (dmesg 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 20 || true)
+              echo "--- PM2 current state ---"
+              print_status || true
+              ;;
+            status)
+              print_status
+              ;;
+            auth-audit)
+              echo "Read-only auth directory metadata; no session contents or credentials are displayed."
+              for DIR in "$APP/auth_info" "$APP/subbot_sessions"; do
+                echo "--- $(basename "$DIR") ---"
+                if [ -d "$DIR" ]; then
+                  printf 'files: '; find "$DIR" -type f 2>/dev/null | wc -l
+                  printf 'total_bytes: '; du -sb "$DIR" 2>/dev/null | awk '{print $1}'
+                else
+                  echo "directory: MISSING"
+                fi
+              done
+              printf 'creds_json_present: '; [ -s "$APP/auth_info/creds.json" ] && echo yes || echo no
+              for pattern in 'session-*.json' 'pre-key-*.json' 'sender-key-*.json' 'app-state-sync-key-*.json' 'app-state-sync-version-*.json'; do
+                count="$(find "$APP/auth_info" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | wc -l)"
+                printf '%s: %s\n' "$pattern" "$count"
+              done
+              print_status
+              ;;
+            logs)
+              echo "Filtered diagnostics only; chat/message-like lines are excluded."
+              FOUND=0
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  MATCHES="$(tail -n 200 "$f" | grep -Ei 'error|warn|exception|failed|timeout|401|403|408|429|disconnect|reconnect|uncaught|rejection' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\.whatsapp\.net|@g\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 30 || true)"
+                  if [ -n "$MATCHES" ]; then
+                    echo "--- $(basename "$f") ---"
+                    printf '%s\n' "$MATCHES"
+                    FOUND=1
+                  fi
+                fi
+              done
+              [ "$FOUND" -eq 1 ] || echo "No matching diagnostic lines found."
+              print_status
+              ;;
+            connection-audit)
+              echo "Read-only WhatsApp connection timeline; message content and identifiers excluded."
+              for f in "$HOME/.pm2/logs/hasa2-error.log" "$HOME/.pm2/logs/hasa2-out.log"; do
+                if [ -f "$f" ]; then
+                  echo "--- $(basename "$f") ---"
+                  tail -n 250 "$f" | grep -Ei 'connected|connection open|connection closed|reconnect|Bad MAC|logged out|401|403|408|428|disconnect|stream:error|connection.update' | grep -Eiv 'message|chat|jid|from|to|body|text|payload|quoted|contact|media|@s\\.whatsapp\\.net|@g\\.us' | sed -E 's/[0-9]{8,}/[REDACTED_NUMBER]/g; s#https?://[^ ]+#URL_REDACTED#g' | tail -n 60 || true
+                fi
+              done
+              print_status
+              ;;
+            inspect-changes)
+              echo "Tracked and untracked file names only; file contents are not shown."
+              echo "--- git status --short ---"
+              git status --short
+              echo "--- tracked diff summary ---"
+              git diff --stat
+              echo "--- staged diff summary ---"
+              git diff --cached --stat
+              echo "--- untracked non-ignored files ---"
+              git ls-files --others --exclude-standard
+              print_status
+              ;;
+            inspect-guard-script)
+              echo "Read-only inspection of deploy guard script."
+              sed -n "1,240p" /home/opc/bin/hasa2-deploy
+              ;;
+            inspect-downloader-diff)
+              echo "Read-only diff for plugins/downloader.js only; no app/session/config changes."
+              git diff --no-ext-diff --unified=5 -- plugins/downloader.js | sed -E 's/(api[_-]?key|token|password|secret)([=:][[:space:]]*)[^[:space:]]+/\\1\\2[REDACTED]/Ig; s/[0-9]{8,}/[REDACTED_NUMBER]/g'
+              git fetch origin assistant-workflow
+              echo "--- Difference against incoming GitHub downloader ---"
+              git diff --no-ext-diff --unified=5 origin/assistant-workflow -- plugins/downloader.js | sed -E 's/(api[_-]?key|token|password|secret)([=:][[:space:]]*)[^[:space:]]+/\\1\\2[REDACTED]/Ig; s/[0-9]{8,}/[REDACTED_NUMBER]/g'
+              echo "--- File metadata ---"
+              if [ -f plugins/downloader.js ]; then
+                printf 'working_tree_sha256: '; sha256sum plugins/downloader.js | awk '{print $1}'
+                printf 'working_tree_lines: '; wc -l < plugins/downloader.js
+              fi
+              ;;
+            checkpoint-downloader)
+              echo "Verify merged target, then checkpoint only Oracle's local downloader patch for rollback safety."
+              git fetch origin assistant-workflow
+              TARGET="$(git rev-parse origin/assistant-workflow)"
+              git show "$TARGET:plugins/downloader.js" | grep -Fq 'const MAX_BYTES = 200 * 1024 * 1024;'
+              git show "$TARGET:plugins/downloader.js" | grep -Fq 'video: { url: file }'
+              git show "$TARGET:plugins/downloader.js" | grep -Fq 'YOUTUBE_COOKIES_FILE'
+              UNEXPECTED="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" && $2 != "plugins/downloader.js" {print}')"
+              if [ -n "$UNEXPECTED" ]; then
+                echo "STOP: Other tracked local changes exist; no checkpoint made."
+                printf '%s\\n' "$UNEXPECTED"
+                exit 2
+              fi
+              if ! git diff --quiet HEAD -- plugins/downloader.js; then
+                git -c user.name="Hasa Deployment Checkpoint" -c user.email="deployment-checkpoint@users.noreply.github.com" add plugins/downloader.js
+                git -c user.name="Hasa Deployment Checkpoint" -c user.email="deployment-checkpoint@users.noreply.github.com" commit --only plugins/downloader.js -m "Checkpoint Oracle downloader before merged deployment"
+                echo "DOWNLOADER_CHECKPOINT=CREATED"
+              else
+                echo "DOWNLOADER_CHECKPOINT=NOT_NEEDED"
+              fi
+              echo "Incoming target: $(git rev-parse --short "$TARGET")"
+              echo "Local checkpoint: $(git rev-parse --short HEAD)"
+              git status --short
+              ;;
+            patch-deploy-guard)
+              GUARD=/home/opc/bin/hasa2-deploy
+              BACKUP="${GUARD}.bak-$(date +%Y%m%d-%H%M%S)"
+              cp -p "$GUARD" "$BACKUP"
+              python3 - "$GUARD" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+          old = '  if [ -n "$(git status --porcelain)" ]; then'
+          new = '  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s and 'LOCAL_AI_BACKUP=""' not in s:
+              raise SystemExit("Deploy guard status check not found; no changes made.")
+          needle = '  OLD_SHA="$(git rev-parse HEAD)"'
+          if 'UNTRACKED="$(git ls-files --others --exclude-standard)"' not in s:
+              block = """  UNTRACKED=\"$(git ls-files --others --exclude-standard)\"
+            UNEXPECTED=\"$(printf '%s\\n' \"$UNTRACKED\" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)\"
+            if [ -n \"$UNEXPECTED\" ]; then
+              echo \"STOP: Unexpected untracked files exist; preserving them.\"
+              printf '%s\\n' \"$UNEXPECTED\"
+              exit 1
+            fi
+          
+          """
+              if needle not in s:
+                  raise SystemExit("Deploy guard insertion point not found; no changes made.")
+              s = s.replace(needle, block + needle, 1)
+          old_bundle = '  git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" "$OLD_SHA"'
+          if old_bundle in s:
+              new_bundle = chr(10).join([
+                  '  if ! git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all; then',
+                  '    rm -f "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle"',
+                  '    git archive --format=tar "$OLD_SHA" | gzip -c > "$BACKUP_DIR/pre-deploy-$OLD_SHA.tar.gz"',
+                  '  fi'
+              ])
+              s = s.replace(old_bundle, new_bundle, 1)
+          elif 'git bundle create "$BACKUP_DIR/pre-deploy-$OLD_SHA.bundle" --all' not in s:
+              raise SystemExit("Deploy backup command not found; no changes made.")
+          p.write_text(s)
+          PY
+              python3 - "$GUARD" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text()
+
+          marker = '  LOCAL_AI_BACKUP=""'
+          if marker not in s:
+              start = s.find('  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then')
+              if start < 0:
+                  raise SystemExit("Deploy guard local-change check not found; no changes made.")
+              finish = s.find('  fi', start)
+              if finish < 0:
+                  raise SystemExit("Deploy guard local-change check is incomplete; no changes made.")
+              finish += len('  fi')
+              replacement = r'''  LOCAL_AI_BACKUP=""
+          OTHER_CHANGES="$(git status --porcelain --untracked-files=no | awk '$2 != "plugins/ai.js" {print}')"
+          if [ -n "$OTHER_CHANGES" ]; then
+            echo "STOP: Unexpected tracked production changes exist; preserving them."
+            printf '%s\n' "$OTHER_CHANGES"
+            exit 1
+          fi
+          if ! git diff --quiet HEAD -- plugins/ai.js; then
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
+            LOCAL_AI_BACKUP="$BACKUP_DIR/local-ai-$(date +%Y%m%d-%H%M%S).js"
+            cp -p "$APP_DIR/plugins/ai.js" "$LOCAL_AI_BACKUP"
+            echo "Preserving local AI implementation: $LOCAL_AI_BACKUP"
+          fi'''
+              s = s[:start] + replacement + s[finish:]
+
+          fetch_marker = '  NEW_SHA="$(git rev-parse "origin/$BRANCH")"'
+          if 'Remote AI implementation changed' not in s:
+              pos = s.find(fetch_marker)
+              if pos < 0:
+                  raise SystemExit("Remote SHA insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              if line_end < 0:
+                  raise SystemExit("Remote SHA line is incomplete; no changes made.")
+              insert = r'''
+          if ! git diff --quiet "$OLD_SHA" "$NEW_SHA" -- plugins/ai.js; then
+            echo "STOP: Remote AI implementation changed; refusing to overwrite the local production AI file."
+            exit 1
+          fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          rollback_marker = '    git reset --hard "$OLD_SHA" || true'
+          rollback_restore = 'Restoring preserved local AI after rollback.'
+          if rollback_restore not in s:
+              pos = s.find(rollback_marker)
+              if pos < 0:
+                  raise SystemExit("Rollback insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              insert = r'''
+              if [ -n "$LOCAL_AI_BACKUP" ] && [ -f "$LOCAL_AI_BACKUP" ]; then
+                cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+                echo "Restoring preserved local AI after rollback."
+              fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          new_marker = '  git reset --hard "$NEW_SHA"'
+          restore_marker = 'Restored preserved local AI implementation after code update.'
+          if restore_marker not in s:
+              pos = s.find(new_marker)
+              if pos < 0:
+                  raise SystemExit("New commit reset insertion point not found; no changes made.")
+              line_end = s.find('\n', pos)
+              insert = r'''
+          if [ -n "$LOCAL_AI_BACKUP" ]; then
+            cp -p "$LOCAL_AI_BACKUP" "$APP_DIR/plugins/ai.js"
+            echo "Restored preserved local AI implementation after code update."
+          fi'''
+              s = s[:line_end] + insert + s[line_end:]
+
+          old_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json)$' || true)"""
+          new_allow = r"""  UNEXPECTED="$(printf '%s\n' "$UNTRACKED" | grep -Ev '^(bot_logo[.]jpg|package-lock[.]json|plugins/ai[.]js[.]backup-[0-9]{8}-[0-9]{6})$' || true)"""
+          if old_allow in s:
+              s = s.replace(old_allow, new_allow, 1)
+          elif new_allow not in s:
+              raise SystemExit("Untracked backup allowlist not found; no changes made.")
+
+          p.write_text(s)
+          PY
+              bash -n "$GUARD"
+              echo "Deploy guard updated; original backup: $BACKUP"
+              sed -n "14,52p" "$GUARD"
+              ;;
+            xvdl-diagnose)
+              echo "Read-only public XVDL source diagnostics; no media downloads, bot restart, or session changes."
+              TMP="$(mktemp -d /tmp/hasa-xvdl-diagnostic.XXXXXX)"
+              trap 'rm -rf -- "$TMP"' EXIT
+              probe() {
+                local label="$1" url="$2" code
+                code="$(curl -4 -L -sS -o "$TMP/page" -w '%{http_code}' --connect-timeout 8 --max-time 25 "$url" 2>"$TMP/curl.err" || true)"
+                echo "HTTP_PROBE=$label STATUS=${code:-000}"
+                if [ -s "$TMP/curl.err" ]; then
+                  sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' "$TMP/curl.err" | head -n 1
+                fi
+              }
+              probe "pornhub-root" "https://www.pornhub.com/"
+              probe "pornhub-amateur" "https://www.pornhub.com/categories/amateur"
+              probe "xhamster-root" "https://xhamster.com/"
+              probe "xhamster-popular" "https://xhamster.com/videos?sort=popular"
+              probe "xhamster-amateur" "https://xhamster.com/categories/amateur"
+              echo "--- XHAMSTER PUBLIC HTML LISTING PARSE ---"
+              for item in "category|https://xhamster.com/categories/amateur" "search|https://xhamster.com/search/amateur"; do
+                label="${item%%|*}"
+                url="${item#*|}"
+                if curl -4 -L -sS --connect-timeout 8 --max-time 25 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/133.0.0.0 Safari/537.36" "$url" -o "$TMP/xh.html"; then
+                  python3 - "$TMP/xh.html" "$label" <<'PY'
+          import re,sys,html
+          s=open(sys.argv[1],errors="ignore").read()
+          links=[]
+          for m in re.finditer(r'''(?is)<a\\b[^>]*href=["'](?P<href>(?:https?://(?:www\\.)?xhamster\\.com)?/videos/[^"'?# ]+)["'][^>]*>(?P<body>.*?)</a>''',s):
+              u=html.unescape(m.group("href"))
+              if u.startswith("/"): u="https://xhamster.com"+u
+              title=re.sub(r"<[^>]+>"," ",m.group("body"))
+              title=" ".join(html.unescape(title).split())
+              if u not in [x[0] for x in links]: links.append((u,title[:90]))
+          if not links:
+              urls=[]
+              for m in re.finditer(r'''(?i)(?:https?:\\?/\\?/xhamster\\.com)?\\?/videos\\?/[^"'\\\\<> ]+''',s):
+                  u=html.unescape(m.group(0)).replace("\\/", "/")
+                  if u.startswith("/"): u="https://xhamster.com"+u
+                  if u not in urls: urls.append(u)
+              links=[(u,"") for u in urls]
+          print("PAGE="+sys.argv[2]+" HTML_BYTES="+str(len(s))+" VIDEO_LINKS="+str(len(links)))
+          for u,t in links[:4]: print("VIDEO_URL="+u+" TITLE="+t)
+          print("EMBEDDED_STATE="+str(any(x in s for x in ["__NEXT_DATA__","videoEntity","videoList","video-list"])))
+          PY
+                else
+                  echo "HTML_FETCH=$label FAILED"
+                fi
+              done
+              for item in "pornhub-amateur|https://www.pornhub.com/categories/amateur" "pornhub-popular|https://www.pornhub.com/video?o=mv" "xhamster-popular|https://xhamster.com/videos?sort=popular" "xhamster-amateur|https://xhamster.com/categories/amateur"; do
+                label="${item%%|*}"
+                url="${item#*|}"
+                echo "--- YTDLP $label ---"
+                if timeout 100 yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "$url" >"$TMP/list.json" 2>"$TMP/list.err"; then
+                  python3 - "$TMP/list.json" <<'PY'
+          import json,sys
+          try:
+              d=json.load(open(sys.argv[1]))
+              entries=d.get("entries") if isinstance(d,dict) else None
+              if entries is None: entries=[d]
+              print("ENTRIES_COUNT="+str(sum(1 for x in entries if isinstance(x,dict))))
+              print("EXTRACTOR="+str(d.get("extractor_key","unknown")) if isinstance(d,dict) else "EXTRACTOR=unknown")
+          except Exception:
+              print("JSON_PARSE=FAILED")
+          PY
+                else
+                  echo "YTDLP_EXIT=FAILED"
+                  if [ -s "$TMP/list.err" ]; then
+                    grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out' "$TMP/list.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+                  fi
+                fi
+              done
+              echo "--- XHAMSTER SINGLE VIDEO METADATA ---"
+              if curl -4 -L -sS --connect-timeout 8 --max-time 25 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/133.0.0.0 Safari/537.36" "https://xhamster.com/categories/amateur" -o "$TMP/xh-video.html"; then
+                VIDEO_URL="$(python3 - "$TMP/xh-video.html" <<'PY'
+          import re,html,sys
+          s=open(sys.argv[1],errors="ignore").read()
+          m=re.search(r'''(?i)(?:https?:\\?/\\?/xhamster\\.com)?\\?/videos\\?/[^"'\\\\<> ]+''',s)
+          if m:
+              u=html.unescape(m.group(0)).replace("\\/", "/")
+              print(u if u.startswith("https://") else "https://xhamster.com"+u)
+          PY
+                )"
+                if [ -n "$VIDEO_URL" ] && timeout 75 yt-dlp --skip-download --dump-single-json --no-warnings --no-playlist "$VIDEO_URL" >"$TMP/xh-video.json" 2>"$TMP/xh-video.err"; then
+                  python3 - "$TMP/xh-video.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1])); print("VIDEO_METADATA=OK"); print("VIDEO_TITLE_PRESENT="+str(bool(d.get("title")))); print("VIDEO_DURATION_PRESENT="+str(bool(d.get("duration")))); print("VIDEO_FORMAT_COUNT="+str(len(d.get("formats") or []))); print("VIDEO_EXTRACTOR="+str(d.get("extractor_key","unknown")))
+          PY
+                else
+                  echo "VIDEO_METADATA=FAILED"
+                  grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out|no video formats' "$TMP/xh-video.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+                fi
+              fi
+              echo "--- PORNHUB SEARCH FALLBACK ---"
+              if timeout 75 yt-dlp --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://www.pornhub.com/video/search?search=amateur" >"$TMP/ph-search.json" 2>"$TMP/ph-search.err"; then
+                python3 - "$TMP/ph-search.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1])); e=d.get("entries") if isinstance(d,dict) else None; print("PORN_SEARCH_ENTRIES="+str(sum(1 for x in (e if e is not None else [d]) if isinstance(x,dict)))); print("PORN_SEARCH_EXTRACTOR="+str(d.get("extractor_key","unknown")) if isinstance(d,dict) else "unknown")
+          PY
+              else
+                echo "PORN_SEARCH=FAILED"
+                grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out' "$TMP/ph-search.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+              fi
+              echo "--- YTDLP IMPERSONATED PROBE ---"
+              if timeout 100 yt-dlp --impersonate Chrome-133 --flat-playlist --dump-single-json --no-warnings --playlist-end 3 "https://xhamster.com/videos?sort=popular" >"$TMP/imp.json" 2>"$TMP/imp.err"; then
+                python3 - "$TMP/imp.json" <<'PY'
+          import json,sys
+          try:
+              d=json.load(open(sys.argv[1])); e=d.get("entries") if isinstance(d,dict) else None
+              print("IMPERSONATED_ENTRIES="+str(sum(1 for x in (e if e is not None else [d]) if isinstance(x,dict))))
+              print("IMPERSONATED_EXTRACTOR="+str(d.get("extractor_key","unknown")) if isinstance(d,dict) else "IMPERSONATED_EXTRACTOR=unknown")
+          except Exception: print("IMPERSONATED_JSON=FAILED")
+          PY
+              else
+                echo "IMPERSONATED_YTDLP_EXIT=FAILED"
+                grep -Ei 'error|unable|reset|403|429|not supported|unsupported|timed out' "$TMP/imp.err" | sed -E 's#https?://[^ ]+#URL_REDACTED#g; s/[0-9]{8,}/[REDACTED_NUMBER]/g' | head -n 2 || true
+              fi
+              print_status
+              ;;
+            deploy)
+              echo "Starting guarded Oracle deployment; local AI code will be preserved."
+              SSH_ORIGINAL_COMMAND=deploy /home/opc/bin/hasa2-deploy
+              sleep 5
+              print_status
+              ;;
+            sshd-restart)
+              echo "Restarting only the SSH daemon; Hasa_2_bot and WhatsApp session are not touched."
+              sudo -n systemctl restart sshd
+              sleep 2
+              systemctl is-active sshd
+              ss -lnt 2>/dev/null | grep -E '(:22[[:space:]]|:22$)'
+              print_status
+              ;;
+            oracle-agent-restart)
+              echo "Restarting only the Oracle control agent; Hasa_2_bot and WhatsApp session are not touched."
+              pm2 describe hasa-oracle-agent >/dev/null 2>&1 || { echo "Oracle agent PM2 process not found."; exit 2; }
+              pm2 restart hasa-oracle-agent --update-env
+              sleep 6
+              pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="hasa-oracle-agent");console.log("hasa-oracle-agent="+(p?.pm2_env?.status||"NOT FOUND"));if(!p||p.pm2_env?.status!=="online")process.exit(2);});'
+              pm2 save
+              print_status
+              ;;
+            restart)
+              pm2 restart hasa2 --update-env
+              sleep 6
+              print_status
+              ;;
+            remove-old)
+              # Only remove the known legacy PM2 app; refuse if its script path differs.
+              OLD_SCRIPT="$(pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasamd");
+                  console.log(p && p.pm2_env ? (p.pm2_env.pm_exec_path || "") : "NOT_FOUND");
+                });
+              ')"
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ] && [ "$OLD_SCRIPT" != "/home/opc/HASA-MD_next-Bot/index.js" ]; then
+                echo "Refusing removal: legacy PM2 script path did not match the expected old bot."
+                exit 1
+              fi
+              mkdir -p "$BACKUPS"
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                ARCHIVE="$BACKUPS/legacy-HASA-MD_next-Bot-$(date +%Y%m%d-%H%M%S).tar.gz"
+                tar -czf "$ARCHIVE" -C /home/opc HASA-MD_next-Bot
+                echo "Legacy bot archive created: $ARCHIVE"
+              fi
+              if [ "$OLD_SCRIPT" != "NOT_FOUND" ]; then
+                pm2 stop hasamd
+                pm2 delete hasamd
+              fi
+              if [ -d /home/opc/HASA-MD_next-Bot ]; then
+                rm -rf -- /home/opc/HASA-MD_next-Bot
+              fi
+              pm2 save
+              echo "Legacy hasamd process removed."
+              if pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d);
+                process.stdin.on("end", () => {
+                  const p = JSON.parse(s).find(x => x.name === "hasa2");
+                  if (!p || !p.pm2_env || p.pm2_env.status !== "online") process.exitCode = 1;
+                });
+              '; then
+                echo "New hasa2 process remains online."
+              else
+                echo "ERROR: new hasa2 process is not online."
+                exit 1
+              fi
+              pm2 status
+              ;;
+            rollback)
+              test -s "$BACKUPS/last-good-commit"
+              TARGET="$(cat "$BACKUPS/last-good-commit")"
+              CURRENT="$(git rev-parse HEAD)"
+              git cat-file -e "$TARGET^{commit}"
+              printf '%s\n' "$CURRENT" > "$BACKUPS/last-good-commit"
+              git reset --hard "$TARGET"
+              npm install --no-audit --no-fund
+              npm run check
+              pm2 restart hasa2 --update-env
+              sleep 8
+              print_status
+              echo "Rolled back to: $(git rev-parse --short HEAD)"
+              ;;
+          esac
+          SCRIPT
+          )"
+          REMOTE_EXIT=255
+          RESULT=""
+          for attempt in 1 2 3; do
+            echo "Oracle SSH attempt $attempt/3"
+            set +e
+            RESULT="$(printf '%s\n' "$REMOTE_SCRIPT" | ssh -i ~/.ssh/oracle_key -o BatchMode=yes -o ConnectTimeout=25 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 "$SSH_USER@$SSH_HOST" "ACTION='$ACTION' REQUEST_ID='$REQUEST_ID' bash -s" 2>&1)"
+            REMOTE_EXIT=$?
+            set -e
+            if [ "$REMOTE_EXIT" -eq 0 ]; then
+              break
+            fi
+            case "$RESULT" in
+              *"Connection timed out"*|*"banner exchange"*|*"Connection refused"*|*"Connection reset by peer"*|*"kex_exchange_identification"*|*"No route to host"*|*"Operation timed out"*)
+                if [ "$attempt" -lt 3 ]; then
+                  echo "Transient SSH transport failure; waiting 10 seconds before retry."
+                  sleep 10
+                fi
+                ;;
+              *)
+                echo "Remote command failed for a non-transport reason; not retrying."
+                break
+                ;;
+            esac
+          done
+          echo "Remote operation exit code: $REMOTE_EXIT"
+          echo "exit_code=$REMOTE_EXIT" >> "$GITHUB_OUTPUT"
+          {
+            echo 'result<<ORACLE_RESULT'
+            printf '%s\\n' "$RESULT"
+            echo "Remote operation exit code: $REMOTE_EXIT"
+            echo 'ORACLE_RESULT'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send result to private report repository
+        env:
+          REPORT_TOKEN: ${{ secrets.BOT_TEST_REPORT_TOKEN }}
+          REPORT_REPO: ${{ secrets.BOT_TEST_REPORT_REPO }}
+          RESULT: ${{ steps.oracle.outputs.result }}
+        run: |
+          set -euo pipefail
+          test -n "$REPORT_TOKEN"
+          test -n "$REPORT_REPO"
+          TITLE="Oracle $ACTION report [$REQUEST_ID]"
+          BODY="$(printf 'Operation: %s\nRequest: %s\n\n%s' "$ACTION" "$REQUEST_ID" "$RESULT")"
+          JSON="$(jq -n --arg title "$TITLE" --arg body "$BODY" '{title:$title,body:$body}')"
+          RESPONSE="$(curl --fail-with-body --silent --show-error -X POST "https://api.github.com/repos/$REPORT_REPO/issues" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $REPORT_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/json" -d "$JSON")"
+          URL="$(printf '%s' "$RESPONSE" | jq -r '.html_url // empty')"
+          test -n "$URL"
+          echo "Private Oracle report created."
+
+      - name: Mark remote operation failures correctly
+        if: steps.oracle.outputs.exit_code != '0'
+        shell: bash
+        run: |
+          echo "::error::Oracle remote operation failed with exit code ${{ steps.oracle.outputs.exit_code }}. See the private report created above."
+          exit 1
+ | sed -E 's/(token|secret|password|api[_-]?key)([=:][[:space:]]*)[^[:space:]]+/\\1\\2[REDACTED]/Ig' || true)
+              echo "--- System cron references to process control ---"
+              (grep -RInE 'pm2|hasa2|hasamd|node index|killall|pkill|systemctl restart' /etc/crontab /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly 2>/dev/null | sed -E 's/(token|secret|password|api[_-]?key)([=:][[:space:]]*)[^[:space:]]+/\\1\\2[REDACTED]/Ig' || true)
+              echo "--- All system timers ---"
+              systemctl list-timers --all --no-pager 2>/dev/null || true
+              echo "--- Recent scheduler/service events ---"
+              (journalctl --since '-2 hours' --no-pager 2>/dev/null | grep -Ei 'cron|crond|pm2|hasa|node|restart|stopping|started|SIGINT|SIGTERM|kill' | tail -n 100 || true)
               echo "--- PM2 daemon event log ---"
               if [ -f "$HOME/.pm2/pm2.log" ]; then
                 stat -c '%n | bytes=%s | modified=%y' "$HOME/.pm2/pm2.log"
