@@ -36,7 +36,7 @@ if (!fs.existsSync(decryptFile)) {
 }
 
 let decryptSource = fs.readFileSync(decryptFile, 'utf8')
-const decryptMarker = 'primary identity failed to decrypt; retrying with stanza-provided PN/LID pairing'
+const decryptMarker = 'Decrypt retry started using alternate PN/LID identity.'
 
 if (decryptSource.includes(decryptMarker)) {
   console.log('Baileys rc14 LID/PN decrypt retry patch already applied.')
