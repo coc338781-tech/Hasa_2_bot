@@ -143,7 +143,10 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
       case "speed":
         speed = safeNumber(v, 0.25, 4, "Speed");
         filters.push("setpts=" + (1 / speed).toFixed(5) + "*PTS");
-        let remaining = speed;\n        while (remaining < 0.5) { audioFilters.push("atempo=0.5"); remaining /= 0.5; }\n        while (remaining > 2) { audioFilters.push("atempo=2"); remaining /= 2; }\n        audioFilters.push("atempo=" + remaining.toFixed(5));
+        let remaining = speed;
+        while (remaining < 0.5) { audioFilters.push("atempo=0.5"); remaining /= 0.5; }
+        while (remaining > 2) { audioFilters.push("atempo=2"); remaining /= 2; }
+        audioFilters.push("atempo=" + remaining.toFixed(5));
         audioMode = "encode";
         break;
       case "trim": {
@@ -258,7 +261,10 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
   } else if (audioMode === "mute") {
     args.push("-an");
   } else if (musicPath) {
-    args.push("-i", musicPath);\n    if (hasAudio) args.push("-filter_complex", "[1:a]volume=" + musicVolume + "[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");\n    else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);\n    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-shortest");
+    args.push("-i", musicPath);
+    if (hasAudio) args.push("-filter_complex", "[1:a]volume=" + musicVolume + "[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");
+    else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);
+    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-shortest");
   } else if (audioFilters.length) {
     args.push("-af", audioFilters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac");
   } else {
