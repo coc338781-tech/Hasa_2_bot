@@ -341,7 +341,9 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
     if (!hasAudio) throw new Error("මේ වීඩියෝ එකේ Audio track එකක් නැහැ.");
     args.push("-vn");
     if (audioFilters.length) args.push("-af", audioFilters.join(","));
-    args.push("-codec:a", "libmp3lame", "-q:a", "3", output);
+    args.push("-codec:a", "libmp3lame", "-q:a", "3");
+    if (trimEnd !== null) args.push("-t", String(trimEnd - trimStart));
+    args.push(output);
     return { args, outputFormat };
   }
 
