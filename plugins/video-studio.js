@@ -31,14 +31,17 @@ const HELP = `🎬 *HASA VIDEO STUDIO*
 
 *Options:*
 quality 480|720|1080 | speed 0.25-4
-caption <සිංහල/English> | text <text>
-trim <start> <end> | mute | volume 0-200
+caption <සිංහල/English> | text <text> | textposition top/middle/bottom
+trim <start> <end> | mute | volume 0-200 | pitch 0.5-2
 music <https URL>| music remove | musicvolume 0-100
 format 9:16|16:9|1:1 | crop | rotate 90|180|270
 flip h|v | brightness -1..1 | contrast 0..2
 saturation 0..3 | filter cinematic|warm|bw|vintage|none
 textcolor white|yellow|red|blue|green | fontsize 12-96
-reverse | gif | extractaudio
+fps 24|25|30|50|60 | sharpen 0-2 | denoise 0-10
+vignette on | sepia on | fadein 1 | fadeout 1
+audiofadein 1 | audiofadeout 1
+reverse (වීඩියෝව විනාඩි 2ට අඩු විය යුතුයි) | gif | extractaudio
 
 *වැදගත්:* එක් එක් Edit එක | ලකුණෙන් වෙන් කරන්න.
 සිංහල අකුරු නිවැරදිව පෙන්වීමට Server එකේ Sinhala Unicode Font එකක් තිබිය යුතුයි.
