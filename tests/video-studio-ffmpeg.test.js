@@ -17,7 +17,7 @@ async function makeSample(dir) {
     "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30",
     "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100",
     "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", input
+    "-c:a", "aac", "-threads", "1", input
   ], { timeout: 30000 });
   return input;
 }
