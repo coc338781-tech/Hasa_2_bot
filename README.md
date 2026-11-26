@@ -10,7 +10,7 @@ A separate WhatsApp MD bot project. It does not overwrite or share the existing 
 - Configurable auto replies with add/replace/list/remove/reset commands.
 - Group commands: tagall, hidetag, promote, demote, kick, groupinfo (admin checks included).
 - AI chat using Gemini when an API key is configured.
-- Video downloader for supported public URLs via yt-dlp (.dl and .fb).
+- Video downloader for supported public URLs via yt-dlp (.dl and .fb).\n- HASA Video Studio (reply-based FFmpeg editing, multi-operation jobs, Sinhala text captions, quality/speed/trim/audio/filters/aspect ratios/GIF/audio extraction).
 - Optional auto voice reply and composing presence.
 - Owner-only personal WhatsApp assistant: contact lookup, daily incoming-message counts, and explicit message sending.
 - Optional context-aware AI Smart Reply for private one-to-one chats; disabled by default.
@@ -23,7 +23,7 @@ pkg install nodejs-lts git ffmpeg python -y
 git clone https://github.com/coc338781-tech/Hasa_2_bot.git
 cd Hasa_2_bot
 npm install
-python -m pip install -U yt-dlp
+pkg install ffmpeg ffprobe font-noto-sans-sinhala -y\npython -m pip install -U yt-dlp
 cp config.example.json config.json
 nano config.json
 npm run check
@@ -40,7 +40,7 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 - `.addreply word-reply`, `.replaceeply word-reply`, `.getreply`, `.removereply word`, `.resetreply`
 - `.tagall`, `.hidetag`, `.promote @user`, `.demote @user`, `.kick @user`, `.groupinfo`
 - `.ai question`, `.hack` (owner-only harmless prank simulation)
-- `.dl url`, `.fb url`
+- `.dl url`, `.fb url`\n- `.vedit help` (reply to a video), `.vedit quality 1080 | speed 0.8 | caption Sinhala text`, `.vedit trim 00:05 00:25 | mute | format 9:16`, `.vedit music <HTTPS audio URL>`, `.vedit filter cinematic`, `.vedit gif`, `.vedit extractaudio`
 - `.subbot phone-number`, `.subcheck`, `.stopsubbot`, `.restartsubbot`, `.delsubbot`, `.helpsubbot`
 - `.personalhelp`, `.contact <name or number>`, `.today`, `.sendto <name or number> | <message>`, `.smartreply on|off`
 
@@ -51,3 +51,4 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 - Legacy source files are kept under `legacy-plugins/` for reference and are not loaded directly.
 - Syntax/CI checks do not guarantee WhatsApp will accept a session or that external download/AI providers will always work. Real connection testing must be done after installation with your own WhatsApp account.
 - Atlas-MD code has not been copied wholesale; features are being ported selectively to avoid mixing incompatible Baileys APIs or QR login paths.
+\n## HASA Video Studio\n\nThe Video Studio requires system `ffmpeg` and `ffprobe` binaries. Install a Sinhala Unicode font and set `videoStudio.fontFile` in `config.json` to its actual font path. Reply to a WhatsApp video with `.vedit help`; chain multiple operations with ` | ` so the bot performs one final encode. Jobs are queued and temporary media is removed after processing. The initial implementation supports local FFmpeg operations; cloud AI auto-edit, speech-to-text subtitles, background removal, and face detection require separately configured AI/model services and are not claimed as active until integrated and tested.\n
