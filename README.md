@@ -44,7 +44,7 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 - `.ai question`, `.hack` (owner-only harmless prank simulation)
 - `.dl url`, `.fb url`
 - `.vedit help` (reply to a video); combine operations with ` | `, e.g. `.vedit quality 1080 | speed 0.8 | caption Sinhala text | filter cinematic`
-- `.vedit trim 00:05 00:25 | mute | format 9:16`, `.vedit music <HTTPS audio URL> | musicvolume 25`, `.vedit pitch 1.2 | fps 30`, `.vedit sharpen 1 | denoise 2`, `.vedit fadein 1 | fadeout 1`, `.vedit reverse`, `.vedit gif`, `.vedit extractaudio`
+- `.vedit trim 00:05 00:25 | mute | format 9:16`, `.vedit music <HTTPS audio URL> | musicvolume 25`, `.vedit pitch 1.2 | fps 30`, `.vedit sharpen 1 | denoise 2`, `.vedit fadein 1 | fadeout 1`, `.vedit reverse`, `.vedit thumbnail 00:05`, `.vedit auto`, `.vedit subtitle auto`, `.vedit voiceover සිංහල වාක්‍යය`, `.vedit gif`, `.vedit extractaudio`
 - `.subbot phone-number`, `.subcheck`, `.stopsubbot`, `.restartsubbot`, `.delsubbot`, `.helpsubbot`
 - `.personalhelp`, `.contact <name or number>`, `.today`, `.sendto <name or number> | <message>`, `.smartreply on|off`
 
@@ -58,14 +58,14 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 
 ## HASA Video Studio
 
-The Video Studio requires system `ffmpeg` and `ffprobe` binaries. On Ubuntu/Debian install them with `sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-core`. The Noto Sinhala font is normally at `/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf`; verify the path and set `videoStudio.fontFile` in `config.json`. On Termux, install `ffmpeg` and place a licensed Sinhala Unicode TTF font in a readable local path. Set that exact path in the config. Reply to a WhatsApp video with `.vedit help`; chain multiple operations with ` | ` so the bot performs one final encode. Jobs are queued and temporary media is removed after processing. The initial implementation supports local FFmpeg operations; cloud AI auto-edit, speech-to-text subtitles, background removal, and face detection require separately configured AI/model services and are not claimed as active until integrated and tested.
+The Video Studio requires system `ffmpeg` and `ffprobe` binaries. `GEMINI_API_KEY` enables `.vedit auto` (Gemini visual recommendations) and `.vedit voiceover <text>` (Gemini TTS). On Ubuntu/Debian install them with `sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-core`. The Noto Sinhala font is normally at `/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf`; verify the path and set `videoStudio.fontFile` in `config.json`. On Termux, install `ffmpeg` and place a licensed Sinhala Unicode TTF font in a readable local path. Set that exact path in the config. Reply to a WhatsApp video with `.vedit help`; chain multiple operations with ` | ` so the bot performs one final encode. Jobs are queued and temporary media is removed after processing. The initial implementation supports local FFmpeg operations; cloud AI auto-edit, speech-to-text subtitles, background removal, and face detection require separately configured AI/model services and are not claimed as active until integrated and tested.
 
 
 The CI suite includes real FFmpeg integration checks for chained filter export and music mixing. Automatic speech recognition/subtitles, generative AI auto-edit, voice-over synthesis, background removal and face detection are not yet enabled; they require a configured transcription/model provider and will not be shown as available commands until end-to-end tests exist.
 
 ## Optional AI editing and Sinhala auto-subtitles
 
-- `.vedit auto` creates a small 3×3 contact sheet from the video and sends those preview frames to Gemini for a conservative visual edit plan. It requires `GEMINI_API_KEY`. This is an explicit cloud-processing command; do not use it for private footage unless you are comfortable sending preview frames to Google.
+- `.vedit auto` creates a small 3×3 contact sheet from the video and sends those preview frames to Gemini 3.8 Flash for a conservative visual edit plan. It requires `GEMINI_API_KEY`. This is an explicit cloud-processing command; do not use it for private footage unless you are comfortable sending preview frames to Google.\n- `.vedit voiceover <Sinhala text>` generates a Sinhala WAV voice-over with Gemini 3.8 Flash TTS and mixes it with the video audio. It requires `GEMINI_API_KEY`; generated speech is processed by Google.
 - `.vedit subtitle auto` runs local Whisper.cpp speech recognition in Sinhala and burns the generated SRT captions into the video. It does not send the video/audio to Gemini.
 - On Ubuntu/Debian, build Whisper.cpp and download a multilingual model (the base model is a lighter starting point):
   ```sh
