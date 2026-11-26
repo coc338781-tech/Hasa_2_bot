@@ -127,8 +127,9 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
   let reverse = false, gif = false, extractAudio = false;
   let musicPath = null;
   let musicVolume = 0.25;
-  let textColor = "white", fontSize = 36;
+  let textColor = "white", fontSize = 36, textPosition = "bottom";
   let brightness = 0, contrast = 1, saturation = 1;
+  let videoFadeIn = 0, videoFadeOut = 0, audioFadeIn = 0, audioFadeOut = 0;
   const captions = [];
 
   for (const op of operations) {
@@ -169,6 +170,50 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
         break;
       case "fontsize":
         fontSize = safeNumber(v, 12, 96, "Font size");
+        break;
+      case "textposition":
+        if (!["top", "middle", "bottom"].includes(v)) throw new Error("textposition top/middle/bottom භාවිතා කරන්න.");
+        textPosition = v;
+        break;
+      case "pitch": {
+        const pitch = safeNumber(v, 0.5, 2, "Pitch");
+        audioFilters.push("asetrate=44100*" + pitch + ",aresample=44100,atempo=" + (1 / pitch).toFixed(5));
+        audioMode = "encode";
+        break;
+      }
+      case "fps": {
+        const fps = safeNumber(v, 12, 60, "FPS");
+        if (![24, 25, 30, 50, 60].includes(fps)) throw new Error("FPS 24/25/30/50/60 භාවිතා කරන්න.");
+        filters.push("fps=" + fps);
+        break;
+      }
+      case "sharpen":
+        filters.push("unsharp=5:5:" + safeNumber(v, 0, 2, "Sharpen") + ":5:5:0");
+        break;
+      case "denoise":
+        filters.push("hqdn3d=" + safeNumber(v, 0, 10, "Denoise"));
+        break;
+      case "vignette":
+        if (!["on", "off"].includes(v)) throw new Error("vignette on/off භාවිතා කරන්න.");
+        if (v === "on") filters.push("vignette");
+        break;
+      case "sepia":
+        if (!["on", "off"].includes(v)) throw new Error("sepia on/off භාවිතා කරන්න.");
+        if (v === "on") filters.push("colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131");
+        break;
+      case "fadein":
+        videoFadeIn = safeNumber(v, 0.1, 10, "Fade in");
+        break;
+      case "fadeout":
+        videoFadeOut = safeNumber(v, 0.1, 10, "Fade out");
+        break;
+      case "audiofadein":
+        audioFadeIn = safeNumber(v, 0.1, 10, "Audio fade in");
+        audioMode = "encode";
+        break;
+      case "audiofadeout":
+        audioFadeOut = safeNumber(v, 0.1, 10, "Audio fade out");
+        audioMode = "encode";
         break;
       case "mute":
         audioMode = "mute";
@@ -238,6 +283,11 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
 
   if (gif && extractAudio) throw new Error("GIF සහ MP3 export එකම Job එකක කළ නොහැක. වෙන වෙනම Job දෙකක් කරන්න.");
   if (brightness !== 0 || contrast !== 1 || saturation !== 1) filters.push("eq=brightness=" + brightness + ":contrast=" + contrast + ":saturation=" + saturation);
+  const effectiveDuration = Math.max(0, (trimEnd !== null ? trimEnd - (trimStart || 0) : 0) || 0);
+  if (videoFadeIn) filters.push("fade=t=in:st=0:d=" + videoFadeIn);
+  if (videoFadeOut && effectiveDuration > videoFadeOut) filters.push("fade=t=out:st=" + (effectiveDuration - videoFadeOut) + ":d=" + videoFadeOut);
+  if (audioFadeIn) audioFilters.push("afade=t=in:st=0:d=" + audioFadeIn);
+  if (audioFadeOut && effectiveDuration > audioFadeOut) audioFilters.push("afade=t=out:st=" + (effectiveDuration - audioFadeOut) + ":d=" + audioFadeOut);
 
   if (extractAudio) {
     return { args: ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-codec:a", "libmp3lame", "-q:a", "3", output], outputFormat };
@@ -256,7 +306,8 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
     const color = textColor;
     const size = fontSize;
     const textfile = escapeFilterPath(textFile);
-    filters.push("drawtext=" + fontPart + "textfile='" + textfile + "':fontcolor=" + color + ":fontsize=" + size + ":borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-text_h-50");
+    const y = textPosition === "top" ? "50" : textPosition === "middle" ? "(h-text_h)/2" : "h-text_h-50";
+    filters.push("drawtext=" + fontPart + "textfile='" + textfile + "':fontcolor=" + color + ":fontsize=" + size + ":borderw=2:bordercolor=black:x=(w-text_w)/2:y=" + y);
   }
 
   if (!gif && filters.length) args.push("-vf", filters.join(","));
