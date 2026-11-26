@@ -121,7 +121,7 @@ async function startBot(authState = null) {
   await plugins?.onConnection?.(sock, config);
 
   sock.ev.on("creds.update", saveCreds);
-  sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
+  sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
     if (generation !== socketGeneration) return;
     if (qr && !state.creds.registered) {
       void requestPairingCode(sock, state, generation);
@@ -129,6 +129,30 @@ async function startBot(authState = null) {
     if (connection === "open") {
       reconnectAttempts = 0;
       console.log("✅ Hasa_2_bot connected. Pairing-code login only.");
+      if (config?.networkActivationPending && config?.publicBotId) {
+        const marker = "./data/network-activation-notified.json";
+        if (!fs.existsSync(marker)) {
+          const owner = Array.isArray(config.owner) ? config.owner.find(value => /^\d{8,15}$/.test(String(value))) : null;
+          if (owner) {
+            const text = [
+              "🎉 BOT ACTIVATED!", "",
+              "Your HASA WhatsApp Bot is now successfully ON.",
+              "Bot ID: " + config.publicBotId,
+              "Status: 🟢 ONLINE",
+              "Network: HASA BOT NETWORK", "",
+              "Now you can use your Bot!", "",
+              "⚡ POWERED BY HASA BOT NETWORK"
+            ].join(String.fromCharCode(10));
+            try {
+              await sock.sendMessage(owner + "@s.whatsapp.net", { text });
+              fs.writeFileSync(marker, JSON.stringify({ botId: config.publicBotId, sentAt: new Date().toISOString() }), { mode: 0o600 });
+              config.networkActivationPending = false;
+            } catch (error) {
+              logger.warn({ error: error.message, botId: config.publicBotId }, "Activation notification could not be sent; it will retry after reconnect");
+            }
+          }
+        }
+      }
       writeBotHealth("online");
       void plugins.onConnection?.(sock, config).catch(error => console.error("Plugin connection hook failed:", error.message));
       if (restoredSubbotsGeneration !== generation) {
