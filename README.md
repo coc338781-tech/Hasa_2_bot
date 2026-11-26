@@ -74,7 +74,7 @@ The CI suite installs FFmpeg and Whisper.cpp, builds the multilingual base model
   sudo apt-get install -y cmake build-essential
   git clone https://github.com/ggml-org/whisper.cpp.git /opt/whisper.cpp
   cmake -S /opt/whisper.cpp -B /opt/whisper.cpp/build -DWHISPER_BUILD_TESTS=OFF
-  cmake --build /opt/whisper.cpp/build -j2
+  cmake --build /opt/whisper.cpp/build -j1
   bash /opt/whisper.cpp/models/download-ggml-model.sh tiny
   ```
 - Set `videoStudio.whisperBinary` to `/opt/whisper.cpp/build/bin/whisper-cli` and `videoStudio.whisperModel` to `/opt/whisper.cpp/models/ggml-tiny.bin` in `config.json`. The default language is Sinhala (`si`) and Whisper is limited to two CPU threads by default.
