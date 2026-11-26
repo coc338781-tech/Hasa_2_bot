@@ -502,35 +502,41 @@ export async function getAiAutoEdit(input, workDir, config) {
   } catch {
     throw new Error("AI Auto Edit වෙතින් වලංගු edit plan එකක් ලැබුණේ නැහැ.");
   }
-  const brightness = Number(parsed.brightness);
-  const contrast = Number(parsed.contrast);
-  const saturation = Number(parsed.saturation);
-  const speed = Number(parsed.speed);
-  if (!Number.isFinite(brightness) || brightness < -0.1 || brightness > 0.1 ||
-      !Number.isFinite(contrast) || contrast < 0.9 || contrast > 1.2 ||
-      !Number.isFinite(saturation) || saturation < 0.8 || saturation > 1.3 ||
-      !Number.isFinite(speed) || speed < 0.8 || speed > 1.2) {
-    throw new Error("AI Auto Edit එකෙන් ලැබුණු අගයන් ආරක්ෂිත සීමාවෙන් පිටතයි.");
+  return normalizeAiEditPlan(parsed);
+}
+
+
+
+export function normalizeAiEditPlan(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("AI Auto Edit edit plan එක JSON object එකක් විය යුතුයි.");
   }
+  const bounded = (value, fallback, min, max) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(max, Math.max(min, number));
+  };
+  const brightness = bounded(parsed.brightness, 0, -0.1, 0.1);
+  const contrast = bounded(parsed.contrast, 1, 0.9, 1.2);
+  const saturation = bounded(parsed.saturation, 1, 0.8, 1.3);
+  const speed = bounded(parsed.speed, 1, 0.8, 1.2);
   const allowedFilters = ["none", "cinematic", "warm", "bw", "vintage"];
   const allowedFormats = ["original", "9:16", "16:9", "1:1"];
-  if (!allowedFilters.includes(parsed.filter) || !allowedFormats.includes(parsed.format)) {
-    throw new Error("AI Auto Edit එකෙන් නොදන්නා Filter හෝ Format එකක් ලැබුණා.");
-  }
+  const filter = allowedFilters.includes(parsed.filter) ? parsed.filter : "none";
+  const format = allowedFormats.includes(parsed.format) ? parsed.format : "original";
   const generated = [
-    { name: "filter", value: parsed.filter },
+    { name: "filter", value: filter },
     { name: "brightness", value: String(brightness) },
     { name: "contrast", value: String(contrast) },
     { name: "saturation", value: String(saturation) },
     { name: "speed", value: String(speed) }
   ];
-  if (parsed.format !== "original") generated.push({ name: "format", value: parsed.format });
+  if (format !== "original") generated.push({ name: "format", value: format });
   if (typeof parsed.caption === "string" && parsed.caption.trim()) {
     generated.push({ name: "caption", value: parsed.caption.trim().slice(0, 70) });
   }
   return generated;
 }
-
 
 export function buildTtsInteractionRequest(text, config = {}) {
   const style = String(config.videoStudio?.ttsStyle || "").trim();
