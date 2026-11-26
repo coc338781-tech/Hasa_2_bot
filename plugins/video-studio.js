@@ -176,7 +176,7 @@ function buildPlan(operations, input, output, workDir, config) {
         break;
       case "music":
         if (v.toLowerCase() === "remove" || v.toLowerCase() === "off") audioMode = "mute";
-        else if (/^https:\/\//i.test(v)) musicPath = v;
+        else if (/^https:\/\//i.test(v) || fs.existsSync(v)) musicPath = v;
         else throw new Error("Music සඳහා HTTPS audio URL එකක් හෝ 'music remove' දෙන්න.");
         break;
       case "musicvolume":
@@ -289,7 +289,7 @@ async function downloadMusic(url, destination) {
 }
 
 async function processJob(job) {
-  const { sock, jid, message, video, operations, config } = job;
+  const { sock, jid, message, video, config } = job;\n  let operations = job.operations;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-"));
   const input = path.join(dir, "input.mp4");
   const output = path.join(dir, operations.some(x => x.name === "gif") ? "output.gif" : operations.some(x => x.name === "extractaudio") ? "output.mp3" : "output.mp4");
