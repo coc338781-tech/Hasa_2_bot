@@ -36,7 +36,7 @@ try {
   ], { stdio: "pipe" });
 
   const failures = [];
-  console.log("TEST 1/2: Gemini 3.8 Flash visual auto-edit request...");
+  console.log("TEST 1/3: Gemini 3.8 Flash visual auto-edit request...");
   try {
     const plan = await getAiAutoEdit(video, dir, config);
     if (!Array.isArray(plan) || !plan.some(x => x.name === "filter") || !plan.some(x => x.name === "speed")) {
@@ -48,7 +48,7 @@ try {
     console.error("FAIL: " + failures[failures.length - 1]);
   }
 
-  console.log("TEST 2/2: Gemini 3.8 Flash TTS Sinhala voice generation...");
+  console.log("TEST 2/3: Gemini 3.8 Flash TTS Sinhala voice generation...");
   try {
     await generateVoiceover("ආයුබෝවන්! මෙය හසා වීඩියෝ ස්ටුඩියෝ සිංහල හඬ පරීක්ෂණයකි.", voice, config);
     const probe = JSON.parse(execFileSync("ffprobe", [
