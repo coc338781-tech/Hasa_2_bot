@@ -25,6 +25,10 @@ const HELP = `🎬 *HASA VIDEO STUDIO*
 .vedit rotate 90 | flip h | volume 70
 .vedit music URL | musicvolume 25
 .vedit music remove
+.vedit auto (Gemini visual auto edit)
+.vedit subtitle auto (Whisper)
+.vedit voiceover අද ලස්සන දවසක්
+.vedit thumbnail 00:05
 .vedit reverse
 .vedit gif
 .vedit extractaudio
@@ -430,7 +434,7 @@ async function getAiAutoEdit(input, workDir, config) {
   const imageData = fs.readFileSync(contactSheet).toString("base64");
   const ai = new GoogleGenerativeAI(apiKey);
   const model = ai.getGenerativeModel({
-    model: config.videoStudio?.aiModel || config.aiModel || "gemini-2.0-flash",
+    model: config.videoStudio?.aiModel || "gemini-3.8-flash",
     generationConfig: { responseMimeType: "application/json" }
   });
   const prompt = `Analyze this 3x3 contact sheet sampled from a user-provided video. Recommend a conservative, tasteful edit using ONLY the allowed options. Return JSON only with keys: brightness (-0.1..0.1), contrast (0.9..1.2), saturation (0.8..1.3), speed (0.8..1.2), filter ("none"|"cinematic"|"warm"|"bw"|"vintage"), format ("original"|"9:16"|"16:9"|"1:1"), caption (short Sinhala caption, maximum 70 characters). Do not invent events, people, identities, audio, dialogue, or facts. Prefer format "original" unless vertical social video is clearly appropriate. Do not include markdown.`;
