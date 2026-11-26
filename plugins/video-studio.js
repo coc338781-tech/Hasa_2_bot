@@ -4,7 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { downloadContentFromMessage } from "@whiskeysockets/baileys";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const run = promisify(execFile);
 const queue = [];
@@ -432,19 +432,20 @@ export async function getAiAutoEdit(input, workDir, config) {
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vf", "fps=1/3,scale=320:-1,tile=3x3", "-frames:v", "1", "-q:v", "4", contactSheet], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
   if (!fs.existsSync(contactSheet)) throw new Error("AI analysis සඳහා Video preview එකක් සකස් කළ නොහැක.");
   const imageData = fs.readFileSync(contactSheet).toString("base64");
-  const ai = new GoogleGenerativeAI(apiKey);
-  const model = ai.getGenerativeModel({
-    model: config.videoStudio?.aiModel || "gemini-3.8-flash",
-    generationConfig: { responseMimeType: "application/json" }
-  });
+  const ai = new GoogleGenAI({ apiKey });
+  const model = config.videoStudio?.aiModel || "gemini-3.8-flash";
   const prompt = `Analyze this 3x3 contact sheet sampled from a user-provided video. Recommend a conservative, tasteful edit using ONLY the allowed options. Return JSON only with keys: brightness (-0.1..0.1), contrast (0.9..1.2), saturation (0.8..1.3), speed (0.8..1.2), filter ("none"|"cinematic"|"warm"|"bw"|"vintage"), format ("original"|"9:16"|"16:9"|"1:1"), caption (short Sinhala caption, maximum 70 characters). Do not invent events, people, identities, audio, dialogue, or facts. Prefer format "original" unless vertical social video is clearly appropriate. Do not include markdown.`;
-  const result = await model.generateContent([
-    { inlineData: { mimeType: "image/jpeg", data: imageData } },
-    prompt
-  ]);
+  const result = await ai.models.generateContent({
+    model,
+    contents: [
+      { inlineData: { mimeType: "image/jpeg", data: imageData } },
+      { text: prompt }
+    ],
+    config: { responseMimeType: "application/json" }
+  });
   let parsed;
   try {
-    parsed = JSON.parse(result.response.text());
+    parsed = JSON.parse(result.text);
   } catch {
     throw new Error("AI Auto Edit වෙතින් වලංගු edit plan එකක් ලැබුණේ නැහැ.");
   }
