@@ -642,11 +642,12 @@ async function processJob(job) {
       const generated = await getAiAutoEdit(input, dir, config);
       operations = [...generated, ...operations.filter(x => x.name !== "auto")];
     }
-    const music = operations.find(x => x.name === "music" && /^https:\/\//i.test(x.value));
-    if (music) {
+    // The last music operation wins (so "music URL | music remove" really removes it).
+    const musicIndex = operations.map(x => x.name).lastIndexOf("music");
+    if (musicIndex >= 0 && /^https:\/\//i.test(operations[musicIndex].value)) {
       const musicFile = path.join(dir, "music-audio");
-      await downloadMusic(music.value, musicFile);
-      operations = operations.map(x => x.name === "music" ? { ...x, value: musicFile } : x);
+      await downloadMusic(operations[musicIndex].value, musicFile);
+      operations = operations.map((x, index) => index === musicIndex ? { ...x, value: musicFile } : x);
     }
     const plan = buildPlan(operations, input, output, dir, config, info.streams.some(s => s.codec_type === "audio"), info.duration);
     await run("ffmpeg", plan.args, { timeout: 8 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 });
