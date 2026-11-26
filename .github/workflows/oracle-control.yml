@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|video-studio-preflight|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit|dnf-cache-mitigate|scheduler-audit|remove-stale-cron|inspect-baileys-source) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|video-studio-preflight|video-studio-install-font|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit|dnf-cache-mitigate|scheduler-audit|remove-stale-cron|inspect-baileys-source) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -429,6 +429,25 @@ jobs:
               print_status || true
               ;;
             status)
+              print_status
+              ;;
+            video-studio-install-font)
+              echo "Install the official SIL Open Font License Noto Sans Sinhala variable font in opc's user font directory; no root access or bot/session changes."
+              FONT_DIR="$HOME/.local/share/fonts/hasa-video-studio"
+              TMP="$(mktemp -d)"
+              trap 'rm -rf "$TMP"' EXIT
+              FONT_URL="https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssinhala/NotoSansSinhala%5Bwdth%2Cwght%5D.ttf"
+              curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 "$FONT_URL" -o "$TMP/NotoSansSinhala.ttf"
+              test "$(git hash-object "$TMP/NotoSansSinhala.ttf")" = "4e65c3d072ed4759f6682b008af4087781c056ba"
+              curl --fail --location --retry 3 --connect-timeout 15 --max-time 60 "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssinhala/OFL.txt" -o "$TMP/OFL.txt"
+              mkdir -p "$FONT_DIR"
+              install -m 644 "$TMP/NotoSansSinhala.ttf" "$FONT_DIR/NotoSansSinhala.ttf"
+              install -m 644 "$TMP/OFL.txt" "$FONT_DIR/OFL.txt"
+              fc-cache -f "$FONT_DIR"
+              echo "=== VERIFIED SINHALA FONT ==="
+              fc-match "Noto Sans Sinhala" -f '%{family}|%{file}\\n'
+              test "$(fc-match "Noto Sans Sinhala" -f '%{file}')" = "$FONT_DIR/NotoSansSinhala.ttf"
+              echo "FONT_INSTALL=SUCCESS"
               print_status
               ;;
             video-studio-preflight)
