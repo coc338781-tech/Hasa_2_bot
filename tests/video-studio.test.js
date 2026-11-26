@@ -89,3 +89,23 @@ test("Gemini auto-edit values are clamped to safe bounds and missing values use 
     { name: "caption", value: "සිංහල caption" }
   ]);
 });
+
+test("Gemini auto-edit normalizer handles JSON strings, object arrays, and malformed responses safely", () => {
+  const wrapped = normalizeAiEditPlan(JSON.stringify(JSON.stringify({
+    filter: "warm", brightness: 0.05, contrast: 1.1, saturation: 1.2, speed: 1.05
+  })));
+  assert.ok(wrapped.some(item => item.name === "filter" && item.value === "warm"));
+  assert.ok(wrapped.some(item => item.name === "speed" && item.value === "1.05"));
+
+  const listed = normalizeAiEditPlan([null, { filter: "bw", format: "9:16" }]);
+  assert.ok(listed.some(item => item.name === "filter" && item.value === "bw"));
+  assert.ok(listed.some(item => item.name === "format" && item.value === "9:16"));
+
+  assert.deepEqual(normalizeAiEditPlan(null), [
+    { name: "filter", value: "none" },
+    { name: "brightness", value: "0" },
+    { name: "contrast", value: "1" },
+    { name: "saturation", value: "1" },
+    { name: "speed", value: "1" }
+  ]);
+});
