@@ -1,4 +1,4 @@
 {
-  "action": "video-studio-install-font",
-  "request_id": "hasa-video-sinhala-font-install-retry-20261126"
+  "action": "deploy",
+  "request_id": "hasa-video-studio-prod-deploy-retry-20261126"
 }
