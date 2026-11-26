@@ -68,12 +68,13 @@ The CI suite installs FFmpeg and Whisper.cpp, builds the multilingual base model
 - `.vedit auto` creates a small 3×3 contact sheet from the video and sends those preview frames to Gemini 3.8 Flash for a conservative visual edit plan. It requires `GEMINI_API_KEY`. This is an explicit cloud-processing command; do not use it for private footage unless you are comfortable sending preview frames to Google.
 - `.vedit voiceover <Sinhala text>` generates a Sinhala WAV voice-over with Gemini 3.8 Flash TTS and mixes it with the video audio. It requires `GEMINI_API_KEY`; generated speech is processed by Google.
 - `.vedit subtitle auto` runs local Whisper.cpp speech recognition in Sinhala and burns the generated SRT captions into the video. It does not send the video/audio to Gemini.
-- On Ubuntu/Debian, build Whisper.cpp and download a multilingual model (the base model is a lighter starting point):
+- Low-memory VPS setting: FFmpeg filter/encoder threads and Whisper threads default to 1; only one video job runs at a time. Video Studio rejects source dimensions above 1920px on either side. Reverse is limited to 15 seconds and downscales to 640×360 at 15 FPS before buffering, to avoid large RAM spikes.
+- For Sinhala auto-subtitles on a low-memory VPS, build Whisper.cpp and download the multilingual `tiny` model (lower RAM use; `base` may improve recognition but needs more memory):
   ```sh
   sudo apt-get install -y cmake build-essential
   git clone https://github.com/ggml-org/whisper.cpp.git /opt/whisper.cpp
   cmake -S /opt/whisper.cpp -B /opt/whisper.cpp/build -DWHISPER_BUILD_TESTS=OFF
   cmake --build /opt/whisper.cpp/build -j2
-  bash /opt/whisper.cpp/models/download-ggml-model.sh base
+  bash /opt/whisper.cpp/models/download-ggml-model.sh tiny
   ```
-- Set `videoStudio.whisperBinary` to `/opt/whisper.cpp/build/bin/whisper-cli` and `videoStudio.whisperModel` to `/opt/whisper.cpp/models/ggml-base.bin` in `config.json`. The default language is Sinhala (`si`) and Whisper is limited to two CPU threads by default.
+- Set `videoStudio.whisperBinary` to `/opt/whisper.cpp/build/bin/whisper-cli` and `videoStudio.whisperModel` to `/opt/whisper.cpp/models/ggml-tiny.bin` in `config.json`. The default language is Sinhala (`si`) and Whisper is limited to two CPU threads by default.
