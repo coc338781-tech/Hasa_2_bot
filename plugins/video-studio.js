@@ -32,6 +32,7 @@ const HELP = `🎬 *HASA VIDEO STUDIO*
 *Options:*
 quality 480|720|1080 | speed 0.25-4
 caption <සිංහල/English> | text <text> | textposition top/middle/bottom
+subtitle auto (Whisper model අවශ්‍යයි)
 trim <start> <end> | mute | volume 0-200 | pitch 0.5-2
 music <https URL>| music remove | musicvolume 0-100
 format 9:16|16:9|1:1 | crop | rotate 90|180|270
@@ -394,7 +395,7 @@ async function processJob(job) {
       const wav = path.join(dir, "speech.wav");
       const subtitleBase = path.join(dir, "generated-captions");
       await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
-      await run(config.videoStudio?.whisperBinary || "whisper-cli", ["-m", model, "-f", wav, "-osrt", "-of", subtitleBase], { timeout: 8 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+      await run(config.videoStudio?.whisperBinary || "whisper-cli", ["-m", model, "-f", wav, "-l", config.videoStudio?.whisperLanguage || "si", "-osrt", "-of", subtitleBase], { timeout: 8 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
       const subtitleFile = subtitleBase + ".srt";
       if (!fs.existsSync(subtitleFile) || !fs.statSync(subtitleFile).size) throw new Error("Whisper මඟින් Subtitle file එකක් නිර්මාණය වුණේ නැහැ.");
       operations = operations.filter(x => !(x.name === "subtitle" && x.value.toLowerCase() === "auto"));
