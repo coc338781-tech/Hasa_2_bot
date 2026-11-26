@@ -217,8 +217,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
       case "blur":
         filters.push("gblur=sigma=" + safeNumber(v, 0.1, 20, "Blur"));
         break;
-      case "compress":
-        if (v === "low") crf = 28;
+      case "compress":        if (v === "low") crf = 28;
         else if (v === "medium") crf = 23;
         else if (v === "high") crf = 18;
         else throw new Error("compress low/medium/high භාවිතා කරන්න.");
@@ -398,8 +397,11 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   } else {
     args.push("-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   }
-  if (gif) args.push("-loop", "0");
-  else if (outputFormat === "mp4") args.push("-movflags", "+faststart");
+  if (gif) {
+    // WhatsApp animated GIF messages are MP4 videos flagged for GIF playback.
+    args.push("-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast",
+      "-crf", String(crf), "-pix_fmt", "yuv420p", "-movflags", "+faststart");
+  } else if (outputFormat === "mp4") args.push("-movflags", "+faststart");
   if (trimEnd !== null) args.push("-t", String(trimEnd - trimStart));
   args.push(output);
   return { args, outputFormat };
@@ -437,8 +439,7 @@ export async function getAiAutoEdit(input, workDir, config) {
   const primaryModel = config.videoStudio?.aiModel || "gemini-3.8-flash";
   const models = [...new Set([primaryModel, "gemini-3.6-flash", "gemini-3.5-flash-lite"])];
   const prompt = `Analyze this 3x3 contact sheet sampled from a user-provided video. Recommend a conservative, tasteful edit using ONLY the allowed options. Return JSON only with keys: brightness (-0.1..0.1), contrast (0.9..1.2), saturation (0.8..1.3), speed (0.8..1.2), filter ("none"|"cinematic"|"warm"|"bw"|"vintage"), format ("original"|"9:16"|"16:9"|"1:1"), caption (short Sinhala caption, maximum 70 characters). Do not invent events, people, identities, audio, dialogue, or facts. Prefer format "original" unless vertical social video is clearly appropriate. Do not include markdown.`;
-  let result;
-  let lastError;
+  let result;  let lastError;
   for (const model of models) {
     let modelSucceeded = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -565,7 +566,7 @@ async function processJob(job) {
   let operations = job.operations;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-"));
   const input = path.join(dir, "input.mp4");
-  const output = path.join(dir, operations.some(x => x.name === "gif") ? "output.gif" : operations.some(x => x.name === "extractaudio") ? "output.mp3" : operations.some(x => x.name === "thumbnail") ? "thumbnail.jpg" : "output.mp4");
+  const output = path.join(dir, operations.some(x => x.name === "gif") ? "output.mp4" : operations.some(x => x.name === "extractaudio") ? "output.mp3" : operations.some(x => x.name === "thumbnail") ? "thumbnail.jpg" : "output.mp4");
   try {
     await sock.sendMessage(jid, { text: "⏳ *HASA VIDEO STUDIO*\nVideo එක Download කරලා Edit කරන්න සූදානම් කරනවා..." }, { quoted: message });
     await downloadMedia(video, "video", input, config.videoStudio?.maxInputBytes || MAX_INPUT_BYTES);
@@ -631,11 +632,22 @@ async function processJob(job) {
 async function drainQueue() {
   if (active) return;
   active = true;
-  while (queue.length) {
-    const job = queue.shift();
-    await processJob(job);
+  try {
+    while (queue.length) {
+      const job = queue.shift();
+      try {
+        await processJob(job);
+      } catch (error) {
+        console.error("[HASA VIDEO STUDIO] Queue worker failure:", error);
+        await job.sock.sendMessage(job.jid, {
+          text: "❌ *Video Edit අසාර්ථකයි*\\n" + (error.message || "Unknown error")
+        }, { quoted: job.message }).catch(() => {});
+      }
+    }
+  } finally {
+    active = false;
+    if (queue.length) void drainQueue();
   }
-  active = false;
 }
 
 export default async function videoStudio({ sock, message, config }) {
