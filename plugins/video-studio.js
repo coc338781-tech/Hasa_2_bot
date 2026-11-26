@@ -640,7 +640,7 @@ async function drainQueue() {
       } catch (error) {
         console.error("[HASA VIDEO STUDIO] Queue worker failure:", error);
         await job.sock.sendMessage(job.jid, {
-          text: "❌ *Video Edit අසාර්ථකයි*\\n" + (error.message || "Unknown error")
+          text: "❌ *Video Edit අසාර්ථකයි*\n" + (error.message || "Unknown error")
         }, { quoted: job.message }).catch(() => {});
       }
     }
