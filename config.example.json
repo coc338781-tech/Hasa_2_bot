@@ -38,7 +38,6 @@
   "videoStudio": {
     "enabled": true,
     "ownerOnly": true,
-    "fontFile": "/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf",
     "maxDurationSeconds": 900,
     "maxDimension": 1920,
     "maxInputBytes": 188743680,
@@ -50,6 +49,7 @@
     "ttsModel": "gemini-3.8-flash-tts",
     "ttsVoice": "Kore",
     "ttsStyle": "Natural, clear Sinhala narration with warm and friendly delivery",
-    "ffmpegThreads": 1
+    "ffmpegThreads": 1,
+    "fontName": "Noto Sans Sinhala"
   }
 }
