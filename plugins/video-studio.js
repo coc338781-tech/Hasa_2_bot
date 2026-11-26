@@ -63,17 +63,23 @@ function quotedVideo(message) {
     quoted.viewOnceMessageV2?.message?.videoMessage || null;
 }
 
-async function downloadMedia(media, type, destination) {
+async function downloadMedia(media, type, destination, maxBytes = MAX_INPUT_BYTES) {
   const stream = await downloadContentFromMessage(media, type);
-  const chunks = [];
   let total = 0;
-  for await (const chunk of stream) {
-    total += chunk.length;
-    if (total > MAX_INPUT_BYTES) throw new Error("ගොනුව 180MB සීමාව ඉක්මවයි.");
-    chunks.push(chunk);
+  const fd = fs.openSync(destination, "w", 0o600);
+  try {
+    for await (const chunk of stream) {
+      total += chunk.length;
+      if (total > maxBytes) throw new Error("ගොනුව " + Math.round(maxBytes / 1024 / 1024) + "MB සීමාව ඉක්මවයි.");
+      fs.writeSync(fd, chunk);
+    }
+  } catch (error) {
+    fs.rmSync(destination, { force: true });
+    throw error;
+  } finally {
+    fs.closeSync(fd);
   }
   if (!total) throw new Error("WhatsApp වෙතින් වීඩියෝ දත්ත ලැබුණේ නැහැ.");
-  fs.writeFileSync(destination, Buffer.concat(chunks), { mode: 0o600 });
   return total;
 }
 
@@ -112,7 +118,7 @@ async function probe(file) {
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration,size:stream=codec_type,width,height", "-of", "json", file], { timeout: 20000, maxBuffer: 2 * 1024 * 1024 });
   const data = JSON.parse(stdout);
   const duration = Number(data.format?.duration || 0);
-  if (!duration || duration > MAX_DURATION) throw new Error("වීඩියෝව හිස් හෝ විනාඩි 15 සීමාව ඉක්මවා ඇත.");
+  if (!duration || duration > (Number(process.env.HASA_VIDEO_MAX_DURATION) || MAX_DURATION)) throw new Error("වීඩියෝව හිස් හෝ විනාඩි 15 සීමාව ඉක්මවා ඇත.");
   return { duration, streams: data.streams || [] };
 }
 
@@ -343,6 +349,8 @@ async function downloadMusic(url, destination) {
     if (!response.ok) throw new Error("Music URL එකෙන් audio ලබාගන්න බැරි වුණා (" + response.status + ").");
     const type = response.headers.get("content-type") || "";
     if (!type.startsWith("audio/") && !/octet-stream/i.test(type)) throw new Error("URL එක audio file එකක් නොවේ.");
+    const declaredSize = Number(response.headers.get("content-length") || 0);
+    if (declaredSize > 30 * 1024 * 1024) throw new Error("Music file එක 30MB ඉක්මවයි.");
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!buffer.length || buffer.length > 30 * 1024 * 1024) throw new Error("Music file එක හිස් හෝ 30MB ඉක්මවයි.");
     fs.writeFileSync(destination, buffer, { mode: 0o600 });
@@ -359,7 +367,7 @@ async function processJob(job) {
   const output = path.join(dir, operations.some(x => x.name === "gif") ? "output.gif" : operations.some(x => x.name === "extractaudio") ? "output.mp3" : "output.mp4");
   try {
     await sock.sendMessage(jid, { text: "⏳ *HASA VIDEO STUDIO*\nVideo එක Download කරලා Edit කරන්න සූදානම් කරනවා..." }, { quoted: message });
-    await downloadMedia(video, "video", input);
+    await downloadMedia(video, "video", input, config.videoStudio?.maxInputBytes || MAX_INPUT_BYTES);
     const info = await probe(input);
     if (!info.streams.some(s => s.codec_type === "video")) throw new Error("Video track එකක් හමු වුණේ නැහැ.");
     const music = operations.find(x => x.name === "music" && /^https:\/\//i.test(x.value));
@@ -372,16 +380,16 @@ async function processJob(job) {
     await run("ffmpeg", plan.args, { timeout: 8 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 });
     const stat = fs.statSync(output);
     if (!stat.size || stat.size > MAX_OUTPUT_BYTES) throw new Error("Edited file එක හිස් හෝ 180MB සීමාව ඉක්මවා ඇත.");
-    const buffer = fs.readFileSync(output);
+    const mediaStream = fs.createReadStream(output);
     const caption = "✅ *HASA VIDEO STUDIO — EDIT COMPLETED*\n" +
       "🎬 " + operations.map(x => x.name).join(" + ") + "\n" +
       "⏱️ " + info.duration.toFixed(1) + "s";
     if (plan.outputFormat === "mp3") {
-      await sock.sendMessage(jid, { audio: buffer, mimetype: "audio/mpeg", fileName: "Hasa_Audio.mp3", caption }, { quoted: message });
+      await sock.sendMessage(jid, { audio: mediaStream, mimetype: "audio/mpeg", fileName: "Hasa_Audio.mp3", caption }, { quoted: message });
     } else if (plan.outputFormat === "gif") {
-      await sock.sendMessage(jid, { video: buffer, gifPlayback: true, caption }, { quoted: message });
+      await sock.sendMessage(jid, { video: mediaStream, gifPlayback: true, caption }, { quoted: message });
     } else {
-      await sock.sendMessage(jid, { video: buffer, mimetype: "video/mp4", fileName: "Hasa_Edited.mp4", caption }, { quoted: message });
+      await sock.sendMessage(jid, { video: mediaStream, mimetype: "video/mp4", fileName: "Hasa_Edited.mp4", caption }, { quoted: message });
     }
   } catch (error) {
     console.error("[HASA VIDEO STUDIO]", error);
