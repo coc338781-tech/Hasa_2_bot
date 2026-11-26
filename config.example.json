@@ -1,6 +1,8 @@
 {
   "prefix": ".",
-  "owner": ["947XXXXXXXX"],
+  "owner": [
+    "947XXXXXXXX"
+  ],
   "botName": "Hasa_2_bot",
   "autoReply": false,
   "autoStatusSeen": true,
@@ -18,5 +20,12 @@
   "autoVoice": false,
   "autoVoiceText": "Hello, I received your voice message.",
   "fastMode": true,
-  "downloadDir": "downloads"
+  "downloadDir": "downloads",
+  "videoStudio": {
+    "enabled": true,
+    "ownerOnly": true,
+    "fontFile": "/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf",
+    "maxDurationSeconds": 900,
+    "maxInputBytes": 188743680
+  }
 }
