@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hasa2-oracle-control
+  group: hasa2-oracle-control-${{ github.event.head_commit.id }}
   cancel-in-progress: false
 
 jobs:
