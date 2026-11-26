@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseOperations, parseTime, buildPlan, buildTtsInteractionRequest, extractTtsAudio, normalizeAiEditPlan } from "../plugins/video-studio.js";
+import { Readable } from "node:stream";
+import { parseOperations, parseTime, buildPlan, buildTtsInteractionRequest, extractTtsAudio, normalizeAiEditPlan, asBaileysStream } from "../plugins/video-studio.js";
+
+test("Baileys 7 media uploads receive readable streams in the required object shape", () => {
+  const stream = Readable.from([Buffer.from("test-video")]);
+  const upload = asBaileysStream(stream);
+  assert.deepEqual(Object.keys(upload), ["stream"]);
+  assert.equal(upload.stream, stream);
+  assert.throws(() => asBaileysStream(undefined), /stream is invalid/);
+});
 
 test("parseOperations keeps multi-word Sinhala captions and splits chained edits", () => {
   assert.deepEqual(parseOperations("quality 1080 | speed 0.8 | caption අද මගේ ලස්සන දවස | mute"), [
