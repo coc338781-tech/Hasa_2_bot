@@ -1,0 +1,21 @@
+name: Video Studio Validation
+
+on:
+  pull_request:
+    branches:
+      - fix/pairing-baileys-7rc14-test
+  push:
+    branches:
+      - feature/hasa-video-studio
+
+jobs:
+  syntax-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run check
