@@ -512,6 +512,7 @@ export function normalizeAiEditPlan(parsed) {
     throw new Error("AI Auto Edit edit plan එක JSON object එකක් විය යුතුයි.");
   }
   const bounded = (value, fallback, min, max) => {
+    if (value === null || value === undefined || value === "") return fallback;
     const number = Number(value);
     if (!Number.isFinite(number)) return fallback;
     return Math.min(max, Math.max(min, number));
