@@ -81,3 +81,20 @@ test("GIF export produces an MP4 video suitable for WhatsApp GIF playback", { sk
   assert.ok(data.streams.some(stream => stream.codec_type === "video" && stream.codec_name === "h264"));
   assert.ok(!data.streams.some(stream => stream.codec_type === "audio"));
 });
+
+test("thumbnail export produces a valid JPEG at the requested timestamp", { skip: !ffmpegAvailable }, async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-thumbnail-test-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const input = await makeSample(dir);
+  const output = path.join(dir, "thumbnail.jpg");
+  const plan = buildPlan(parseOperations("thumbnail 00:01"), input, output, dir,
+    { videoStudio: { ffmpegThreads: 1 } }, true, 2);
+  await run("ffmpeg", plan.args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
+  assert.ok(fs.statSync(output).size > 1000);
+  const { stdout } = await run("ffprobe", [
+    "-v", "error", "-show_entries", "stream=codec_name,width,height",
+    "-of", "json", output
+  ]);
+  const streams = JSON.parse(stdout).streams;
+  assert.ok(streams.some(stream => stream.codec_name === "mjpeg" && stream.width === 320 && stream.height === 240));
+});
