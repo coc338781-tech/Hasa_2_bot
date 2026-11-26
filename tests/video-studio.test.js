@@ -109,3 +109,22 @@ test("Gemini auto-edit normalizer handles JSON strings, object arrays, and malfo
     { name: "speed", value: "1" }
   ]);
 });
+
+
+test("FFmpeg uses single-thread filters and encoders by default", () => {
+  const plan = buildPlan([{ name: "quality", value: "720" }], "/tmp/input.mp4", "/tmp/output.mp4", "/tmp", {}, true, 2);
+  assert.ok(plan.args.includes("-filter_threads"));
+  assert.equal(plan.args[plan.args.indexOf("-filter_threads") + 1], "1");
+  assert.ok(plan.args.includes("-filter_complex_threads"));
+  assert.equal(plan.args[plan.args.indexOf("-filter_complex_threads") + 1], "1");
+  assert.equal(plan.args[plan.args.indexOf("-threads") + 1], "1");
+});
+
+test("Reverse editing is bounded to 15 seconds and downscales before frame buffering", () => {
+  const plan = buildPlan([{ name: "reverse", value: "" }], "/tmp/input.mp4", "/tmp/output.mp4", "/tmp", {}, true, 15);
+  const filters = plan.args[plan.args.indexOf("-vf") + 1];
+  assert.match(filters, /scale=640:360/);
+  assert.match(filters, /fps=15/);
+  assert.match(filters, /reverse/);
+  assert.throws(() => buildPlan([{ name: "reverse", value: "" }], "/tmp/input.mp4", "/tmp/output.mp4", "/tmp", {}, true, 15.1), /15/);
+});
