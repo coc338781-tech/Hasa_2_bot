@@ -368,8 +368,8 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
     const subtitleFile = path.join(workDir, "caption-" + i + ".ass");
     const color = ({ white: "&H00FFFFFF", yellow: "&H0000FFFF", red: "&H000000FF", blue: "&H00FF0000", green: "&H0000FF00" })[textColor] || "&H00FFFFFF";
     const alignment = textPosition === "top" ? 8 : textPosition === "middle" ? 5 : 2;
-    const fontName = String(config.videoStudio?.fontName || "Noto Sans Sinhala").replace(/[\\r\\n,]/g, " ");
-    const safeCaption = String(captions[i]).replace(/\\r\\n?/g, "\\n").replace(/\\n/g, "\\N").replace(/[{}]/g, " ");
+    const fontName = String(config.videoStudio?.fontName || "Noto Sans Sinhala").replace(/[\r\n,]/g, " ");
+    const safeCaption = String(captions[i]).replace(/\r\n?/g, "\n").replace(/\n/g, "\\N").replace(/[{}]/g, " ");
     const ass = [
       "[Script Info]",
       "ScriptType: v4.00+",
@@ -385,7 +385,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
       "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
       "Dialogue: 0,0:00:00.00,0:15:00.00,Default,,0,0,0,," + safeCaption,
       ""
-    ].join("\\n");
+    ].join("\n");
     fs.writeFileSync(subtitleFile, ass, { encoding: "utf8", mode: 0o600 });
     filters.push("subtitles=filename='" + escapeFilterPath(subtitleFile) + "'");
   }
