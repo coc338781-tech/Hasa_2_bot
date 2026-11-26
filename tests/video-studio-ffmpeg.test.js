@@ -29,6 +29,10 @@ test("FFmpeg applies a chained multi-edit job in one export", { skip: !ffmpegAva
   const output = path.join(dir, "edited.mp4");
   const operations = parseOperations("trim 00:00.5 00:01.5 | quality 480 | speed 0.8 | caption HASA STUDIO | filter cinematic | volume 70 | audiofadein 0.2 | format 9:16");
   const plan = buildPlan(operations, input, output, dir, { videoStudio: { ffmpegThreads: 1 } }, true, 2);
+  const videoFilters = plan.args[plan.args.indexOf("-vf") + 1];
+  assert.match(videoFilters, /subtitles=filename=/);
+  const captionFile = path.join(dir, "caption-0.ass");
+  assert.match(fs.readFileSync(captionFile, "utf8"), /HASA STUDIO/);
   await run("ffmpeg", plan.args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ok(fs.statSync(output).size > 1000);
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "json", output]);

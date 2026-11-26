@@ -363,15 +363,31 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   }
 
   for (let i = 0; i < captions.length; i++) {
-    const textFile = path.join(workDir, "caption-" + i + ".txt");
-    fs.writeFileSync(textFile, captions[i], { encoding: "utf8", mode: 0o600 });
-    const font = config.videoStudio?.fontFile || "/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf";
-    const fontPart = fs.existsSync(font) ? "fontfile='" + escapeFilterPath(font) + "':" : "";
-    const color = textColor;
-    const size = fontSize;
-    const textfile = escapeFilterPath(textFile);
-    const y = textPosition === "top" ? "50" : textPosition === "middle" ? "(h-text_h)/2" : "h-text_h-50";
-    filters.push("drawtext=" + fontPart + "textfile='" + textfile + "':fontcolor=" + color + ":fontsize=" + size + ":borderw=2:bordercolor=black:x=(w-text_w)/2:y=" + y);
+    // Use libass subtitles rather than drawtext: some production FFmpeg builds
+    // ship libass/freetype but omit the drawtext filter.
+    const subtitleFile = path.join(workDir, "caption-" + i + ".ass");
+    const color = ({ white: "&H00FFFFFF", yellow: "&H0000FFFF", red: "&H000000FF", blue: "&H00FF0000", green: "&H0000FF00" })[textColor] || "&H00FFFFFF";
+    const alignment = textPosition === "top" ? 8 : textPosition === "middle" ? 5 : 2;
+    const fontName = String(config.videoStudio?.fontName || "Noto Sans Sinhala").replace(/[\r\n,]/g, " ");
+    const safeCaption = String(captions[i]).replace(/\r\n?/g, "\n").replace(/\n/g, "\\N").replace(/[{}]/g, " ");
+    const ass = [
+      "[Script Info]",
+      "ScriptType: v4.00+",
+      "PlayResX: 1920",
+      "PlayResY: 1080",
+      "ScaledBorderAndShadow: yes",
+      "",
+      "[V4+ Styles]",
+      "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+      "Style: Default," + fontName + "," + fontSize + "," + color + ",&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,0," + alignment + ",30,30,50,1",
+      "",
+      "[Events]",
+      "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+      "Dialogue: 0,0:00:00.00,0:15:00.00,Default,,0,0,0,," + safeCaption,
+      ""
+    ].join("\n");
+    fs.writeFileSync(subtitleFile, ass, { encoding: "utf8", mode: 0o600 });
+    filters.push("subtitles=filename='" + escapeFilterPath(subtitleFile) + "'");
   }
 
   if (trimStart !== null) args.splice(4, 0, "-ss", String(trimStart));
