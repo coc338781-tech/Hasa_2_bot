@@ -617,7 +617,7 @@ async function processJob(job) {
     } else if (plan.outputFormat === "jpg") {
       await sock.sendMessage(jid, { image: mediaStream, caption: "🖼️ *HASA VIDEO STUDIO — THUMBNAIL READY*" }, { quoted: message });
     } else if (plan.outputFormat === "gif") {
-      await sock.sendMessage(jid, { video: mediaStream, gifPlayback: true, caption }, { quoted: message });
+      await sock.sendMessage(jid, { video: mediaStream, mimetype: "video/mp4", fileName: "Hasa_Animation.mp4", gifPlayback: true, caption }, { quoted: message });
     } else {
       await sock.sendMessage(jid, { video: mediaStream, mimetype: "video/mp4", fileName: "Hasa_Edited.mp4", caption }, { quoted: message });
     }
