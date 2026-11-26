@@ -1,4 +1,4 @@
 {
-  "action": "deploy",
-  "request_id": "hasa-video-studio-prod-deploy-20261126"
+  "action": "video-studio-preflight",
+  "request_id": "video-studio-ffmpeg-audit-20261126"
 }
