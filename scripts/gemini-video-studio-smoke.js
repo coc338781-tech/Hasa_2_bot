@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { getAiAutoEdit, generateVoiceover, generateWhisperSubtitles } from "../plugins/video-studio.js";
+import { getAiAutoEdit, generateVoiceover, generateWhisperSubtitles, buildPlan } from "../plugins/video-studio.js";
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -42,7 +42,13 @@ try {
     if (!Array.isArray(plan) || !plan.some(x => x.name === "filter") || !plan.some(x => x.name === "speed")) {
       throw new Error("Gemini Flash returned an incomplete or invalid edit plan.");
     }
-    console.log("PASS: Gemini 3.8 Flash returned a validated edit plan (" + plan.map(x => x.name).join(", ") + ").");
+    const autoEdited = path.join(dir, "gemini-auto-edited.mp4");
+    const ffmpegPlan = buildPlan(plan, video, autoEdited, dir, config, true, 6);
+    execFileSync("ffmpeg", ffmpegPlan.args, { stdio: "pipe" });
+    if (!fs.existsSync(autoEdited) || fs.statSync(autoEdited).size < 1024) {
+      throw new Error("Gemini's edit plan could not be rendered by FFmpeg.");
+    }
+    console.log("PASS: Gemini 3.8 Flash plan rendered successfully with FFmpeg (" + plan.map(x => x.name).join(", ") + ").");
   } catch (error) {
     failures.push("Gemini Flash visual auto-edit: " + (error.message || error));
     console.error("FAIL: " + failures[failures.length - 1]);
@@ -79,10 +85,19 @@ try {
     ], { stdio: "pipe" });
     const subtitleFile = await generateWhisperSubtitles(speechVideo, dir, config);
     const subtitles = fs.readFileSync(subtitleFile, "utf8");
-    if (!subtitles.trim() || !/\d{2}:\d{2}:\d{2},\d{3}\s+-->\s+\d{2}:\d{2}:\d{2},\d{3}/.test(subtitles)) {
-      throw new Error("Whisper did not produce a valid timed SRT subtitle file.");
+    const subtitleLines = subtitles.split(/\r?\n/).map(line => line.trim()).filter(line =>
+      line && !/^\d+$/.test(line) && !/^\d{2}:\d{2}:\d{2},\d{3}\s+-->/.test(line)
+    );
+    if (!subtitles.trim() || !/\d{2}:\d{2}:\d{2},\d{3}\s+-->\s+\d{2}:\d{2}:\d{2},\d{3}/.test(subtitles) || !subtitleLines.length) {
+      throw new Error("Whisper did not produce a valid timed SRT subtitle with recognized text.");
     }
-    console.log("PASS: Whisper.cpp generated Sinhala SRT subtitles (" + fs.statSync(subtitleFile).size + " bytes).");
+    const subtitledVideo = path.join(dir, "whisper-subtitled.mp4");
+    const subtitlePlan = buildPlan([{ name: "subtitlefile", value: subtitleFile }], speechVideo, subtitledVideo, dir, config, true, 6);
+    execFileSync("ffmpeg", subtitlePlan.args, { stdio: "pipe" });
+    if (!fs.existsSync(subtitledVideo) || fs.statSync(subtitledVideo).size < 1024) {
+      throw new Error("FFmpeg could not burn the generated Sinhala SRT into the video.");
+    }
+    console.log("PASS: Whisper.cpp generated SRT subtitles and FFmpeg burned them into video (" + fs.statSync(subtitleFile).size + " bytes).");
   } catch (error) {
     failures.push("Whisper Sinhala subtitles: " + (error.message || error));
     console.error("FAIL: " + failures[failures.length - 1]);
