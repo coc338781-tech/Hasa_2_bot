@@ -178,7 +178,7 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
         audioMode = "encode";
         break;
       case "music":
-        if (v.toLowerCase() === "remove" || v.toLowerCase() === "off") audioMode = "mute";
+        if (v.toLowerCase() === "remove" || v.toLowerCase() === "off") { musicPath = null; audioMode = "mute"; }
         else if (/^https:\/\//i.test(v) || v.startsWith(workDir + path.sep)) musicPath = v;
         else throw new Error("Music සඳහා HTTPS audio URL එකක් හෝ 'music remove' දෙන්න.");
         break;
@@ -262,13 +262,15 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
   if (!gif && filters.length) args.push("-vf", filters.join(","));
   if (gif) {
     args.push("-an", "-vf", [...filters, "fps=12,scale=480:-1:flags=lanczos"].join(","));
+  } else if (musicPath) {
+    args.push("-stream_loop", "-1", "-i", musicPath);
+    if (hasAudio && audioMode !== "mute") {
+      const sourceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
+      args.push("-filter_complex", "[0:a]" + sourceFilters + "anull[original];[1:a]volume=" + musicVolume + "[music];[original][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");
+    } else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);
+    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-shortest");
   } else if (audioMode === "mute") {
     args.push("-an");
-  } else if (musicPath) {
-    args.push("-i", musicPath);
-    if (hasAudio) args.push("-filter_complex", "[1:a]volume=" + musicVolume + "[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");
-    else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);
-    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-shortest");
   } else if (audioFilters.length) {
     args.push("-af", audioFilters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac");
   } else {
