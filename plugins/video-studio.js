@@ -169,6 +169,10 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
         audioMode = "encode";
         break;
       }
+      case "subtitlefile":
+        if (!v || !v.startsWith(workDir + path.sep) || !fs.existsSync(v)) throw new Error("Subtitle file එක හමු වුණේ නැහැ.");
+        filters.push("subtitles=filename='" + escapeFilterPath(v) + "':force_style='FontName=Noto Sans Sinhala,FontSize=22,Alignment=2,MarginV=40'");
+        break;
       case "caption":
       case "text":
         if (!v) throw new Error("Caption/Text එක හිස්.");
@@ -381,6 +385,21 @@ async function processJob(job) {
     await downloadMedia(video, "video", input, config.videoStudio?.maxInputBytes || MAX_INPUT_BYTES);
     const info = await probe(input, config.videoStudio?.maxDurationSeconds || MAX_DURATION);
     if (!info.streams.some(s => s.codec_type === "video")) throw new Error("Video track එකක් හමු වුණේ නැහැ.");
+    const autoSubtitle = operations.filter(x => x.name === "subtitle" && x.value.toLowerCase() === "auto");
+    if (autoSubtitle.length) {
+      const model = config.videoStudio?.whisperModel;
+      if (!model || !fs.existsSync(model)) throw new Error("Auto Sinhala Subtitle සඳහා whisper.cpp model එකක් අවශ්‍යයි. config.json තුළ videoStudio.whisperModel සකසන්න.");
+      if (!info.streams.some(s => s.codec_type === "audio")) throw new Error("මේ වීඩියෝවේ කථන Audio track එකක් නැහැ.");
+      if (info.duration > 300) throw new Error("Auto Subtitle සඳහා දැනට වීඩියෝව විනාඩි 5කට අඩු විය යුතුයි.");
+      const wav = path.join(dir, "speech.wav");
+      const subtitleBase = path.join(dir, "generated-captions");
+      await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+      await run(config.videoStudio?.whisperBinary || "whisper-cli", ["-m", model, "-f", wav, "-osrt", "-of", subtitleBase], { timeout: 8 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+      const subtitleFile = subtitleBase + ".srt";
+      if (!fs.existsSync(subtitleFile) || !fs.statSync(subtitleFile).size) throw new Error("Whisper මඟින් Subtitle file එකක් නිර්මාණය වුණේ නැහැ.");
+      operations = operations.filter(x => !(x.name === "subtitle" && x.value.toLowerCase() === "auto"));
+      operations.push({ name: "subtitlefile", value: subtitleFile });
+    }
     const music = operations.find(x => x.name === "music" && /^https:\/\//i.test(x.value));
     if (music) {
       const musicFile = path.join(dir, "music-audio");
