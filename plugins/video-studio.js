@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { downloadContentFromMessage } from "@whiskeysockets/baileys";
@@ -295,7 +294,8 @@ async function downloadMusic(url, destination) {
 }
 
 async function processJob(job) {
-  const { sock, jid, message, video, config } = job;\n  let operations = job.operations;
+  const { sock, jid, message, video, config } = job;
+  let operations = job.operations;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-"));
   const input = path.join(dir, "input.mp4");
   const output = path.join(dir, operations.some(x => x.name === "gif") ? "output.gif" : operations.some(x => x.name === "extractaudio") ? "output.mp3" : "output.mp4");
