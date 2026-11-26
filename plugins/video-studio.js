@@ -322,6 +322,8 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   }
 
   if (gif && extractAudio) throw new Error("GIF සහ MP3 export එකම Job එකක කළ නොහැක. වෙන වෙනම Job දෙකක් කරන්න.");
+  if (extractAudio && (voiceoverPath || musicPath)) throw new Error("MP3 extraction එක වෙනම Job එකක කරන්න; Music/Voice-over සමඟ එකතු කළ නොහැක.");
+  if (gif && (voiceoverPath || musicPath)) throw new Error("GIF එකකට Audio track එකක් එක් කළ නොහැක.");
   if (thumbnailAt !== null) {
     if (operations.length !== 1) throw new Error("Thumbnail export එක වෙනත් edits සමඟ එකම Job එකක කළ නොහැක. .vedit thumbnail 00:05 ලෙස වෙනම කරන්න.");
     return { args: ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(thumbnailAt), "-i", input, "-frames:v", "1", "-q:v", "2", output], outputFormat };
@@ -335,7 +337,6 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
 
   if (extractAudio) {
     if (trimStart !== null) args.splice(4, 0, "-ss", String(trimStart));
-    if (trimEnd !== null) args.push("-t", String(trimEnd - trimStart));
     if (muteOriginal) throw new Error("Mute සහ MP3 extraction එක එකම Job එකක කළ නොහැක.");
     if (!hasAudio) throw new Error("මේ වීඩියෝ එකේ Audio track එකක් නැහැ.");
     args.push("-vn");
@@ -363,7 +364,6 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   }
 
   if (trimStart !== null) args.splice(4, 0, "-ss", String(trimStart));
-  if (trimEnd !== null) args.push("-t", String(trimEnd - trimStart));
   if (voiceoverPath && musicPath) throw new Error("Voice-over සහ Music file එකම Job එකක දැනට එකතු කළ නොහැක.");
   if (!gif && filters.length) args.push("-vf", filters.join(","));
   if (gif) {
@@ -393,6 +393,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   }
   if (gif) args.push("-loop", "0");
   else if (outputFormat === "mp4") args.push("-movflags", "+faststart");
+  if (trimEnd !== null) args.push("-t", String(trimEnd - trimStart));
   args.push(output);
   return { args, outputFormat };
 }
