@@ -352,6 +352,7 @@ export default async function videoStudio({ sock, message, config }) {
   const [command, ...rest] = body.slice(prefix.length).trim().split(/\s+/);
   if (!["vedit", "vhelp", "videohelp"].includes((command || "").toLowerCase())) return;
   const argText = body.slice(prefix.length).trim().replace(/^\S+\s*/, "");
+  if (config.videoStudio?.enabled === false) return sock.sendMessage(jid, { text: "⛔ HASA VIDEO STUDIO දැනට අක්‍රිය කර ඇත." }, { quoted: message });
   if (!argText || /^help$/i.test(argText)) {
     return sock.sendMessage(jid, { text: HELP }, { quoted: message });
   }
