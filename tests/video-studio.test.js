@@ -74,7 +74,7 @@ test("Gemini auto-edit values are clamped to safe bounds and missing values use 
   const plan = normalizeAiEditPlan({
     brightness: 9,
     contrast: -4,
-    saturation: "not-a-number",
+    saturation: null,
     speed: 0,
     filter: "unexpected",
     format: "unexpected",
