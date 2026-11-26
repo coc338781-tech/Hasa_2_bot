@@ -53,6 +53,13 @@ const CATEGORIES = {
   "8": ["PERSONAL ASSISTANT", [
     ".personalhelp", ".contact <name or number>", ".today",
     ".sendto <name or number> | <message>", ".smartreply on/off"
+  ]],
+  "9": ["🎬 HASA VIDEO STUDIO", [
+    ".vedit help", ".vedit quality 1080 | speed 0.8 | caption සිංහල වාක්‍යය",
+    ".vedit trim 00:05 00:25 | mute | format 9:16",
+    ".vedit filter cinematic | brightness 0.1 | contrast 1.2",
+    ".vedit music <HTTPS audio URL> | musicvolume 25",
+    ".vedit rotate 90 | flip h | reverse", ".vedit gif", ".vedit extractaudio"
   ]]
 };
 
@@ -130,7 +137,8 @@ function makeMainMenu(config) {
     "5   AUTO REPLY",
     "6   OWNER & SETTINGS",
     "7   SUBBOT",
-    "8   PERSONAL ASSISTANT"
+    "8   PERSONAL ASSISTANT",
+    "9   🎬 HASA VIDEO STUDIO"
   ];
   return [
     "*HELLO! WELCOME TO HASA 2 BOT*",
