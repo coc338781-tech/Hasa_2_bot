@@ -265,4 +265,111 @@ export function createPostgresProvisioningStore(pool) {
         }
         const active = await client.query(
           `SELECT 1 FROM provisioning_jobs WHERE bot_instance_id = $1
-      "ã≠¶ÎmÆÈ‹j◊ù
+            AND job_type IN ('instance_start','instance_stop','instance_restart')
+            AND status IN ('queued','leased','running') LIMIT 1`, [bot.id]);
+        if (active.rowCount) { await client.query("ROLLBACK"); return { ok: false, reason: "action_already_queued" }; }
+        const jobId = randomUUID();
+        await client.query(
+          `INSERT INTO provisioning_jobs (id, server_id, bot_instance_id, customer_id, job_type, payload)
+           VALUES ($1, $2, $3, $4, $5, '{}'::jsonb)`,
+          [jobId, bot.server_id, bot.id, bot.customer_id, jobType]);
+        await client.query("UPDATE bot_instances SET status = 'provisioning', updated_at = now() WHERE id = $1", [bot.id]);
+        await client.query(
+          `INSERT INTO audit_events (action, resource_type, resource_id, outcome, metadata)
+           VALUES ($3, 'bot_instance', $1, 'queued', jsonb_build_object('action', $2))`,
+          [bot.id, action, customerId ? "bot.customer_action" : "bot.owner_action"]);
+        await client.query("COMMIT");
+        return { ok: true, job_id: jobId, status: "queued" };
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
+    async listBots() {
+      const result = await pool.query(
+        `SELECT b.id, b.public_id, b.customer_id, c.display_name, c.phone_e164, b.status, b.whatsapp_registered, b.runtime_provisioned,
+                b.server_id, s.label AS server_label, s.status AS server_status,
+                b.release_version, b.last_started_at, b.last_stopped_at, b.last_error_code
+           FROM bot_instances b
+           JOIN customers c ON c.id = b.customer_id
+           LEFT JOIN servers s ON s.id = b.server_id
+          ORDER BY b.created_at DESC LIMIT 1000`);
+      return result.rows;
+    },
+    async listInstancesForServer(serverId) {
+      const result = await pool.query(
+        `SELECT id, status FROM bot_instances
+          WHERE server_id = $1 AND status IN ('online','provisioning')
+          ORDER BY updated_at DESC LIMIT 500`, [serverId]);
+      return result.rows;
+    },
+    async updateBotStatusForServer({ instanceId, serverId, status, errorCode = null }) {
+      if (!["online", "provisioning", "offline", "failed"].includes(status)) return false;
+      const result = await pool.query(
+        `UPDATE bot_instances SET status = $3, last_error_code = $4,
+           whatsapp_registered = CASE WHEN $4 = 'whatsapp_session_invalid' THEN false ELSE whatsapp_registered END,
+           last_started_at = CASE WHEN $3 = 'online' THEN now() ELSE last_started_at END,
+           last_stopped_at = CASE WHEN $3 = 'offline' THEN now() ELSE last_stopped_at END,
+           updated_at = now()
+          WHERE id = $1 AND server_id = $2 RETURNING id`,
+        [instanceId, serverId, status, errorCode]);
+      return result.rowCount === 1;
+    },
+    async getJobForServer(jobId, serverId) {
+      const result = await pool.query(
+        `SELECT id, server_id, bot_instance_id, customer_id, job_type, status, payload
+           FROM provisioning_jobs WHERE id = $1 AND server_id = $2 LIMIT 1`, [jobId, serverId]);
+      return result.rows[0] || null;
+    },
+    async updatePairingStatus(pairingId, customerId, status, failureCode = null) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        if (status === "offline") {
+          const pending = await client.query(
+            `UPDATE pairing_requests SET status = 'failed', failure_code = $3, updated_at = now()
+              WHERE id = $1 AND customer_id = $2 AND status IN ('queued','generating','code_ready')
+              RETURNING bot_instance_id`, [pairingId, customerId, failureCode || "whatsapp_disconnected"]);
+          if (pending.rowCount) {
+            await client.query("UPDATE bot_instances SET status = 'offline', last_error_code = $2, updated_at = now() WHERE id = $1",
+              [pending.rows[0].bot_instance_id, failureCode || "whatsapp_disconnected"]);
+          }
+          const changed = pending.rowCount ? pending : await client.query(
+            `UPDATE bot_instances b SET status = 'offline', last_stopped_at = now(), updated_at = now()
+              FROM pairing_requests p
+             WHERE p.id = $1 AND p.customer_id = $2 AND p.bot_instance_id = b.id AND p.status = 'paired'
+             RETURNING b.id`, [pairingId, customerId]);
+          await client.query("COMMIT");
+          return changed.rowCount === 1;
+        }
+        if (!["paired","expired","failed"].includes(status)) { await client.query("ROLLBACK"); return false; }
+        const current = await client.query("SELECT status FROM pairing_requests WHERE id = $1 AND customer_id = $2 FOR UPDATE", [pairingId, customerId]);
+        if (!current.rowCount) { await client.query("ROLLBACK"); return false; }
+        if (status === "paired" && current.rows[0].status === "paired") { await client.query("COMMIT"); return true; }
+        const result = await client.query(
+          `UPDATE pairing_requests SET status = $3, failure_code = $4,
+             paired_at = CASE WHEN $3 = 'paired' THEN now() ELSE paired_at END, updated_at = now()
+            WHERE id = $1 AND customer_id = $2 AND status IN ('queued','generating','code_ready')
+            RETURNING bot_instance_id`,
+          [pairingId, customerId, status, failureCode]);
+        if (result.rowCount !== 1) { await client.query("ROLLBACK"); return false; }
+        const botId = result.rows[0].bot_instance_id;
+        if (status === "paired") {
+          await client.query(
+            "UPDATE bot_instances SET status = 'offline', whatsapp_registered = true, public_id = COALESCE(public_id, 'HASA-' || lpad(nextval('hasa_bot_public_id_seq')::text, 4, '0')), last_error_code = NULL, updated_at = now() WHERE id = $1",
+            [botId]);
+        } else {
+          await client.query("UPDATE bot_instances SET status = 'offline', last_error_code = $2, updated_at = now() WHERE id = $1", [botId, failureCode || null]);
+        }
+        await client.query("COMMIT");
+        return true;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
+    async markCodeReady(pairingId, customerId) {
+      const result = await pool.query(
+        `UPDATE pairing_requests SET status = 'code_ready', updated_at = now()
+          WHERE id = $1 AND customer_id = $2 AND status = 'generating' RETURNING id`,
+        [pairingId, customerId]);
+      return result.rowCount === 1;
+    }
+  };
+}
