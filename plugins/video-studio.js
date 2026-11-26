@@ -508,9 +508,14 @@ export async function getAiAutoEdit(input, workDir, config) {
 
 
 export function normalizeAiEditPlan(parsed) {
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("AI Auto Edit edit plan එක JSON object එකක් විය යුතුයි.");
+  // Gemini may wrap JSON in a string or return a list; safely select an object when present.
+  if (typeof parsed === "string") {
+    try { parsed = JSON.parse(parsed); } catch { parsed = null; }
   }
+  if (Array.isArray(parsed)) {
+    parsed = parsed.find(item => item && typeof item === "object" && !Array.isArray(item)) || null;
+  }
+  if (!parsed || typeof parsed !== "object") parsed = {};
   const bounded = (value, fallback, min, max) => {
     if (value === null || value === undefined || value === "") return fallback;
     const number = Number(value);
