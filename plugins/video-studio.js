@@ -47,7 +47,7 @@ textcolor white|yellow|red|blue|green | fontsize 12-96
 fps 24|25|30|50|60 | sharpen 0-2 | blur 0.1-20 | denoise 0-10
 vignette on | sepia on | fadein 1 | fadeout 1
 audiofadein 1 | audiofadeout 1 | normalize
-reverse (වීඩියෝව විනාඩි 2ට අඩු විය යුතුයි) | thumbnail 00:05 | gif | extractaudio | auto
+reverse (තත්පර 15ට අඩු විය යුතුයි) | thumbnail 00:05 | gif | extractaudio | auto
 
 *වැදගත්:* එක් එක් Edit එක | ලකුණෙන් වෙන් කරන්න.
 සිංහල අකුරු නිවැරදිව පෙන්වීමට Server එකේ Sinhala Unicode Font එකක් තිබිය යුතුයි.
@@ -134,12 +134,12 @@ async function probe(file, maxDuration = MAX_DURATION) {
 export function buildPlan(operations, input, output, workDir, config, hasAudio, sourceDuration) {
   const filters = [];
   const audioFilters = [];
-  const args = ["-hide_banner", "-loglevel", "error", "-y", "-i", input];
+  const args = ["-hide_banner", "-loglevel", "error", "-y", "-filter_threads", "1", "-filter_complex_threads", "1", "-i", input];
   let outputFormat = "mp4";
   let crf = 23;
   let thumbnailAt = null;
   let audioMode = "copy";
-  const encoderThreads = Math.max(1, Math.min(4, Number(config.videoStudio?.ffmpegThreads) || 2));
+  const encoderThreads = Math.max(1, Math.min(2, Number(config.videoStudio?.ffmpegThreads) || 1));
   let muteOriginal = false;
   let speed = 1;
   let trimStart = null, trimEnd = null;
@@ -332,7 +332,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   if (thumbnailAt !== null) {
     if (thumbnailAt >= sourceDuration) throw new Error("Thumbnail time එක වීඩියෝවේ duration එක ඉක්මවයි.");
     if (operations.length !== 1) throw new Error("Thumbnail export එක වෙනත් edits සමඟ එකම Job එකක කළ නොහැක. .vedit thumbnail 00:05 ලෙස වෙනම කරන්න.");
-    return { args: ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(thumbnailAt), "-i", input, "-frames:v", "1", "-q:v", "2", output], outputFormat };
+    return { args: ["-hide_banner", "-loglevel", "error", "-y", "-filter_threads", "1", "-filter_complex_threads", "1", "-ss", String(thumbnailAt), "-i", input, "-frames:v", "1", "-q:v", "2", output], outputFormat };
   }
   if (brightness !== 0 || contrast !== 1 || saturation !== 1) filters.push("eq=brightness=" + brightness + ":contrast=" + contrast + ":saturation=" + saturation);
   const effectiveDuration = Math.max(0, (trimEnd !== null ? trimEnd - (trimStart || 0) : sourceDuration) / speed);
@@ -354,8 +354,10 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   }
 
   const reverseDuration = trimEnd !== null ? trimEnd - trimStart : sourceDuration;
-  if (reverse && reverseDuration > 120) throw new Error("Reverse Effect එක සඳහා වීඩියෝව විනාඩි 2කට අඩු විය යුතුයි.");
+  if (reverse && reverseDuration > 15) throw new Error("RAM ආරක්ෂාව සඳහා Reverse Effect එකට වීඩියෝව තත්පර 15කට අඩු විය යුතුයි.");
   if (reverse) {
+    // FFmpeg reverse buffers decoded frames; reduce frame size/rate first to cap peak RAM.
+    filters.unshift("scale=640:360:force_original_aspect_ratio=decrease", "fps=15");
     filters.push("reverse");
     audioFilters.push("areverse");
   }
@@ -617,7 +619,7 @@ export async function generateWhisperSubtitles(input, workDir, config) {
     "-hide_banner", "-loglevel", "error", "-y", "-i", input,
     "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav
   ], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
-  const threads = Math.max(1, Math.min(4, Number(config.videoStudio?.whisperThreads) || 2));
+  const threads = Math.max(1, Math.min(2, Number(config.videoStudio?.whisperThreads) || 1));
   await run(config.videoStudio?.whisperBinary || "whisper-cli", [
     "-m", model, "-f", wav, "-l", config.videoStudio?.whisperLanguage || "si",
     "-t", String(threads), "-osrt", "-of", subtitleBase
@@ -639,7 +641,12 @@ async function processJob(job) {
     await sock.sendMessage(jid, { text: "⏳ *HASA VIDEO STUDIO*\nVideo එක Download කරලා Edit කරන්න සූදානම් කරනවා..." }, { quoted: message });
     await downloadMedia(video, "video", input, config.videoStudio?.maxInputBytes || MAX_INPUT_BYTES);
     const info = await probe(input, config.videoStudio?.maxDurationSeconds || MAX_DURATION);
-    if (!info.streams.some(s => s.codec_type === "video")) throw new Error("Video track එකක් හමු වුණේ නැහැ.");
+    const videoStream = info.streams.find(s => s.codec_type === "video");
+    if (!videoStream) throw new Error("Video track එකක් හමු වුණේ නැහැ.");
+    const maxDimension = Math.max(640, Math.min(1920, Number(config.videoStudio?.maxDimension) || 1920));
+    if (Math.max(Number(videoStream.width) || 0, Number(videoStream.height) || 0) > maxDimension) {
+      throw new Error("RAM ආරක්ෂාව සඳහා උපරිම " + maxDimension + "px පළල/උස වීඩියෝ භාවිතා කරන්න.");
+    }
     const voiceover = operations.find(x => x.name === "voiceover");
     if (voiceover) {
       const voiceoverFile = path.join(dir, "voiceover.wav");
