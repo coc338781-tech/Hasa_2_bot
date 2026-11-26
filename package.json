@@ -19,6 +19,6 @@
     "chalk": "^5.4.1",
     "pino": "^9.6.0",
     "dotenv": "^16.4.7",
-    "@google/genai": "^1.0.0"
+    "@google/genai": "^2.32.0"
   }
 }
