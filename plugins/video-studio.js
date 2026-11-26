@@ -53,6 +53,14 @@ reverse (තත්පර 15ට අඩු විය යුතුයි) | thumbna
 සිංහල අකුරු නිවැරදිව පෙන්වීමට Server එකේ Sinhala Unicode Font එකක් තිබිය යුතුයි.
 වීඩියෝ සීමාව: විනාඩි 15 / 180MB. Server එකේ FFmpeg සහ FFprobe අවශ්‍යයි.`;
 
+export function asBaileysStream(stream) {
+  if (!stream || typeof stream.pipe !== "function") {
+    throw new Error("Video Studio media output stream is invalid.");
+  }
+  // Baileys 7 expects readable media as { stream }, not a bare Node Readable.
+  return { stream };
+}
+
 function bodyOf(message) {
   return message.message?.conversation ||
     message.message?.extendedTextMessage?.text ||
@@ -691,7 +699,7 @@ async function processJob(job) {
     await run("ffmpeg", plan.args, { timeout: 8 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 });
     const stat = fs.statSync(output);
     if (!stat.size || stat.size > MAX_OUTPUT_BYTES) throw new Error("Edited file එක හිස් හෝ 180MB සීමාව ඉක්මවා ඇත.");
-    const mediaStream = fs.createReadStream(output);
+    const mediaStream = asBaileysStream(fs.createReadStream(output));
     const caption = "✅ *HASA VIDEO STUDIO — EDIT COMPLETED*\n" +
       "🎬 " + operations.map(x => x.name).join(" + ") + "\n" +
       "⏱️ " + info.duration.toFixed(1) + "s";
