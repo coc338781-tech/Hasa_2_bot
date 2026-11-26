@@ -61,10 +61,19 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
       catch (error) { log.warn({ instanceId, error: error?.message }, "Socket close failed"); }
     }, pairingTimeoutMs);
     entry.timer.unref?.();
-    socket.ev.on("creds.update", async () => {
-      try { await auth.saveCreds(); }
-      catch (error) { log.warn({ instanceId, error: error?.message }, "WhatsApp credentials could not be saved"); }
-    });
+    let credentialSaveError = null;
+    let credentialSaveChain = Promise.resolve();
+    const persistCredentials = () => {
+      credentialSaveChain = credentialSaveChain.then(async () => {
+        await auth.saveCreds();
+        credentialSaveError = null;
+      }).catch(error => {
+        credentialSaveError = error;
+        log.warn({ instanceId, error: error?.message }, "WhatsApp credentials could not be saved");
+      });
+      return credentialSaveChain;
+    };
+    socket.ev.on("creds.update", () => { void persistCredentials(); });
     socket.ev.on("connection.update", async update => {
       if (sessions.get(instanceId) !== entry) return;
       if (update.qr && !auth.state.creds.registered && !entry.pairingCodeIssued) {
@@ -84,12 +93,25 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
       }
       if (update.connection === "open" && entry.status !== "expired" && !entry.pairingCompleteInFlight) {
         clearTimeout(entry.timer);
-        entry.status = "online";
         entry.pairingCompleteInFlight = true;
         const finalize = async () => {
           if (sessions.get(instanceId) !== entry) return;
-          try { await auth.saveCreds(); }
-          catch (error) { log.warn({ instanceId, error: error?.message }, "Final pairing credentials save failed"); }
+          await persistCredentials();
+          const linkedId = auth.state.creds.me?.id || auth.state.creds.me?.jid || "";
+          const linkedPhone = String(linkedId).split(":")[0].replace(/\\D/g, "");
+          const expectedPhone = phone.replace(/\\D/g, "");
+          if (credentialSaveError || auth.state.creds.registered !== true || !linkedPhone || linkedPhone !== expectedPhone) {
+            entry.status = "failed";
+            sessions.delete(instanceId);
+            const failureCode = credentialSaveError ? "whatsapp_credentials_save_failed"
+              : auth.state.creds.registered !== true ? "whatsapp_registration_not_confirmed"
+              : "whatsapp_linked_phone_mismatch";
+            await notify(instanceId, "failed", { failureCode });
+            try { void Promise.resolve(socket.end?.(new Error(failureCode))).catch(error => log.warn({ instanceId, error: error?.message }, "Unconfirmed pairing socket close failed")); }
+            catch (error) { log.warn({ instanceId, error: error?.message }, "Unconfirmed pairing socket close failed"); }
+            return;
+          }
+          entry.status = "online";
           const acknowledged = await notify(instanceId, "paired");
           if (acknowledged) {
             sessions.delete(instanceId);
