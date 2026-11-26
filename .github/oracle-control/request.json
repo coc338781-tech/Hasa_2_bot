@@ -1,4 +1,4 @@
 {
-  "action": "status",
-  "request_id": "hasa-video-oracle-reconnect-check-20261126"
+  "action": "connection-audit",
+  "request_id": "hasa-postdeploy-connection-20261126-c1"
 }
