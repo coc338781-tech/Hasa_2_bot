@@ -34,6 +34,7 @@
     "aiModel": "gemini-3.8-flash",
     "ttsModel": "gemini-3.8-flash-tts",
     "ttsVoice": "Kore",
-    "ttsStyle": "Natural, clear Sinhala narration with warm and friendly delivery"
+    "ttsStyle": "Natural, clear Sinhala narration with warm and friendly delivery",
+    "ffmpegThreads": 2
   }
 }
