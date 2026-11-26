@@ -585,6 +585,35 @@ export async function generateVoiceover(text, destination, config) {
   }
 }
 
+export async function generateWhisperSubtitles(input, workDir, config) {
+  const model = config.videoStudio?.whisperModel;
+  if (!model || !fs.existsSync(model)) {
+    throw new Error("Auto Sinhala Subtitle සඳහා whisper.cpp model එකක් අවශ්‍යයි. config.json තුළ videoStudio.whisperModel සකසන්න.");
+  }
+  const info = await probe(input, config.videoStudio?.maxDurationSeconds || MAX_DURATION);
+  if (!info.streams.some(stream => stream.codec_type === "audio")) {
+    throw new Error("මේ වීඩියෝවේ කථන Audio track එකක් නැහැ.");
+  }
+  if (info.duration > 300) throw new Error("Auto Subtitle සඳහා දැනට වීඩියෝව විනාඩි 5කට අඩු විය යුතුයි.");
+
+  const wav = path.join(workDir, "speech.wav");
+  const subtitleBase = path.join(workDir, "generated-captions");
+  await run("ffmpeg", [
+    "-hide_banner", "-loglevel", "error", "-y", "-i", input,
+    "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav
+  ], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+  const threads = Math.max(1, Math.min(4, Number(config.videoStudio?.whisperThreads) || 2));
+  await run(config.videoStudio?.whisperBinary || "whisper-cli", [
+    "-m", model, "-f", wav, "-l", config.videoStudio?.whisperLanguage || "si",
+    "-t", String(threads), "-osrt", "-of", subtitleBase
+  ], { timeout: 8 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+  const subtitleFile = subtitleBase + ".srt";
+  if (!fs.existsSync(subtitleFile) || !fs.statSync(subtitleFile).size) {
+    throw new Error("Whisper මඟින් Subtitle file එකක් නිර්මාණය වුණේ නැහැ.");
+  }
+  return subtitleFile;
+}
+
 async function processJob(job) {
   const { sock, jid, message, video, config } = job;
   let operations = job.operations;
@@ -603,18 +632,9 @@ async function processJob(job) {
       operations = operations.filter(x => x.name !== "voiceover");
       operations.push({ name: "voiceoverfile", value: voiceoverFile });
     }
-    const autoSubtitle = operations.filter(x => x.name === "subtitle" && x.value.toLowerCase() === "auto");
-    if (autoSubtitle.length) {
-      const model = config.videoStudio?.whisperModel;
-      if (!model || !fs.existsSync(model)) throw new Error("Auto Sinhala Subtitle සඳහා whisper.cpp model එකක් අවශ්‍යයි. config.json තුළ videoStudio.whisperModel සකසන්න.");
-      if (!info.streams.some(s => s.codec_type === "audio")) throw new Error("මේ වීඩියෝවේ කථන Audio track එකක් නැහැ.");
-      if (info.duration > 300) throw new Error("Auto Subtitle සඳහා දැනට වීඩියෝව විනාඩි 5කට අඩු විය යුතුයි.");
-      const wav = path.join(dir, "speech.wav");
-      const subtitleBase = path.join(dir, "generated-captions");
-      await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
-      await run(config.videoStudio?.whisperBinary || "whisper-cli", ["-m", model, "-f", wav, "-l", config.videoStudio?.whisperLanguage || "si", "-t", String(config.videoStudio?.whisperThreads || 2), "-osrt", "-of", subtitleBase], { timeout: 8 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
-      const subtitleFile = subtitleBase + ".srt";
-      if (!fs.existsSync(subtitleFile) || !fs.statSync(subtitleFile).size) throw new Error("Whisper මඟින් Subtitle file එකක් නිර්මාණය වුණේ නැහැ.");
+    const autoSubtitle = operations.some(x => x.name === "subtitle" && x.value.toLowerCase() === "auto");
+    if (autoSubtitle) {
+      const subtitleFile = await generateWhisperSubtitles(input, dir, config);
       operations = operations.filter(x => !(x.name === "subtitle" && x.value.toLowerCase() === "auto"));
       operations.push({ name: "subtitlefile", value: subtitleFile });
     }
