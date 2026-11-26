@@ -31,6 +31,9 @@
     "whisperModel": "",
     "whisperLanguage": "si",
     "whisperThreads": 2,
-    "aiModel": "gemini-2.0-flash"
+    "aiModel": "gemini-3.8-flash",
+    "ttsModel": "gemini-3.8-flash-tts",
+    "ttsVoice": "Kore",
+    "ttsLanguage": "si-LK"
   }
 }
