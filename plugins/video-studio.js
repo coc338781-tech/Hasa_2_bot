@@ -433,28 +433,41 @@ export async function getAiAutoEdit(input, workDir, config) {
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vf", "fps=1/3,scale=320:-1,tile=3x3", "-frames:v", "1", "-q:v", "4", contactSheet], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
   if (!fs.existsSync(contactSheet)) throw new Error("AI analysis සඳහා Video preview එකක් සකස් කළ නොහැක.");
   const imageData = fs.readFileSync(contactSheet).toString("base64");
-  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 90000 } });
-  const model = config.videoStudio?.aiModel || "gemini-3.8-flash";
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 45000 } });
+  const primaryModel = config.videoStudio?.aiModel || "gemini-3.8-flash";
+  const models = [...new Set([primaryModel, "gemini-3.6-flash", "gemini-3.5-flash-lite"])];
   const prompt = `Analyze this 3x3 contact sheet sampled from a user-provided video. Recommend a conservative, tasteful edit using ONLY the allowed options. Return JSON only with keys: brightness (-0.1..0.1), contrast (0.9..1.2), saturation (0.8..1.3), speed (0.8..1.2), filter ("none"|"cinematic"|"warm"|"bw"|"vintage"), format ("original"|"9:16"|"16:9"|"1:1"), caption (short Sinhala caption, maximum 70 characters). Do not invent events, people, identities, audio, dialogue, or facts. Prefer format "original" unless vertical social video is clearly appropriate. Do not include markdown.`;
   let result;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      result = await ai.models.generateContent({
-        model,
-        contents: [
-          { inlineData: { mimeType: "image/jpeg", data: imageData } },
-          { text: prompt }
-        ],
-        config: { responseMimeType: "application/json" }
-      });
-      break;
-    } catch (error) {
-      const status = Number(error?.status || error?.code || /"code"\\s*:\\s*(\\d+)/.exec(error?.message || "")?.[1]);
-      const transient = [429, 500, 502, 503, 504].includes(status);
-      if (!transient || attempt === 3) throw error;
-      await new Promise(resolve => setTimeout(resolve, attempt * 5000));
+  let lastError;
+  for (const model of models) {
+    let modelSucceeded = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        result = await ai.models.generateContent({
+          model,
+          contents: [
+            { inlineData: { mimeType: "image/jpeg", data: imageData } },
+            { text: prompt }
+          ],
+          config: { responseMimeType: "application/json" }
+        });
+        modelSucceeded = true;
+        break;
+      } catch (error) {
+        lastError = error;
+        let status = Number(error?.status || error?.code || 0);
+        if (!status) {
+          const match = /"code"\\s*:\\s*(\\d+)/.exec(error?.message || "");
+          if (match) status = Number(match[1]);
+        }
+        const transient = [408, 429, 500, 502, 503, 504].includes(status);
+        if (!transient) throw error;
+        if (attempt < 3) await new Promise(resolve => setTimeout(resolve, attempt * 2500));
+      }
     }
+    if (modelSucceeded) break;
   }
+  if (!result) throw lastError || new Error("සියලුම Gemini Flash මාදිලි අසාර්ථක වුණා.");
   let parsed;
   try {
     parsed = JSON.parse(result.text);
