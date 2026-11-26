@@ -31,7 +31,7 @@ const HELP = `🎬 *HASA VIDEO STUDIO*
 .vedit help
 
 *Options:*
-quality 480|720|1080 | speed 0.25-4
+quality 480|720|1080 | speed 0.25-4 | compress low/medium/high
 caption <සිංහල/English> | text <text> | textposition top/middle/bottom
 subtitle auto (Whisper model අවශ්‍යයි)
 trim <start> <end> | mute | volume 0-200 | pitch 0.5-2
@@ -40,10 +40,10 @@ format 9:16|16:9|1:1 | crop | rotate 90|180|270
 flip h|v | brightness -1..1 | contrast 0..2
 saturation 0..3 | filter cinematic|warm|bw|vintage|none
 textcolor white|yellow|red|blue|green | fontsize 12-96
-fps 24|25|30|50|60 | sharpen 0-2 | denoise 0-10
+fps 24|25|30|50|60 | sharpen 0-2 | blur 0.1-20 | denoise 0-10
 vignette on | sepia on | fadein 1 | fadeout 1
-audiofadein 1 | audiofadeout 1
-reverse (වීඩියෝව විනාඩි 2ට අඩු විය යුතුයි) | gif | extractaudio | auto
+audiofadein 1 | audiofadeout 1 | normalize
+reverse (වීඩියෝව විනාඩි 2ට අඩු විය යුතුයි) | thumbnail 00:05 | gif | extractaudio | auto
 
 *වැදගත්:* එක් එක් Edit එක | ලකුණෙන් වෙන් කරන්න.
 සිංහල අකුරු නිවැරදිව පෙන්වීමට Server එකේ Sinhala Unicode Font එකක් තිබිය යුතුයි.
@@ -132,6 +132,8 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   const audioFilters = [];
   const args = ["-hide_banner", "-loglevel", "error", "-y", "-i", input];
   let outputFormat = "mp4";
+  let crf = 23;
+  let thumbnailAt = null;
   let audioMode = "copy";
   let muteOriginal = false;
   let speed = 1;
@@ -203,6 +205,23 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
         filters.push("fps=" + fps);
         break;
       }
+      case "blur":
+        filters.push("gblur=sigma=" + safeNumber(v, 0.1, 20, "Blur"));
+        break;
+      case "compress":
+        if (v === "low") crf = 28;
+        else if (v === "medium") crf = 23;
+        else if (v === "high") crf = 18;
+        else throw new Error("compress low/medium/high භාවිතා කරන්න.");
+        break;
+      case "normalize":
+        audioFilters.push("loudnorm=I=-16:TP=-1.5:LRA=11");
+        audioMode = "encode";
+        break;
+      case "thumbnail":
+        thumbnailAt = v ? parseTime(v) : 1;
+        outputFormat = "jpg";
+        break;
       case "sharpen":
         filters.push("unsharp=5:5:" + safeNumber(v, 0, 2, "Sharpen") + ":5:5:0");
         break;
@@ -299,6 +318,10 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   }
 
   if (gif && extractAudio) throw new Error("GIF සහ MP3 export එකම Job එකක කළ නොහැක. වෙන වෙනම Job දෙකක් කරන්න.");
+  if (thumbnailAt !== null) {
+    if (operations.length !== 1) throw new Error("Thumbnail export එක වෙනත් edits සමඟ එකම Job එකක කළ නොහැක. .vedit thumbnail 00:05 ලෙස වෙනම කරන්න.");
+    return { args: ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(thumbnailAt), "-i", input, "-frames:v", "1", "-q:v", "2", output], outputFormat };
+  }
   if (brightness !== 0 || contrast !== 1 || saturation !== 1) filters.push("eq=brightness=" + brightness + ":contrast=" + contrast + ":saturation=" + saturation);
   const effectiveDuration = Math.max(0, (trimEnd !== null ? trimEnd - (trimStart || 0) : sourceDuration) / speed);
   if (videoFadeIn) filters.push("fade=t=in:st=0:d=" + videoFadeIn);
@@ -342,7 +365,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
       const sourceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
       args.push("-filter_complex", "[0:a]" + sourceFilters + "anull[original];[1:a]volume=" + musicVolume + "[music];[original][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");
     } else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);
-    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-shortest");
+    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac", "-shortest");
   } else if (muteOriginal) {
     args.push("-an");
   } else if (audioFilters.length) {
@@ -416,11 +439,11 @@ async function getAiAutoEdit(input, workDir, config) {
     throw new Error("AI Auto Edit එකෙන් නොදන්නා Filter හෝ Format එකක් ලැබුණා.");
   }
   const generated = [
+    { name: "filter", value: parsed.filter },
     { name: "brightness", value: String(brightness) },
     { name: "contrast", value: String(contrast) },
     { name: "saturation", value: String(saturation) },
-    { name: "speed", value: String(speed) },
-    { name: "filter", value: parsed.filter }
+    { name: "speed", value: String(speed) }
   ];
   if (parsed.format !== "original") generated.push({ name: "format", value: parsed.format });
   if (typeof parsed.caption === "string" && parsed.caption.trim()) {
@@ -434,7 +457,7 @@ async function processJob(job) {
   let operations = job.operations;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-"));
   const input = path.join(dir, "input.mp4");
-  const output = path.join(dir, operations.some(x => x.name === "gif") ? "output.gif" : operations.some(x => x.name === "extractaudio") ? "output.mp3" : "output.mp4");
+  const output = path.join(dir, operations.some(x => x.name === "gif") ? "output.gif" : operations.some(x => x.name === "extractaudio") ? "output.mp3" : operations.some(x => x.name === "thumbnail") ? "thumbnail.jpg" : "output.mp4");
   try {
     await sock.sendMessage(jid, { text: "⏳ *HASA VIDEO STUDIO*\nVideo එක Download කරලා Edit කරන්න සූදානම් කරනවා..." }, { quoted: message });
     await downloadMedia(video, "video", input, config.videoStudio?.maxInputBytes || MAX_INPUT_BYTES);
@@ -475,6 +498,8 @@ async function processJob(job) {
       "⏱️ " + info.duration.toFixed(1) + "s";
     if (plan.outputFormat === "mp3") {
       await sock.sendMessage(jid, { audio: mediaStream, mimetype: "audio/mpeg", fileName: "Hasa_Audio.mp3", caption }, { quoted: message });
+    } else if (plan.outputFormat === "jpg") {
+      await sock.sendMessage(jid, { image: mediaStream, caption: "🖼️ *HASA VIDEO STUDIO — THUMBNAIL READY*" }, { quoted: message });
     } else if (plan.outputFormat === "gif") {
       await sock.sendMessage(jid, { video: mediaStream, gifPlayback: true, caption }, { quoted: message });
     } else {
