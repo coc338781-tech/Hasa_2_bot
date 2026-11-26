@@ -65,7 +65,8 @@ The CI suite includes real FFmpeg integration checks for chained filter export a
 
 ## Optional AI editing and Sinhala auto-subtitles
 
-- `.vedit auto` creates a small 3×3 contact sheet from the video and sends those preview frames to Gemini 3.8 Flash for a conservative visual edit plan. It requires `GEMINI_API_KEY`. This is an explicit cloud-processing command; do not use it for private footage unless you are comfortable sending preview frames to Google.\n- `.vedit voiceover <Sinhala text>` generates a Sinhala WAV voice-over with Gemini 3.8 Flash TTS and mixes it with the video audio. It requires `GEMINI_API_KEY`; generated speech is processed by Google.
+- `.vedit auto` creates a small 3×3 contact sheet from the video and sends those preview frames to Gemini 3.8 Flash for a conservative visual edit plan. It requires `GEMINI_API_KEY`. This is an explicit cloud-processing command; do not use it for private footage unless you are comfortable sending preview frames to Google.
+- `.vedit voiceover <Sinhala text>` generates a Sinhala WAV voice-over with Gemini 3.8 Flash TTS and mixes it with the video audio. It requires `GEMINI_API_KEY`; generated speech is processed by Google.
 - `.vedit subtitle auto` runs local Whisper.cpp speech recognition in Sinhala and burns the generated SRT captions into the video. It does not send the video/audio to Gemini.
 - On Ubuntu/Debian, build Whisper.cpp and download a multilingual model (the base model is a lighter starting point):
   ```sh
