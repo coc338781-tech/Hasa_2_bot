@@ -150,7 +150,6 @@ export async function runAgent({ env = process.env, fetchImpl = fetch, signal } 
     if (signal?.aborted) break;
     await new Promise(resolve => {
       const timer = setTimeout(resolve, interval);
-      timer.unref?.();
       signal?.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
     });
   }
