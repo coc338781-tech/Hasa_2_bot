@@ -77,14 +77,14 @@ async function downloadMedia(media, type, destination) {
   return total;
 }
 
-function parseOperations(raw) {
+export function parseOperations(raw) {
   return raw.split("|").map(part => part.trim()).filter(Boolean).map(part => {
     const match = part.match(/^(\S+)(?:\s+([\s\S]*))?$/);
     return { name: (match?.[1] || "").toLowerCase(), value: (match?.[2] || "").trim() };
   });
 }
 
-function parseTime(value) {
+export function parseTime(value) {
   if (/^\d+(?:\.\d+)?$/.test(value)) return Number(value);
   const m = value.match(/^(?:(\d{1,2}):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/);
   if (!m) throw new Error("Time එක 00:00 හෝ seconds ලෙස දෙන්න.");
@@ -128,6 +128,7 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
   let musicPath = null;
   let musicVolume = 0.25;
   let textColor = "white", fontSize = 36;
+  let brightness = 0, contrast = 1, saturation = 1;
   const captions = [];
 
   for (const op of operations) {
@@ -178,7 +179,7 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
         break;
       case "music":
         if (v.toLowerCase() === "remove" || v.toLowerCase() === "off") audioMode = "mute";
-        else if (/^https:\/\//i.test(v) || fs.existsSync(v)) musicPath = v;
+        else if (/^https:\/\//i.test(v) || v.startsWith(workDir + path.sep)) musicPath = v;
         else throw new Error("Music සඳහා HTTPS audio URL එකක් හෝ 'music remove' දෙන්න.");
         break;
       case "musicvolume":
@@ -205,20 +206,21 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
         else throw new Error("flip h හෝ flip v භාවිතා කරන්න.");
         break;
       case "brightness":
-        filters.push("eq=brightness=" + safeNumber(v, -1, 1, "Brightness"));
+        brightness = safeNumber(v, -1, 1, "Brightness");
         break;
       case "contrast":
-        filters.push("eq=contrast=" + safeNumber(v, 0, 2, "Contrast"));
+        contrast = safeNumber(v, 0, 2, "Contrast");
         break;
       case "saturation":
-        filters.push("eq=saturation=" + safeNumber(v, 0, 3, "Saturation"));
+        saturation = safeNumber(v, 0, 3, "Saturation");
         break;
       case "filter":
-        if (v === "cinematic") filters.push("eq=contrast=1.15:saturation=1.2:brightness=-0.02,colorbalance=rs=0.04:bs=-0.04");
+        if (v === "cinematic") { contrast = 1.15; saturation = 1.2; brightness = -0.02; filters.push("colorbalance=rs=0.04:bs=-0.04"); }
         else if (v === "warm") filters.push("colorbalance=rs=0.12:gs=0.03:bs=-0.12");
-        else if (v === "bw") filters.push("hue=s=0");
-        else if (v === "vintage") filters.push("curves=vintage,eq=saturation=0.8");
-        else if (v !== "none") throw new Error("filter cinematic/warm/bw/vintage/none භාවිතා කරන්න.");
+        else if (v === "bw") saturation = 0;
+        else if (v === "vintage") { saturation = 0.8; filters.push("curves=vintage"); }
+        else if (v === "none") { brightness = 0; contrast = 1; saturation = 1; }
+        else throw new Error("filter cinematic/warm/bw/vintage/none භාවිතා කරන්න.");
         break;
       case "reverse":
         reverse = true; audioMode = "encode";
@@ -233,6 +235,9 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
         throw new Error("නොදන්නා Edit Option එකක්: " + op.name + ". .vedit help බලන්න.");
     }
   }
+
+  if (gif && extractAudio) throw new Error("GIF සහ MP3 export එකම Job එකක කළ නොහැක. වෙන වෙනම Job දෙකක් කරන්න.");
+  if (brightness !== 0 || contrast !== 1 || saturation !== 1) filters.push("eq=brightness=" + brightness + ":contrast=" + contrast + ":saturation=" + saturation);
 
   if (extractAudio) {
     return { args: ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-codec:a", "libmp3lame", "-q:a", "3", output], outputFormat };
