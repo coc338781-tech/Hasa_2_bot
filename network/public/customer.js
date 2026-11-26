@@ -2,7 +2,6 @@
 "use strict";
 const $ = id => document.getElementById(id);
 let token = null;
-let mode = "login";
 let pairingPollActive = false;
 let pairingCompletionId = null;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -15,14 +14,6 @@ async function api(path, options = {}) {
   return body;
 }
 function showError(id, message) { $(id).textContent = message; }
-function setMode(next) {
-  mode = next;
-  $("login-form").classList.toggle("hidden", mode !== "login");
-  $("register-form").classList.toggle("hidden", mode !== "register");
-  $("tab-login").classList.toggle("active", mode === "login");
-  $("tab-register").classList.toggle("active", mode === "register");
-  showError("auth-error", "");
-}
 function showWorkspace() {
   $("auth").classList.add("hidden");
   $("workspace").classList.remove("hidden");
@@ -31,13 +22,13 @@ function showWorkspace() {
 async function loadDashboard() {
   const data = await api("/v1/customer/me");
   const c = data.customer, b = data.bot;
-  $("customer-name").textContent = c.display_name || c.login_email.split("@")[0];
+  $("customer-name").textContent = c.display_name || "there";
   $("customer-phone").textContent = c.phone_e164;
-  $("customer-email").textContent = c.login_email;
-  $("account-status").textContent = c.status;
+  
+  $("account-status").textContent = b?.whatsapp_registered ? "Linked successfully" : "Not linked";
   $("bot-status").textContent = b?.status || "Not assigned";
   $("bot-version").textContent = b?.release_version ? `Version ${b.release_version}` : "Your assigned instance";
-  $("bot-id").textContent = b?.id || "Pending";
+  $("bot-id").textContent = b?.whatsapp_registered ? b.id : "Available after WhatsApp linking";
   $("runtime-status").textContent = b?.status || "Not provisioned";
   $("pairing-panel").classList.toggle("hidden", !b?.server_assigned || !b.runtime_provisioned || b.whatsapp_registered);
   $("unassigned-note").classList.toggle("hidden", Boolean(b?.server_assigned));
@@ -58,35 +49,33 @@ async function loadDashboard() {
   if (b?.id) $("pair-phone").value = c.phone_e164;
   showWorkspace();
 }
-async function submitAuth(event, registering) {
+$("phone-access-form").addEventListener("submit", async event => {
   event.preventDefault(); showError("auth-error", "");
-  const payload = registering ? {
-    display_name: $("register-name").value.trim(),
-    email: $("register-email").value,
-    phone: $("register-phone").value,
-    password: $("register-password").value
-  } : { email: $("login-email").value, password: $("login-password").value };
+  const button = event.submitter;
+  if (button) button.disabled = true;
   try {
-    const result = await api(registering ? "/v1/customer/register" : "/v1/customer/login", { method: "POST", body: JSON.stringify(payload) });
+    const result = await api("/v1/customer/phone-access", {
+      method: "POST",
+      body: JSON.stringify({ phone: $("phone-access-number").value.trim() })
+    });
     token = result.access_token;
     await loadDashboard();
   } catch (error) {
     const messages = {
-      invalid_credentials: "Email or password is incorrect.",
-      account_exists: "An account with that email or WhatsApp number already exists.",
-      invalid_registration: "Check your email, international WhatsApp number and password (at least 12 characters).",
-      customer_auth_unavailable: "Customer sign-in is temporarily unavailable. Please try again later."
+      invalid_phone: "Enter a valid international WhatsApp number, e.g. +94771234567.",
+      phone_already_registered_unverified: "This number already has an unfinished bot registration. Contact the owner to recover it.",
+      rate_limited: "Too many attempts. Wait one minute and try again.",
+      customer_auth_unavailable: "The customer service is temporarily unavailable. Try again shortly."
     };
-    showError("auth-error", messages[error.message] || "Could not complete the request. Please check your details and try again.");
-  }
-}
-$("tab-login").addEventListener("click", () => setMode("login"));
-$("tab-register").addEventListener("click", () => setMode("register"));
-$("login-form").addEventListener("submit", event => submitAuth(event, false));
-$("register-form").addEventListener("submit", event => submitAuth(event, true));
+    showError("auth-error", messages[error.message] || "Could not continue. Check the number and try again.");
+  } finally { if (button) button.disabled = false; }
+});
 $("logout").addEventListener("click", async () => {
   try { await api("/v1/customer/logout", { method: "POST", body: "{}" }); } catch {}
-  token = null; $("workspace").classList.add("hidden"); $("auth").classList.remove("hidden"); $("logout").classList.add("hidden"); setMode("login");
+  token = null;
+  $("workspace").classList.add("hidden");
+  $("auth").classList.remove("hidden");
+  $("logout").classList.add("hidden");
 });
 async function fetchPairingCode(pairingId) {
   try {
