@@ -131,6 +131,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   const args = ["-hide_banner", "-loglevel", "error", "-y", "-i", input];
   let outputFormat = "mp4";
   let audioMode = "copy";
+  let muteOriginal = false;
   let speed = 1;
   let trimStart = null, trimEnd = null;
   let reverse = false, gif = false, extractAudio = false;
@@ -225,6 +226,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
         audioMode = "encode";
         break;
       case "mute":
+        muteOriginal = true;
         audioMode = "mute";
         break;
       case "volume":
@@ -232,7 +234,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
         audioMode = "encode";
         break;
       case "music":
-        if (v.toLowerCase() === "remove" || v.toLowerCase() === "off") { musicPath = null; audioMode = "mute"; }
+        if (v.toLowerCase() === "remove" || v.toLowerCase() === "off") { musicPath = null; }
         else if (/^https:\/\//i.test(v) || v.startsWith(workDir + path.sep)) musicPath = v;
         else throw new Error("Music සඳහා HTTPS audio URL එකක් හෝ 'music remove' දෙන්න.");
         break;
@@ -299,6 +301,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   if (audioFadeOut && effectiveDuration > audioFadeOut) audioFilters.push("afade=t=out:st=" + (effectiveDuration - audioFadeOut) + ":d=" + audioFadeOut);
 
   if (extractAudio) {
+    if (muteOriginal) throw new Error("Mute සහ MP3 extraction එක එකම Job එකක කළ නොහැක.");
     if (!hasAudio) throw new Error("මේ වීඩියෝ එකේ Audio track එකක් නැහැ.");
     args.push("-vn");
     if (audioFilters.length) args.push("-af", audioFilters.join(","));
@@ -329,12 +332,12 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
     args.push("-an", "-vf", [...filters, "fps=12,scale=480:-1:flags=lanczos"].join(","));
   } else if (musicPath) {
     args.push("-stream_loop", "-1", "-i", musicPath);
-    if (hasAudio && audioMode !== "mute") {
+    if (hasAudio && !muteOriginal) {
       const sourceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
       args.push("-filter_complex", "[0:a]" + sourceFilters + "anull[original];[1:a]volume=" + musicVolume + "[music];[original][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");
     } else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);
     args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-shortest");
-  } else if (audioMode === "mute") {
+  } else if (muteOriginal) {
     args.push("-an");
   } else if (audioFilters.length) {
     args.push("-af", audioFilters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac");
