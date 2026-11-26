@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import { buildPlan, parseOperations } from "../plugins/video-studio.js";
 
 const run = promisify(execFile);
+const ffmpegAvailable = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
 
 async function makeSample(dir) {
   const input = path.join(dir, "sample.mp4");
@@ -21,7 +22,7 @@ async function makeSample(dir) {
   return input;
 }
 
-test("FFmpeg applies a chained multi-edit job in one export", async t => {
+test("FFmpeg applies a chained multi-edit job in one export", { skip: !ffmpegAvailable }, async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-test-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const input = await makeSample(dir);
@@ -35,7 +36,7 @@ test("FFmpeg applies a chained multi-edit job in one export", async t => {
   assert.ok(streams.some(stream => stream.width === 720 && stream.height === 1280));
 });
 
-test("music can be mixed with source audio without cutting the video short", async t => {
+test("music can be mixed with source audio without cutting the video short", { skip: !ffmpegAvailable }, async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-music-test-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const input = await makeSample(dir);
