@@ -61,6 +61,22 @@
       $("login-error").textContent = error.message === "invalid_owner_credentials" ? "Invalid owner key. Check the key and try again." : error.message;
     } finally { button.disabled = false; }
   });
+  async function botAction(action) {
+    const id = $("bot-public-id").value.trim().toUpperCase();
+    const result = $("bot-control-result");
+    if (!/^HASA-[0-9]{4,}$/.test(id)) { result.textContent = "Enter a valid Bot ID, e.g. HASA-0001."; return; }
+    $("bot-on").disabled = $("bot-off").disabled = true;
+    result.textContent = "Sending " + action.toUpperCase() + " request…";
+    try {
+      await api("/v1/owner/bots/" + encodeURIComponent(id) + "/actions", {method:"POST", body:JSON.stringify({action})});
+      result.textContent = "Request queued for " + id + ". Waiting for worker confirmation.";
+      await refresh();
+    } catch (error) {
+      result.textContent = error.message === "bot_not_found" ? "Bot ID not found." : error.message;
+    } finally { $("bot-on").disabled = $("bot-off").disabled = false; }
+  }
+  $("bot-on").addEventListener("click", () => void botAction("start"));
+  $("bot-off").addEventListener("click", () => void botAction("stop"));
   $("logout").addEventListener("click", signOut);
   $("refresh").addEventListener("click", refresh);
   async function checkHealth() {

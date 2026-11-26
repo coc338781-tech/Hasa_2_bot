@@ -27,7 +27,7 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
       catch (error) { logger?.warn?.({ instanceId: payload.instanceId, error: error?.message }, "Bot exit callback failed"); }
     }
   }
-  async function createInstance({ bot_instance_id }) {
+  async function createInstance({ bot_instance_id, public_bot_id = null }) {
     const dir = instancePath(root, bot_instance_id);
     await ensureDirectory(root); await ensureDirectory(dir);
     for (const child of ["auth_info", "data", "downloads"]) await ensureDirectory(join(dir, child));
@@ -35,13 +35,21 @@ export function createBotRuntime({ dataDir, codeDir = "/opt/hasa-bot", baileys, 
     try {
       const existing = await lstat(configPath);
       if (existing.isSymbolicLink() || !existing.isFile()) throw new Error("unsafe_instance_config");
-      JSON.parse(await readFile(configPath, "utf8"));
+      const existingConfig = JSON.parse(await readFile(configPath, "utf8"));
+      if (public_bot_id && existingConfig.publicBotId !== public_bot_id) {
+        existingConfig.publicBotId = public_bot_id;
+        existingConfig.networkActivationPending = true;
+        await writeFile(configPath, JSON.stringify(existingConfig, null, 2) + String.fromCharCode(10), { mode: 0o600 });
+        await chmod(configPath, 0o600);
+      }
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       const template = JSON.parse(await readFile(join(codeRoot, "config.example.json"), "utf8"));
       template.owner = [];
       template.botName = "HASA BOT";
       template.downloadDir = "downloads";
+      if (public_bot_id) template.publicBotId = public_bot_id;
+      template.networkActivationPending = Boolean(public_bot_id);
       await writeFile(configPath, JSON.stringify(template, null, 2) + "\n", { flag: "wx", mode: 0o600 });
     }
     return { instanceId: bot_instance_id, directory: dir };

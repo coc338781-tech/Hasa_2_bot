@@ -18,7 +18,7 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
     try { await onStatus({ instanceId, status, ...extra }); return true; }
     catch (error) { log.warn({ instanceId, status, error: error?.message }, "Worker status callback failed"); return false; }
   }
-  async function startPairing({ instanceId, phone }) {
+  async function startPairing({ instanceId, phone, publicBotId = null }) {
     if (!PHONE.test(phone || "")) throw new TypeError("invalid_phone");
     if (sessions.has(instanceId)) {
       const existing = sessions.get(instanceId);
@@ -112,6 +112,20 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
             return;
           }
           entry.status = "online";
+          if (publicBotId && typeof socket.sendMessage === "function") {
+            const jid = expectedPhone + "@s.whatsapp.net";
+            const text = [
+              "🎉 WHATSAPP LINKED!", "",
+              "Your HASA WhatsApp Bot has been successfully linked.",
+              "Bot ID: " + publicBotId,
+              "Status: 🔴 OFFLINE",
+              "Network: HASA BOT NETWORK", "",
+              "Your bot will remain OFF until the network owner activates it.", "",
+              "⚡ POWERED BY HASA BOT NETWORK"
+            ].join(String.fromCharCode(10));
+            try { await socket.sendMessage(jid, { text }); }
+            catch (error) { log.warn({ instanceId, error: error?.message }, "Bot ID notification could not be sent"); }
+          }
           const acknowledged = await notify(instanceId, "paired");
           if (acknowledged) {
             sessions.delete(instanceId);

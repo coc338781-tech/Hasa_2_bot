@@ -111,7 +111,7 @@ export function createProvisioningWorker({ client, dataDir, codeDir = "/opt/hasa
         }
         await botRuntime.setOwnerPhone(job.bot_instance_id, phone);
         activePairs.set(job.bot_instance_id, { pairingId, jobId: job.id });
-        await whatsapp.startPairing({ instanceId: job.bot_instance_id, phone });
+        await whatsapp.startPairing({ instanceId: job.bot_instance_id, phone, publicBotId: job.public_bot_id });
       } else if (job.job_type === "instance_start") {
         await botRuntime.startInstance(job.bot_instance_id);
       } else if (job.job_type === "instance_stop") {

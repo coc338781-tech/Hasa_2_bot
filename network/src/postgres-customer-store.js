@@ -22,8 +22,8 @@ export function createPostgresCustomerStore(pool) {
           [randomUUID(), customerId, email, passwordHash]
         );
         await client.query(
-          `INSERT INTO bot_instances (id, customer_id, product_code, status, instance_key)
-           VALUES ($1, $2, 'hasa-bot', 'offline', $3)`,
+          `INSERT INTO bot_instances (id, customer_id, product_code, status, instance_key, public_id)
+           VALUES ($1, $2, 'hasa-bot', 'offline', $3, 'HASA-' || lpad(nextval('hasa_bot_public_id_seq')::text, 4, '0'))`,
           [instanceId, customerId, instanceKey]
         );
         await client.query("COMMIT");
@@ -43,8 +43,8 @@ export function createPostgresCustomerStore(pool) {
           [customerId, displayName, phone]
         );
         await client.query(
-          `INSERT INTO bot_instances (id, customer_id, product_code, status, instance_key)
-           VALUES ($1, $2, 'hasa-bot', 'offline', $3)`,
+          `INSERT INTO bot_instances (id, customer_id, product_code, status, instance_key, public_id)
+           VALUES ($1, $2, 'hasa-bot', 'offline', $3, 'HASA-' || lpad(nextval('hasa_bot_public_id_seq')::text, 4, '0'))`,
           [instanceId, customerId, instanceKey]
         );
         await client.query("COMMIT");

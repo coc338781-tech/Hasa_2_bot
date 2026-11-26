@@ -13,12 +13,12 @@
 <form id="login-form"><label for="owner-key">Owner access key</label><input id="owner-key" type="password" autocomplete="current-password" required minlength="32"><button class="primary" type="submit">Sign in</button></form><p id="login-error" class="error" role="alert"></p>
 </section>
 <section id="dashboard" class="hidden">
-<div class="heading"><div><div class="eyebrow">LIVE NETWORK</div><h1>Server overview</h1><p class="muted">Only server RAM and running bot count.</p></div><button id="refresh" class="secondary" type="button">↻ Refresh</button></div>
+<div class="heading"><div><div class="eyebrow">LIVE NETWORK</div><h1>Server overview</h1><p class="muted">Server RAM, running bot count, and owner-only bot controls.</p></div><button id="refresh" class="secondary" type="button">↻ Refresh</button></div>
 <div class="metrics">
 <article class="metric"><span>SERVER RAM</span><strong id="m-ram">—</strong><small id="m-ram-detail">Waiting for server data</small></article>
 <article class="metric"><span>RUNNING BOTS</span><strong id="m-running">—</strong><small id="m-running-detail">Live bot instances</small></article>
 </div>
-<p id="dashboard-error" class="error" role="alert"></p><p id="last-updated" class="muted tiny">Not refreshed</p>
+<section class="card" style="margin-top:18px;padding:20px"><div class="eyebrow">OWNER ONLY</div><h2>Bot management</h2><p class="muted">Enter a customer Bot ID to turn that bot ON or OFF.</p><label for="bot-public-id">Bot ID</label><input id="bot-public-id" placeholder="HASA-0001" autocomplete="off"><div style="display:flex;gap:10px;margin-top:12px"><button class="primary" id="bot-on" type="button">Turn ON</button><button class="secondary" id="bot-off" type="button">Turn OFF</button></div><p id="bot-control-result" class="muted" role="status"></p></section><p id="dashboard-error" class="error" role="alert"></p><p id="last-updated" class="muted tiny">Not refreshed</p>
 </section>
 </main>
 <footer>HASA BOT NETWORK · Private owner control</footer>

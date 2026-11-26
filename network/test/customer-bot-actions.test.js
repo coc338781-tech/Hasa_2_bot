@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAppServer } from "../src/server.js";
 import { createCustomerSessionToken, hashCustomerToken } from "../src/customer-auth.js";
-test("customer lifecycle actions derive customer identity from the authenticated session", async () => {
+test("customer lifecycle actions are disabled for customers", async () => {
   const customerId = "11111111-1111-4111-8111-111111111111";
   const botId = "22222222-2222-4222-8222-222222222222";
   const token = createCustomerSessionToken();
@@ -19,10 +19,7 @@ test("customer lifecycle actions derive customer identity from the authenticated
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({ action: "restart", customer_id: "attacker-controlled" })
     });
-    assert.equal(response.status, 202);
-    assert.equal(queued.customerId, customerId);
-    assert.equal(queued.botId, botId);
-    assert.equal(queued.action, "restart");
+    assert.equal(response.status, 404);
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
