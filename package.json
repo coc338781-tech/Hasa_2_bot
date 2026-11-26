@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node scripts/patch-baileys.js && npm run test:ping && node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && for f in plugins/*.js; do node --input-type=module -e \"await import('./$f')\" || exit 1; done && node --input-type=module -e \"await import('./lib/subbot-manager.js')\" && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\" && npm run test:anti-delete && npm run test:downloader && npm run test:subbot-restore && npm run test:subbot-pairing && npm run test:utilities && npm run test:language-tools && npm run test:subbot-bulk && npm run test:downloader-check && npm run test:status-saver && npm run test:command-catalog && npm run test:advanced-tools && npm run test:delete-on-read && npm run test:decrypt-retry && npm run test:session-churn-patch && npm run test:baileys-lid-mapping && npm run test:session-log-redaction && npm run test:xvdl && npm run test:personal-assistant && npm run test:status-recovery && npm run test:view-once",
+    "check": "node scripts/patch-baileys.js && npm run test:ping && node --check index.js && for f in lib/*.js plugins/*.js legacy-plugins/*.cjs; do node --check \"$f\" || exit 1; done && for f in plugins/*.js; do node --input-type=module -e \"await import('./$f')\" || exit 1; done && node --input-type=module -e \"await import('./lib/subbot-manager.js')\" && node -e \"JSON.parse(require('fs').readFileSync('config.example.json','utf8'))\" && npm run test:anti-delete && npm run test:downloader && npm run test:subbot-restore && npm run test:subbot-pairing && npm run test:utilities && npm run test:language-tools && npm run test:subbot-bulk && npm run test:downloader-check && npm run test:status-saver && npm run test:command-catalog && npm run test:advanced-tools && npm run test:delete-on-read && npm run test:decrypt-retry && npm run test:session-churn-patch && npm run test:baileys-lid-mapping && npm run test:session-log-redaction && npm run test:xvdl && npm run test:personal-assistant && npm run test:status-recovery && npm run test:view-once && node --test --test-concurrency=1 tests/video-studio.test.js tests/video-studio-ffmpeg.test.js",
     "postinstall": "node scripts/patch-baileys.js",
     "test:ping": "node --test tests/ping.test.js",
     "test:decrypt-retry": "node --test tests/decrypt-retry-patch.test.js",
@@ -43,6 +43,7 @@
     "axios": "^1.7.9",
     "chalk": "^5.4.1",
     "pino": "^9.6.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "@google/genai": "^2.32.0"
   }
 }

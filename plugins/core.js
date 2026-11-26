@@ -65,6 +65,13 @@ const CATEGORIES = {
     ".weather <city>", ".movie <title>", ".quote (reply to message)", ".math <expression>", ".cal <expression>", ".mathstep <expression>",
     ".id", ".jid", ".wame <number> [message]", ".readmore <preview> | <text>", ".fancy <text>",
     ".dictionary <English word>", ".trt [language] <text>", ".translate [language] <text>"
+  ]],
+  "11": ["🎬 HASA VIDEO STUDIO", [
+    ".vedit help (reply to a video)", ".vedit quality 1080 | speed 0.8 | caption <text>",
+    ".vedit trim 00:05 00:25 | mute | format 9:16", ".vedit filter cinematic | brightness 0.1",
+    ".vedit music <HTTPS URL> | musicvolume 25", ".vedit auto", ".vedit subtitle auto",
+    ".vedit voiceover <Sinhala text>", ".vedit thumbnail 00:05", ".vedit reverse",
+    ".vedit gif", ".vedit extractaudio"
   ]]
 };
 
@@ -144,7 +151,8 @@ function makeMainMenu(config) {
     "07  PRANK & FUN",
     "08  OWNER CONTROL & SETTINGS",
     "09  SUBBOT MANAGER",
-    "10  UTILITY TOOLS"
+    "10  UTILITY TOOLS",
+    "11  🎬 HASA VIDEO STUDIO"
   ];
   return [
     "*『 HASA 2 BOT 』*",
@@ -158,7 +166,7 @@ function makeMainMenu(config) {
     ...names.map(line => "┃ " + line),
     "╰━━━━━━━━━━━━━━━━━━",
     "",
-    "↪ Reply with a category number (1-10)",
+    "↪ Reply with a category number (1-11)",
     "📜 Full commands: .list",
     "⚙️ Owner settings: .settings",
     "",
@@ -177,7 +185,8 @@ function makeCommandList(config, prefix) {
     ["PRANK & FUN", [prefix+"hack"]],
     ["OWNER CONTROL", [prefix+"status", prefix+"system", prefix+"logs", prefix+"backup", prefix+"owner", prefix+"settings", prefix+"statusalias list/add/remove", prefix+"apply", "10.1 / 10.2 — Always Online ON/OFF (via "+prefix+"settings)", "11.1 / 11.2 — Public / Private Mode (via "+prefix+"settings)", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message"]],
     ["SUBBOT MANAGER", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"delallsubbot confirm", prefix+"restartallsubbot", prefix+"helpsubbot"]],
-    ["UTILITY TOOLS", [prefix+"weather <city>", prefix+"movie <title>", prefix+"quote (reply to message)", prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>", prefix+"translate [language] <text>"]]
+    ["UTILITY TOOLS", [prefix+"weather <city>", prefix+"movie <title>", prefix+"quote (reply to message)", prefix+"math <expression>", prefix+"cal <expression>", prefix+"mathstep <expression>", prefix+"id", prefix+"jid", prefix+"wame <number> [message]", prefix+"readmore <preview> | <text>", prefix+"fancy <text>", prefix+"dictionary <English word>", prefix+"trt [language] <text>", prefix+"translate [language] <text>"]],
+    ["🎬 HASA VIDEO STUDIO", [prefix+"vedit help (reply to a video)", prefix+"vedit quality 1080 | speed 0.8 | caption <text>", prefix+"vedit trim 00:05 00:25 | mute | format 9:16", prefix+"vedit filter cinematic | brightness 0.1", prefix+"vedit music <HTTPS URL> | musicvolume 25", prefix+"vedit auto", prefix+"vedit subtitle auto", prefix+"vedit voiceover <Sinhala text>", prefix+"vedit thumbnail 00:05", prefix+"vedit reverse", prefix+"vedit gif", prefix+"vedit extractaudio"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
