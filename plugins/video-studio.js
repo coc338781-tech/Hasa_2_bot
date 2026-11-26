@@ -116,7 +116,7 @@ async function probe(file) {
   return { duration, streams: data.streams || [] };
 }
 
-function buildPlan(operations, input, output, workDir, config, hasAudio) {
+function buildPlan(operations, input, output, workDir, config, hasAudio, sourceDuration) {
   const filters = [];
   const audioFilters = [];
   const args = ["-hide_banner", "-loglevel", "error", "-y", "-i", input];
@@ -283,7 +283,7 @@ function buildPlan(operations, input, output, workDir, config, hasAudio) {
 
   if (gif && extractAudio) throw new Error("GIF සහ MP3 export එකම Job එකක කළ නොහැක. වෙන වෙනම Job දෙකක් කරන්න.");
   if (brightness !== 0 || contrast !== 1 || saturation !== 1) filters.push("eq=brightness=" + brightness + ":contrast=" + contrast + ":saturation=" + saturation);
-  const effectiveDuration = Math.max(0, (trimEnd !== null ? trimEnd - (trimStart || 0) : 0) || 0);
+  const effectiveDuration = Math.max(0, (trimEnd !== null ? trimEnd - (trimStart || 0) : sourceDuration) / speed);
   if (videoFadeIn) filters.push("fade=t=in:st=0:d=" + videoFadeIn);
   if (videoFadeOut && effectiveDuration > videoFadeOut) filters.push("fade=t=out:st=" + (effectiveDuration - videoFadeOut) + ":d=" + videoFadeOut);
   if (audioFadeIn) audioFilters.push("afade=t=in:st=0:d=" + audioFadeIn);
@@ -368,7 +368,7 @@ async function processJob(job) {
       await downloadMusic(music.value, musicFile);
       operations = operations.map(x => x.name === "music" ? { ...x, value: musicFile } : x);
     }
-    const plan = buildPlan(operations, input, output, dir, config, info.streams.some(s => s.codec_type === "audio"));
+    const plan = buildPlan(operations, input, output, dir, config, info.streams.some(s => s.codec_type === "audio"), info.duration);
     await run("ffmpeg", plan.args, { timeout: 8 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 });
     const stat = fs.statSync(output);
     if (!stat.size || stat.size > MAX_OUTPUT_BYTES) throw new Error("Edited file එක හිස් හෝ 180MB සීමාව ඉක්මවා ඇත.");
