@@ -43,7 +43,8 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 - `.tagall`, `.hidetag`, `.promote @user`, `.demote @user`, `.kick @user`, `.groupinfo`
 - `.ai question`, `.hack` (owner-only harmless prank simulation)
 - `.dl url`, `.fb url`
-- `.vedit help` (reply to a video); combine operations with ` | `, e.g. `.vedit quality 1080 | speed 0.8 | caption Sinhala text | filter cinematic`\n- `.vedit trim 00:05 00:25 | mute | format 9:16`, `.vedit music <HTTPS audio URL> | musicvolume 25`, `.vedit pitch 1.2 | fps 30`, `.vedit sharpen 1 | denoise 2`, `.vedit fadein 1 | fadeout 1`, `.vedit reverse`, `.vedit gif`, `.vedit extractaudio`
+- `.vedit help` (reply to a video); combine operations with ` | `, e.g. `.vedit quality 1080 | speed 0.8 | caption Sinhala text | filter cinematic`
+- `.vedit trim 00:05 00:25 | mute | format 9:16`, `.vedit music <HTTPS audio URL> | musicvolume 25`, `.vedit pitch 1.2 | fps 30`, `.vedit sharpen 1 | denoise 2`, `.vedit fadein 1 | fadeout 1`, `.vedit reverse`, `.vedit gif`, `.vedit extractaudio`
 - `.subbot phone-number`, `.subcheck`, `.stopsubbot`, `.restartsubbot`, `.delsubbot`, `.helpsubbot`
 - `.personalhelp`, `.contact <name or number>`, `.today`, `.sendto <name or number> | <message>`, `.smartreply on|off`
 
@@ -58,4 +59,6 @@ For AI, add `GEMINI_API_KEY=your_key` to `.env` and set `aiChat` to true in conf
 ## HASA Video Studio
 
 The Video Studio requires system `ffmpeg` and `ffprobe` binaries. On Ubuntu/Debian install them with `sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-core`. The Noto Sinhala font is normally at `/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf`; verify the path and set `videoStudio.fontFile` in `config.json`. On Termux, install `ffmpeg` and place a licensed Sinhala Unicode TTF font in a readable local path. Set that exact path in the config. Reply to a WhatsApp video with `.vedit help`; chain multiple operations with ` | ` so the bot performs one final encode. Jobs are queued and temporary media is removed after processing. The initial implementation supports local FFmpeg operations; cloud AI auto-edit, speech-to-text subtitles, background removal, and face detection require separately configured AI/model services and are not claimed as active until integrated and tested.
-\n\nThe CI suite includes real FFmpeg integration checks for chained filter export and music mixing. Automatic speech recognition/subtitles, generative AI auto-edit, voice-over synthesis, background removal and face detection are not yet enabled; they require a configured transcription/model provider and will not be shown as available commands until end-to-end tests exist.\n
+
+
+The CI suite includes real FFmpeg integration checks for chained filter export and music mixing. Automatic speech recognition/subtitles, generative AI auto-edit, voice-over synthesis, background removal and face detection are not yet enabled; they require a configured transcription/model provider and will not be shown as available commands until end-to-end tests exist.
