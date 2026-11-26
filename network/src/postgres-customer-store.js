@@ -48,7 +48,11 @@ export function createPostgresCustomerStore(pool) {
           [instanceId, customerId, instanceKey]
         );
         await client.query("COMMIT");
-        return { id: customerId, phone_e164: phone, display_name: displayName, bot: { id: instanceId, status: "offline" } };
+        const assignment = await provisioning.assignBotToAvailableServer({ botId: instanceId });
+        return {
+          id: customerId, phone_e164: phone, display_name: displayName,
+          bot: { id: instanceId, status: assignment.ok ? "provisioning" : "offline", server_assigned: assignment.ok }
+        };
       } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
