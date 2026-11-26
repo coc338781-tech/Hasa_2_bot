@@ -31,24 +31,37 @@ try {
     "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", video
   ], { stdio: "pipe" });
 
+  const failures = [];
   console.log("TEST 1/2: Gemini 3.8 Flash visual auto-edit request...");
-  const plan = await getAiAutoEdit(video, dir, config);
-  if (!Array.isArray(plan) || !plan.some(x => x.name === "filter") || !plan.some(x => x.name === "speed")) {
-    throw new Error("Gemini Flash returned an incomplete or invalid edit plan.");
+  try {
+    const plan = await getAiAutoEdit(video, dir, config);
+    if (!Array.isArray(plan) || !plan.some(x => x.name === "filter") || !plan.some(x => x.name === "speed")) {
+      throw new Error("Gemini Flash returned an incomplete or invalid edit plan.");
+    }
+    console.log("PASS: Gemini 3.8 Flash returned a validated edit plan (" + plan.map(x => x.name).join(", ") + ").");
+  } catch (error) {
+    failures.push("Gemini Flash visual auto-edit: " + (error.message || error));
+    console.error("FAIL: " + failures[failures.length - 1]);
   }
-  console.log("PASS: Gemini 3.8 Flash returned a validated edit plan (" + plan.map(x => x.name).join(", ") + ").");
 
   console.log("TEST 2/2: Gemini 3.8 Flash TTS Sinhala voice generation...");
-  await generateVoiceover("ආයුබෝවන්! මෙය හසා වීඩියෝ ස්ටුඩියෝ සිංහල හඬ පරීක්ෂණයකි.", voice, config);
-  const probe = JSON.parse(execFileSync("ffprobe", [
-    "-v", "error", "-show_entries", "format=duration:stream=codec_name,codec_type",
-    "-of", "json", voice
-  ], { encoding: "utf8" }));
-  const duration = Number(probe.format?.duration || 0);
-  if (!fs.existsSync(voice) || fs.statSync(voice).size < 1024 || !probe.streams?.some(x => x.codec_type === "audio") || !(duration > 0.5 && duration < 60)) {
-    throw new Error("Gemini TTS output failed WAV/FFprobe validation.");
+  try {
+    await generateVoiceover("ආයුබෝවන්! මෙය හසා වීඩියෝ ස්ටුඩියෝ සිංහල හඬ පරීක්ෂණයකි.", voice, config);
+    const probe = JSON.parse(execFileSync("ffprobe", [
+      "-v", "error", "-show_entries", "format=duration:stream=codec_name,codec_type",
+      "-of", "json", voice
+    ], { encoding: "utf8" }));
+    const duration = Number(probe.format?.duration || 0);
+    if (!fs.existsSync(voice) || fs.statSync(voice).size < 1024 || !probe.streams?.some(x => x.codec_type === "audio") || !(duration > 0.5 && duration < 60)) {
+      throw new Error("Gemini TTS output failed WAV/FFprobe validation.");
+    }
+    console.log("PASS: Gemini 3.8 Flash TTS generated a valid WAV audio file (" + duration.toFixed(2) + " seconds, " + fs.statSync(voice).size + " bytes).");
+  } catch (error) {
+    failures.push("Gemini Sinhala TTS: " + (error.message || error));
+    console.error("FAIL: " + failures[failures.length - 1]);
   }
-  console.log("PASS: Gemini 3.8 Flash TTS generated a valid WAV audio file (" + duration.toFixed(2) + " seconds, " + fs.statSync(voice).size + " bytes).");
+
+  if (failures.length) throw new Error("LIVE GEMINI SMOKE TEST FAILED: " + failures.join(" | "));
   console.log("LIVE GEMINI SMOKE TEST PASSED.");
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
