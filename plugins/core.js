@@ -59,7 +59,7 @@ const CATEGORIES = {
     ".vedit trim 00:05 00:25 | mute | format 9:16",
     ".vedit filter cinematic | brightness 0.1 | contrast 1.2",
     ".vedit music <HTTPS audio URL> | musicvolume 25",
-    ".vedit rotate 90 | flip h | reverse", ".vedit gif", ".vedit extractaudio"
+    ".vedit rotate 90 | flip h | reverse", ".vedit pitch 1.2 | fps 30 | sharpen 1", ".vedit fadein 1 | fadeout 1", ".vedit gif", ".vedit extractaudio"
   ]]
 };
 
@@ -167,7 +167,7 @@ function makeCommandList(config, prefix) {
     ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
     ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]],
-    ["🎬 HASA VIDEO STUDIO", [prefix+"vedit help", prefix+"vedit quality 1080 | speed 0.8 | caption <text>", prefix+"vedit trim 00:05 00:25 | mute | format 9:16", prefix+"vedit filter cinematic | brightness 0.1", prefix+"vedit music <HTTPS audio URL>", prefix+"vedit reverse", prefix+"vedit gif", prefix+"vedit extractaudio"]]
+    ["🎬 HASA VIDEO STUDIO", [prefix+"vedit help", prefix+"vedit quality 1080 | speed 0.8 | caption <text>", prefix+"vedit trim 00:05 00:25 | mute | format 9:16", prefix+"vedit filter cinematic | brightness 0.1", prefix+"vedit music <HTTPS audio URL>", prefix+"vedit reverse", prefix+"vedit pitch 1.2 | fps 30 | sharpen 1", prefix+"vedit fadein 1 | fadeout 1", prefix+"vedit gif", prefix+"vedit extractaudio"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
