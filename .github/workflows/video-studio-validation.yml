@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - fix/pairing-baileys-7rc14-test
-  push:
-    branches:
-      - feature/hasa-video-studio
 
 jobs:
   syntax-and-tests:
