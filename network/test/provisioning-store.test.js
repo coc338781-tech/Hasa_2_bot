@@ -108,3 +108,27 @@ test("owner cannot assign a bot to a server whose WhatsApp worker is not online"
   assert.deepEqual(result, { ok: false, reason: "worker_not_ready" });
   assert.equal(pool.calls.some(call => call.sql.includes("INSERT INTO provisioning_jobs")), false);
 });
+
+test("new phone customers are assigned to a fresh online worker with enough RAM", async () => {
+  const pool = fakePool([
+    { rowCount: 1, rows: [{ setting_value: 256 * 1024 * 1024 }] },
+    { rowCount: 1, rows: [{ id: "server" }] },
+    { rowCount: 1, rows: [{ id: "server", memory_available_bytes: 2 * 1024 * 1024 * 1024, worker_last_seen_at: new Date().toISOString() }] },
+    { rowCount: 1, rows: [{ setting_value: 256 * 1024 * 1024 }] },
+    { rowCount: 1, rows: [{ id: "bot", customer_id: "customer", server_id: "server" }] }
+  ]);
+  const result = await createPostgresProvisioningStore(pool).assignBotToAvailableServer({ botId: "bot" });
+  assert.equal(result.ok, true);
+  assert.equal(result.bot.server_id, "server");
+  assert.ok(pool.calls.some(call => call.sql.includes("worker_last_seen_at > now() - interval '90 seconds'")));
+  assert.ok(pool.calls.some(call => call.sql.includes("INSERT INTO provisioning_jobs")));
+});
+
+test("new phone customers remain unassigned when no healthy worker is available", async () => {
+  const pool = fakePool([
+    { rowCount: 1, rows: [{ setting_value: 256 * 1024 * 1024 }] },
+    { rowCount: 0, rows: [] }
+  ]);
+  const result = await createPostgresProvisioningStore(pool).assignBotToAvailableServer({ botId: "bot" });
+  assert.deepEqual(result, { ok: false, reason: "server_unavailable" });
+});
