@@ -472,7 +472,7 @@ async function processJob(job) {
       const wav = path.join(dir, "speech.wav");
       const subtitleBase = path.join(dir, "generated-captions");
       await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
-      await run(config.videoStudio?.whisperBinary || "whisper-cli", ["-m", model, "-f", wav, "-l", config.videoStudio?.whisperLanguage || "si", "-osrt", "-of", subtitleBase], { timeout: 8 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+      await run(config.videoStudio?.whisperBinary || "whisper-cli", ["-m", model, "-f", wav, "-l", config.videoStudio?.whisperLanguage || "si", "-t", String(config.videoStudio?.whisperThreads || 2), "-osrt", "-of", subtitleBase], { timeout: 8 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
       const subtitleFile = subtitleBase + ".srt";
       if (!fs.existsSync(subtitleFile) || !fs.statSync(subtitleFile).size) throw new Error("Whisper මඟින් Subtitle file එකක් නිර්මාණය වුණේ නැහැ.");
       operations = operations.filter(x => !(x.name === "subtitle" && x.value.toLowerCase() === "auto"));
