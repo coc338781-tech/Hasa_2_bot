@@ -369,9 +369,9 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   } else if (muteOriginal) {
     args.push("-an");
   } else if (audioFilters.length) {
-    args.push("-af", audioFilters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac");
+    args.push("-af", audioFilters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   } else {
-    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac");
+    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   }
   if (gif) args.push("-loop", "0");
   else if (outputFormat === "mp4") args.push("-movflags", "+faststart");
