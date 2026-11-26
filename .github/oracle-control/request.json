@@ -1,4 +1,4 @@
 {
-  "action": "inspect-guard-script",
-  "request_id": "video-studio-guard-inspect-20261126"
+  "action": "deploy",
+  "request_id": "hasa-video-studio-prod-deploy-20261126"
 }
