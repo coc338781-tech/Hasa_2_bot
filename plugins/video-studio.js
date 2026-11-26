@@ -125,7 +125,7 @@ async function probe(file, maxDuration = MAX_DURATION) {
   return { duration, streams: data.streams || [] };
 }
 
-function buildPlan(operations, input, output, workDir, config, hasAudio, sourceDuration) {
+export function buildPlan(operations, input, output, workDir, config, hasAudio, sourceDuration) {
   const filters = [];
   const audioFilters = [];
   const args = ["-hide_banner", "-loglevel", "error", "-y", "-i", input];
