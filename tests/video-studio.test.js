@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseOperations, parseTime, buildTtsInteractionRequest, extractTtsAudio } from "../plugins/video-studio.js";
+import { parseOperations, parseTime, buildPlan, buildTtsInteractionRequest, extractTtsAudio } from "../plugins/video-studio.js";
 
 test("parseOperations keeps multi-word Sinhala captions and splits chained edits", () => {
   assert.deepEqual(parseOperations("quality 1080 | speed 0.8 | caption අද මගේ ලස්සන දවස | mute"), [
