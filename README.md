@@ -62,3 +62,17 @@ The Video Studio requires system `ffmpeg` and `ffprobe` binaries. On Ubuntu/Debi
 
 
 The CI suite includes real FFmpeg integration checks for chained filter export and music mixing. Automatic speech recognition/subtitles, generative AI auto-edit, voice-over synthesis, background removal and face detection are not yet enabled; they require a configured transcription/model provider and will not be shown as available commands until end-to-end tests exist.
+
+## Optional AI editing and Sinhala auto-subtitles
+
+- `.vedit auto` creates a small 3×3 contact sheet from the video and sends those preview frames to Gemini for a conservative visual edit plan. It requires `GEMINI_API_KEY`. This is an explicit cloud-processing command; do not use it for private footage unless you are comfortable sending preview frames to Google.
+- `.vedit subtitle auto` runs local Whisper.cpp speech recognition in Sinhala and burns the generated SRT captions into the video. It does not send the video/audio to Gemini.
+- On Ubuntu/Debian, build Whisper.cpp and download a multilingual model (the base model is a lighter starting point):
+  ```sh
+  sudo apt-get install -y cmake build-essential
+  git clone https://github.com/ggml-org/whisper.cpp.git /opt/whisper.cpp
+  cmake -S /opt/whisper.cpp -B /opt/whisper.cpp/build -DWHISPER_BUILD_TESTS=OFF
+  cmake --build /opt/whisper.cpp/build -j2
+  bash /opt/whisper.cpp/models/download-ggml-model.sh base
+  ```
+- Set `videoStudio.whisperBinary` to `/opt/whisper.cpp/build/bin/whisper-cli` and `videoStudio.whisperModel` to `/opt/whisper.cpp/models/ggml-base.bin` in `config.json`. The default language is Sinhala (`si`) and Whisper is limited to two CPU threads by default.
