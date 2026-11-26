@@ -98,8 +98,8 @@ export function createWhatsAppWorker({ dataDir, baileys, logger, onPairingCode =
           if (sessions.get(instanceId) !== entry) return;
           await persistCredentials();
           const linkedId = auth.state.creds.me?.id || auth.state.creds.me?.jid || "";
-          const linkedPhone = String(linkedId).split(":")[0].replace(/\\D/g, "");
-          const expectedPhone = phone.replace(/\\D/g, "");
+          const linkedPhone = String(linkedId).split(":")[0].replace(/\D/g, "");
+          const expectedPhone = phone.replace(/\D/g, "");
           if (credentialSaveError || auth.state.creds.registered !== true || !linkedPhone || linkedPhone !== expectedPhone) {
             entry.status = "failed";
             sessions.delete(instanceId);
