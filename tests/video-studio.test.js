@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseOperations, parseTime, buildPlan, buildTtsInteractionRequest, extractTtsAudio } from "../plugins/video-studio.js";
+import { parseOperations, parseTime, buildPlan, buildTtsInteractionRequest, extractTtsAudio, normalizeAiEditPlan } from "../plugins/video-studio.js";
 
 test("parseOperations keeps multi-word Sinhala captions and splits chained edits", () => {
   assert.deepEqual(parseOperations("quality 1080 | speed 0.8 | caption අද මගේ ලස්සන දවස | mute"), [
@@ -68,4 +68,24 @@ test("the last music operation wins when music is removed in the same job", () =
   { videoStudio: { ffmpegThreads: 1 } }, true, 2);
   assert.equal(plan.args.filter(value => value === "-i").length, 1);
   assert.ok(!plan.args.includes("-stream_loop"));
+});
+
+test("Gemini auto-edit values are clamped to safe bounds and missing values use neutral defaults", () => {
+  const plan = normalizeAiEditPlan({
+    brightness: 9,
+    contrast: -4,
+    saturation: "not-a-number",
+    speed: 0,
+    filter: "unexpected",
+    format: "unexpected",
+    caption: "  සිංහල caption  "
+  });
+  assert.deepEqual(plan, [
+    { name: "filter", value: "none" },
+    { name: "brightness", value: "0.1" },
+    { name: "contrast", value: "0.9" },
+    { name: "saturation", value: "1" },
+    { name: "speed", value: "0.8" },
+    { name: "caption", value: "සිංහල caption" }
+  ]);
 });
