@@ -26,6 +26,9 @@
     "ownerOnly": true,
     "fontFile": "/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf",
     "maxDurationSeconds": 900,
-    "maxInputBytes": 188743680
+    "maxInputBytes": 188743680,
+    "whisperBinary": "whisper-cli",
+    "whisperModel": "",
+    "whisperLanguage": "si"
   }
 }
