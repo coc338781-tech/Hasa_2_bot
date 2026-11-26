@@ -425,7 +425,7 @@ async function downloadMusic(url, destination) {
 }
 
 
-async function getAiAutoEdit(input, workDir, config) {
+export async function getAiAutoEdit(input, workDir, config) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("AI Auto Edit සඳහා .env තුළ GEMINI_API_KEY සකසන්න.");
   const contactSheet = path.join(workDir, "video-contact-sheet.jpg");
@@ -504,7 +504,7 @@ export function extractTtsAudio(response) {
   return null;
 }
 
-async function generateVoiceover(text, destination, config) {
+export async function generateVoiceover(text, destination, config) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("AI Voice Over සඳහා .env තුළ GEMINI_API_KEY සකසන්න.");
   if (!text || text.length > 1200) throw new Error("Voice-over Text එක අක්ෂර 1,200කට අඩු විය යුතුයි.");
