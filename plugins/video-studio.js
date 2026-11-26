@@ -478,6 +478,32 @@ async function getAiAutoEdit(input, workDir, config) {
 }
 
 
+export function buildTtsInteractionRequest(text, config = {}) {
+  const style = String(config.videoStudio?.ttsStyle || "").trim();
+  const textPart = { type: "text", text };
+  if (style) textPart.annotations = [{ type: "speech_metadata", style }];
+  return {
+    model: config.videoStudio?.ttsModel || "gemini-3.8-flash-tts",
+    input: [{ type: "user_input", content: [textPart] }],
+    response_format: { type: "audio" },
+    generation_config: {
+      speech_config: [{ voice: config.videoStudio?.ttsVoice || "Kore" }]
+    }
+  };
+}
+
+export function extractTtsAudio(response) {
+  if (typeof response?.output_audio?.data === "string") return response.output_audio.data;
+  const steps = Array.isArray(response?.steps) ? response.steps : [];
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i];
+    if (step?.type !== "model_output" || !Array.isArray(step.content)) continue;
+    const audioPart = step.content.find(part => part?.type === "audio" && typeof part.data === "string");
+    if (audioPart) return audioPart.data;
+  }
+  return null;
+}
+
 async function generateVoiceover(text, destination, config) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("AI Voice Over සඳහා .env තුළ GEMINI_API_KEY සකසන්න.");
@@ -485,28 +511,24 @@ async function generateVoiceover(text, destination, config) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90000);
   try {
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(config.videoStudio?.ttsModel || "gemini-3.8-flash-tts") +
-      ":generateContent", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text }] }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            languageCode: config.videoStudio?.ttsLanguage || "si-LK",
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: config.videoStudio?.ttsVoice || "Kore" } }
-          }
-        }
-      }),
+      body: JSON.stringify(buildTtsInteractionRequest(text, config)),
       signal: controller.signal
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || "Gemini TTS request failed (" + response.status + ").");
-    const audio = data.candidates?.[0]?.content?.parts?.find(part => part.inlineData?.data)?.inlineData?.data;
-    if (!audio) throw new Error("Gemini TTS වෙතින් Audio එකක් ලැබුණේ නැහැ.");
-    fs.writeFileSync(destination, Buffer.from(audio, "base64"), { mode: 0o600 });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = data.error?.message || data.message || "Gemini TTS request failed (" + response.status + ").";
+      throw new Error(detail);
+    }
+    const encoded = extractTtsAudio(data);
+    if (!encoded) throw new Error("Gemini TTS වෙතින් Audio output එකක් ලැබුණේ නැහැ.");
+    const audio = Buffer.from(encoded, "base64");
+    if (audio.length < 44 || audio.toString("ascii", 0, 4) !== "RIFF" || audio.toString("ascii", 8, 12) !== "WAVE") {
+      throw new Error("Gemini TTS වෙතින් ලැබුණු audio එක වලංගු WAV file එකක් නොවේ.");
+    }
+    fs.writeFileSync(destination, audio, { mode: 0o600 });
   } finally {
     clearTimeout(timeout);
   }
