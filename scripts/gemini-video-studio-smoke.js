@@ -6,8 +6,8 @@ import { getAiAutoEdit, generateVoiceover } from "../plugins/video-studio.js";
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
-  console.log("SKIP: GEMINI_API_KEY is not configured in GitHub Actions secrets; live Gemini calls were not made.");
-  process.exit(0);
+  console.error("BLOCKED: GEMINI_API_KEY is missing from GitHub Actions secrets. Configure the repository secret to run real Gemini 3.8 Flash and TTS API checks.");
+  process.exit(1);
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-gemini-smoke-"));
