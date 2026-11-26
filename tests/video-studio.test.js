@@ -59,3 +59,13 @@ test("GIF export is encoded as WhatsApp-compatible MP4 playback", () => {
   assert.ok(plan.args.includes("yuv420p"));
   assert.ok(!plan.args.includes("-loop"));
 });
+
+test("the last music operation wins when music is removed in the same job", () => {
+  const plan = buildPlan([
+    { name: "music", value: "/tmp/work/music.wav" },
+    { name: "music", value: "remove" }
+  ], "/tmp/input.mp4", "/tmp/output.mp4", "/tmp/work",
+  { videoStudio: { ffmpegThreads: 1 } }, true, 2);
+  assert.equal(plan.args.filter(value => value === "-i").length, 1);
+  assert.ok(!plan.args.includes("-stream_loop"));
+});
