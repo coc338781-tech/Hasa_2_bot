@@ -166,7 +166,8 @@ function makeCommandList(config, prefix) {
     ["AI & PRANK COMMANDS", [prefix+"ai <question>", prefix+"hack"]],
     ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
-    ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]],\n    ["🎬 HASA VIDEO STUDIO", [prefix+"vedit help", prefix+"vedit quality 1080 | speed 0.8 | caption <text>", prefix+"vedit trim 00:05 00:25 | mute | format 9:16", prefix+"vedit filter cinematic | brightness 0.1", prefix+"vedit music <HTTPS audio URL>", prefix+"vedit reverse", prefix+"vedit gif", prefix+"vedit extractaudio"]]
+    ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]],
+    ["🎬 HASA VIDEO STUDIO", [prefix+"vedit help", prefix+"vedit quality 1080 | speed 0.8 | caption <text>", prefix+"vedit trim 00:05 00:25 | mute | format 9:16", prefix+"vedit filter cinematic | brightness 0.1", prefix+"vedit music <HTTPS audio URL>", prefix+"vedit reverse", prefix+"vedit gif", prefix+"vedit extractaudio"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
