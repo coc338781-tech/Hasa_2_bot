@@ -114,11 +114,11 @@ function escapeDrawText(text) {
     .replace(/%/g, "\\%").replace(/,/g, "\\,").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
 }
 
-async function probe(file) {
+async function probe(file, maxDuration = MAX_DURATION) {
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration,size:stream=codec_type,width,height", "-of", "json", file], { timeout: 20000, maxBuffer: 2 * 1024 * 1024 });
   const data = JSON.parse(stdout);
   const duration = Number(data.format?.duration || 0);
-  if (!duration || duration > (Number(process.env.HASA_VIDEO_MAX_DURATION) || MAX_DURATION)) throw new Error("වීඩියෝව හිස් හෝ විනාඩි 15 සීමාව ඉක්මවා ඇත.");
+  if (!duration || duration > maxDuration) throw new Error("වීඩියෝව හිස් හෝ " + Math.round(maxDuration / 60) + " විනාඩි සීමාව ඉක්මවා ඇත.");
   return { duration, streams: data.streams || [] };
 }
 
@@ -296,9 +296,14 @@ function buildPlan(operations, input, output, workDir, config, hasAudio, sourceD
   if (audioFadeOut && effectiveDuration > audioFadeOut) audioFilters.push("afade=t=out:st=" + (effectiveDuration - audioFadeOut) + ":d=" + audioFadeOut);
 
   if (extractAudio) {
-    return { args: ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-codec:a", "libmp3lame", "-q:a", "3", output], outputFormat };
+    if (!hasAudio) throw new Error("මේ වීඩියෝ එකේ Audio track එකක් නැහැ.");
+    args.push("-vn");
+    if (audioFilters.length) args.push("-af", audioFilters.join(","));
+    args.push("-codec:a", "libmp3lame", "-q:a", "3", output);
+    return { args, outputFormat };
   }
 
+  if (reverse && sourceDuration > 120) throw new Error("Reverse Effect එක සඳහා වීඩියෝව විනාඩි 2කට අඩු විය යුතුයි.");
   if (reverse) {
     filters.push("reverse");
     audioFilters.push("areverse");
@@ -368,7 +373,7 @@ async function processJob(job) {
   try {
     await sock.sendMessage(jid, { text: "⏳ *HASA VIDEO STUDIO*\nVideo එක Download කරලා Edit කරන්න සූදානම් කරනවා..." }, { quoted: message });
     await downloadMedia(video, "video", input, config.videoStudio?.maxInputBytes || MAX_INPUT_BYTES);
-    const info = await probe(input);
+    const info = await probe(input, config.videoStudio?.maxDurationSeconds || MAX_DURATION);
     if (!info.streams.some(s => s.codec_type === "video")) throw new Error("Video track එකක් හමු වුණේ නැහැ.");
     const music = operations.find(x => x.name === "music" && /^https:\/\//i.test(x.value));
     if (music) {
