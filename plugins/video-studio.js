@@ -252,7 +252,7 @@ function buildPlan(operations, input, output, workDir, config) {
     filters.push("drawtext=" + fontPart + "textfile='" + textfile + "':fontcolor=" + color + ":fontsize=" + size + ":borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-text_h-50");
   }
 
-  if (filters.length) args.push("-vf", filters.join(","));
+  if (!gif && filters.length) args.push("-vf", filters.join(","));
   if (gif) {
     args.push("-an", "-vf", [...filters, "fps=12,scale=480:-1:flags=lanczos"].join(","));
   } else if (audioMode === "mute") {
