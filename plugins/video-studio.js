@@ -134,7 +134,7 @@ async function probe(file, maxDuration = MAX_DURATION) {
 export function buildPlan(operations, input, output, workDir, config, hasAudio, sourceDuration) {
   const filters = [];
   const audioFilters = [];
-  const args = ["-hide_banner", "-loglevel", "error", "-y", "-filter_threads", "1", "-filter_complex_threads", "1", "-i", input];
+  const args = ["-hide_banner", "-loglevel", "error", "-y", "-filter_threads", "1", "-i", input];
   let outputFormat = "mp4";
   let crf = 23;
   let thumbnailAt = null;
@@ -332,7 +332,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   if (thumbnailAt !== null) {
     if (thumbnailAt >= sourceDuration) throw new Error("Thumbnail time එක වීඩියෝවේ duration එක ඉක්මවයි.");
     if (operations.length !== 1) throw new Error("Thumbnail export එක වෙනත් edits සමඟ එකම Job එකක කළ නොහැක. .vedit thumbnail 00:05 ලෙස වෙනම කරන්න.");
-    return { args: ["-hide_banner", "-loglevel", "error", "-y", "-filter_threads", "1", "-filter_complex_threads", "1", "-ss", String(thumbnailAt), "-i", input, "-frames:v", "1", "-q:v", "2", output], outputFormat };
+    return { args: ["-hide_banner", "-loglevel", "error", "-y", "-filter_threads", "1", "-ss", String(thumbnailAt), "-i", input, "-frames:v", "1", "-q:v", "2", output], outputFormat };
   }
   if (brightness !== 0 || contrast !== 1 || saturation !== 1) filters.push("eq=brightness=" + brightness + ":contrast=" + contrast + ":saturation=" + saturation);
   const effectiveDuration = Math.max(0, (trimEnd !== null ? trimEnd - (trimStart || 0) : sourceDuration) / speed);
