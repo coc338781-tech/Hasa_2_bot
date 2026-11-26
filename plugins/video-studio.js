@@ -139,6 +139,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   let crf = 23;
   let thumbnailAt = null;
   let audioMode = "copy";
+  const encoderThreads = Math.max(1, Math.min(4, Number(config.videoStudio?.ffmpegThreads) || 2));
   let muteOriginal = false;
   let speed = 1;
   let trimStart = null, trimEnd = null;
@@ -382,20 +383,20 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
     } else {
       args.push("-filter_complex", "[1:a]apad=whole_dur=" + effectiveDuration + "[voice]", "-map", "0:v:0", "-map", "[voice]");
     }
-    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
+    args.push("-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   } else if (musicPath) {
     args.push("-stream_loop", "-1", "-i", musicPath);
     if (hasAudio && !muteOriginal) {
       const sourceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
       args.push("-filter_complex", "[0:a]" + sourceFilters + "anull[original];[1:a]volume=" + musicVolume + "[music];[original][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");
     } else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);
-    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac", "-shortest");
+    args.push("-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac", "-shortest");
   } else if (muteOriginal) {
     args.push("-an");
   } else if (audioFilters.length) {
-    args.push("-af", audioFilters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
+    args.push("-af", audioFilters.join(","), "-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   } else {
-    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
+    args.push("-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   }
   if (gif) args.push("-loop", "0");
   else if (outputFormat === "mp4") args.push("-movflags", "+faststart");
