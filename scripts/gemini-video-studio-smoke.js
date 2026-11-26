@@ -24,7 +24,7 @@ try {
       whisperBinary: process.env.WHISPER_BINARY || "whisper-cli",
       whisperModel: process.env.WHISPER_MODEL || "",
       whisperLanguage: "si",
-      whisperThreads: 2
+      whisperThreads: 1
     }
   };
 
