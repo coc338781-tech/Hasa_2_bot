@@ -448,6 +448,9 @@ jobs:
                 [ -s "$FONT" ] && echo "FONT_READY=$FONT"
               done
               command -v fc-match >/dev/null 2>&1 && fc-match Sinhala | head -n 1 || true
+              command -v fc-list >/dev/null 2>&1 && fc-list :lang=si family file | head -n 12 || true
+              echo "=== AVAILABLE SINHALA FONT PACKAGES ==="
+              dnf -q list available "*noto*sinhala*" 2>&1 | head -n 15 || true
               echo "=== MEMORY / DISK ==="
               free -m
               df -h /home/opc
