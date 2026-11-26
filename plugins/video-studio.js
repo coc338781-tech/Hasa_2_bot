@@ -457,7 +457,7 @@ export async function getAiAutoEdit(input, workDir, config) {
         lastError = error;
         let status = Number(error?.status || error?.code || 0);
         if (!status) {
-          const match = /"code"\\s*:\\s*(\\d+)/.exec(error?.message || "");
+          const match = /"code"[^0-9]*(\d+)/.exec(error?.message || "");
           if (match) status = Number(match[1]);
         }
         const transient = [408, 429, 500, 502, 503, 504].includes(status);
