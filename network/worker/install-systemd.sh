@@ -26,6 +26,9 @@ API_URL="$(sed -n 's/^HASA_AGENT_API_URL=//p' "$AGENT_ENV" | tail -n1)"
 AGENT_TOKEN="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(typeof x.agent_token!=="string"||x.agent_token.length<32)process.exit(2);process.stdout.write(x.agent_token)' "$CREDENTIAL_FILE")"
 if [[ -z "$API_URL" || -z "$AGENT_TOKEN" ]]; then echo "Could not read the enrolled agent API URL/token." >&2; exit 1; fi
 if ! id hasa-worker >/dev/null 2>&1; then useradd --system --home-dir /var/lib/hasa-worker --create-home --shell /usr/sbin/nologin hasa-worker; fi
+# The API deployment restricts /opt/hasa-network to the ec2-user group.
+# Give the isolated worker read-only traversal access without making app files world-readable.
+usermod --append --groups ec2-user hasa-worker
 install -d -o root -g root -m 0755 /opt/hasa-network
 cp -a "$NETWORK_DIR/." /opt/hasa-network/
 cd /opt/hasa-network
