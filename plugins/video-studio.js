@@ -175,6 +175,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
         if (times.length !== 2) throw new Error("trim 00:05 00:25 ලෙස දෙන්න.");
         trimStart = parseTime(times[0]); trimEnd = parseTime(times[1]);
         if (trimEnd <= trimStart) throw new Error("Trim end එක start එකට වඩා පසුව තිබිය යුතුයි.");
+        if (trimStart >= sourceDuration || trimEnd > sourceDuration) throw new Error("Trim time එක වීඩියෝවේ duration එක ඉක්මවයි.");
         audioMode = "encode";
         break;
       }
@@ -329,6 +330,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   if (extractAudio && (voiceoverPath || musicPath)) throw new Error("MP3 extraction එක වෙනම Job එකක කරන්න; Music/Voice-over සමඟ එකතු කළ නොහැක.");
   if (gif && (voiceoverPath || musicPath)) throw new Error("GIF එකකට Audio track එකක් එක් කළ නොහැක.");
   if (thumbnailAt !== null) {
+    if (thumbnailAt >= sourceDuration) throw new Error("Thumbnail time එක වීඩියෝවේ duration එක ඉක්මවයි.");
     if (operations.length !== 1) throw new Error("Thumbnail export එක වෙනත් edits සමඟ එකම Job එකක කළ නොහැක. .vedit thumbnail 00:05 ලෙස වෙනම කරන්න.");
     return { args: ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(thumbnailAt), "-i", input, "-frames:v", "1", "-q:v", "2", output], outputFormat };
   }
@@ -351,7 +353,8 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
     return { args, outputFormat };
   }
 
-  if (reverse && sourceDuration > 120) throw new Error("Reverse Effect එක සඳහා වීඩියෝව විනාඩි 2කට අඩු විය යුතුයි.");
+  const reverseDuration = trimEnd !== null ? trimEnd - trimStart : sourceDuration;
+  if (reverse && reverseDuration > 120) throw new Error("Reverse Effect එක සඳහා වීඩියෝව විනාඩි 2කට අඩු විය යුතුයි.");
   if (reverse) {
     filters.push("reverse");
     audioFilters.push("areverse");
@@ -380,7 +383,8 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
       const sourceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
       args.push("-filter_complex", "[0:a]" + sourceFilters + "anull[original];[1:a]apad=whole_dur=" + effectiveDuration + "[voice];[original][voice]amix=inputs=2:duration=first:dropout_transition=1[aout]", "-map", "0:v:0", "-map", "[aout]");
     } else {
-      args.push("-filter_complex", "[1:a]apad=whole_dur=" + effectiveDuration + "[voice]", "-map", "0:v:0", "-map", "[voice]");
+      const voiceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
+      args.push("-filter_complex", "[1:a]" + voiceFilters + "apad=whole_dur=" + effectiveDuration + "[voice]", "-map", "0:v:0", "-map", "[voice]");
     }
     args.push("-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   } else if (musicPath) {
@@ -388,7 +392,10 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
     if (hasAudio && !muteOriginal) {
       const sourceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
       args.push("-filter_complex", "[0:a]" + sourceFilters + "anull[original];[1:a]volume=" + musicVolume + "[music];[original][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v:0", "-map", "[aout]");
-    } else args.push("-map", "0:v:0", "-map", "1:a:0", "-af", "volume=" + musicVolume);
+    } else {
+      const musicFilters = [...audioFilters, "volume=" + musicVolume];
+      args.push("-map", "0:v:0", "-map", "1:a:0", "-af", musicFilters.join(","));
+    }
     args.push("-c:v", "libx264", "-threads", String(encoderThreads), "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac", "-shortest");
   } else if (muteOriginal) {
     args.push("-an");
@@ -417,11 +424,28 @@ async function downloadMusic(url, destination) {
     if (!response.ok) throw new Error("Music URL එකෙන් audio ලබාගන්න බැරි වුණා (" + response.status + ").");
     const type = response.headers.get("content-type") || "";
     if (!type.startsWith("audio/") && !/octet-stream/i.test(type)) throw new Error("URL එක audio file එකක් නොවේ.");
+    const maxBytes = 30 * 1024 * 1024;
     const declaredSize = Number(response.headers.get("content-length") || 0);
-    if (declaredSize > 30 * 1024 * 1024) throw new Error("Music file එක 30MB ඉක්මවයි.");
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (!buffer.length || buffer.length > 30 * 1024 * 1024) throw new Error("Music file එක හිස් හෝ 30MB ඉක්මවයි.");
-    fs.writeFileSync(destination, buffer, { mode: 0o600 });
+    if (declaredSize > maxBytes) throw new Error("Music file එක 30MB ඉක්මවයි.");
+    if (!response.body) throw new Error("Music URL එකෙන් audio stream එකක් ලැබුණේ නැහැ.");
+    let total = 0;
+    const fd = fs.openSync(destination, "w", 0o600);
+    try {
+      for await (const chunk of response.body) {
+        total += chunk.length;
+        if (total > maxBytes) throw new Error("Music file එක 30MB ඉක්මවයි.");
+        fs.writeSync(fd, chunk);
+      }
+    } catch (error) {
+      fs.rmSync(destination, { force: true });
+      throw error;
+    } finally {
+      fs.closeSync(fd);
+    }
+    if (!total) {
+      fs.rmSync(destination, { force: true });
+      throw new Error("Music file එක හිස්.");
+    }
   } finally {
     clearTimeout(timeout);
   }
