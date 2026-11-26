@@ -31,6 +31,29 @@ export function createPostgresProvisioningStore(pool) {
       );
       return bytes;
     },
+    async assignBotToAvailableServer({ botId }) {
+      const minFreeMemoryBytes = await this.getMinFreeMemoryBytes();
+      const candidates = await pool.query(
+        `SELECT s.id FROM servers s
+          WHERE s.status = 'online'
+            AND s.last_heartbeat_at > now() - interval '150 seconds'
+            AND s.worker_last_seen_at > now() - interval '90 seconds'
+            AND s.memory_available_bytes >= $1
+          ORDER BY
+            (SELECT count(*) FROM bot_instances b
+              WHERE b.server_id = s.id AND b.status IN ('online','provisioning','pairing')) ASC,
+            s.memory_available_bytes DESC, s.last_heartbeat_at DESC
+          LIMIT 5`,
+        [minFreeMemoryBytes]
+      );
+      let lastReason = null;
+      for (const candidate of candidates.rows) {
+        const result = await this.assignBotToServer({ botId, serverId: candidate.id });
+        if (result.ok) return result;
+        lastReason = result.reason;
+      }
+      return { ok: false, reason: lastReason || "server_unavailable" };
+    },
     async assignBotToServer({ botId, serverId }) {
       const client = await pool.connect();
       try {
