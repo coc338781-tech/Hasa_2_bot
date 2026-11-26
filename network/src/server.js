@@ -106,6 +106,33 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       return;
     }
 
+    if (req.method === "POST" && req.url === "/v1/customer/phone-access") {
+      const remote = req.socket.remoteAddress || "unknown";
+      if (rateLimited(customerRegisterAttempts, remote, clock(), 3)) { sendJson(res, 429, { error: "rate_limited" }); return; }
+      if (!customerStore || typeof customerStore.createCustomerByPhone !== "function" || typeof customerStore.findCustomerByPhone !== "function") {
+        sendJson(res, 503, { error: "customer_auth_unavailable" }); return;
+      }
+      try {
+        const body = await readJson(req);
+        const phone = normalizePhone(body?.phone);
+        if (!phone) { sendJson(res, 400, { error: "invalid_phone" }); return; }
+        let customer = await customerStore.findCustomerByPhone(phone);
+        if (customer) {
+          if (customer.status !== "active" || !customer.whatsapp_registered) {
+            sendJson(res, 409, { error: "phone_already_registered_unverified" }); return;
+          }
+        } else {
+          customer = await customerStore.createCustomerByPhone({ phone });
+        }
+        const accessToken = await issueCustomerSession(customerStore, customer.id, clock());
+        sendJson(res, 200, { authenticated: true, access_token: accessToken, expires_in_seconds: CUSTOMER_SESSION_TTL_MS / 1000 });
+      } catch (error) {
+        if (error.code === "23505") { sendJson(res, 409, { error: "phone_already_registered_unverified" }); return; }
+        sendJson(res, 500, { error: "customer_auth_unavailable" });
+      }
+      return;
+    }
+
     if (req.method === "POST" && req.url === "/v1/customer/register") {
       const remote = req.socket.remoteAddress || "unknown";
       if (rateLimited(customerRegisterAttempts, remote, clock(), 3)) { sendJson(res, 429, { error: "rate_limited" }); return; }
@@ -156,9 +183,9 @@ export function createAppServer({ agentStore = null, customerStore = null, provi
       try {
         const data = await customerStore.getCustomerDashboard(customerSession.id);
         if (!data) { sendJson(res, 404, { error: "customer_not_found" }); return; }
-        const { customer_id, display_name, phone_e164, account_status, login_email, bot_id, bot_status, release_version, last_started_at, last_stopped_at, last_error_code, whatsapp_registered, runtime_provisioned, server_assigned, pairing_id, pairing_status, pairing_phone, pairing_expires_at, pairing_created_at } = data;
+        const { customer_id, display_name, phone_e164, account_status, bot_id, bot_status, release_version, last_started_at, last_stopped_at, last_error_code, whatsapp_registered, runtime_provisioned, server_assigned, pairing_id, pairing_status, pairing_phone, pairing_expires_at, pairing_created_at } = data;
         sendJson(res, 200, {
-          customer: { id: customer_id, display_name, phone_e164, status: account_status, login_email },
+          customer: { id: customer_id, display_name, phone_e164, status: account_status },
           bot: bot_id ? { id: bot_id, status: bot_status, whatsapp_registered: Boolean(whatsapp_registered), runtime_provisioned: Boolean(runtime_provisioned), server_assigned: Boolean(server_assigned), release_version, last_started_at, last_stopped_at, last_error_code } : null,
           latest_pairing: pairing_id ? { id: pairing_id, status: pairing_status, phone_e164: pairing_phone, expires_at: pairing_expires_at, created_at: pairing_created_at } : null
         });
