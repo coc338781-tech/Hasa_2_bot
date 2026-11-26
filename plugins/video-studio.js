@@ -509,8 +509,8 @@ export async function getAiAutoEdit(input, workDir, config) {
 
 export function normalizeAiEditPlan(parsed) {
   // Gemini may wrap JSON in a string or return a list; safely select an object when present.
-  if (typeof parsed === "string") {
-    try { parsed = JSON.parse(parsed); } catch { parsed = null; }
+  for (let depth = 0; depth < 2 && typeof parsed === "string"; depth++) {
+    try { parsed = JSON.parse(parsed); } catch { parsed = null; break; }
   }
   if (Array.isArray(parsed)) {
     parsed = parsed.find(item => item && typeof item === "object" && !Array.isArray(item)) || null;
