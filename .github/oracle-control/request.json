@@ -1,4 +1,4 @@
 {
-  "action": "deploy",
-  "request_id": "hasa-video-studio-prod-deploy-retry-20261126"
+  "action": "status",
+  "request_id": "hasa-video-posttimeout-status-20261126"
 }
