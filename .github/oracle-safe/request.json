@@ -1,4 +1,4 @@
 {
-  "action": "deploy",
-  "request_id": "hasa-video-stream-fix-20261126-01"
+  "action": "status",
+  "request_id": "hasa-video-stream-postdeploy-20261126-02"
 }
