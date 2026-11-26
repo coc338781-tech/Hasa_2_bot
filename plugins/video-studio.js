@@ -433,7 +433,7 @@ export async function getAiAutoEdit(input, workDir, config) {
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vf", "fps=1/3,scale=320:-1,tile=3x3", "-frames:v", "1", "-q:v", "4", contactSheet], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
   if (!fs.existsSync(contactSheet)) throw new Error("AI analysis සඳහා Video preview එකක් සකස් කළ නොහැක.");
   const imageData = fs.readFileSync(contactSheet).toString("base64");
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 90000 } });
   const model = config.videoStudio?.aiModel || "gemini-3.8-flash";
   const prompt = `Analyze this 3x3 contact sheet sampled from a user-provided video. Recommend a conservative, tasteful edit using ONLY the allowed options. Return JSON only with keys: brightness (-0.1..0.1), contrast (0.9..1.2), saturation (0.8..1.3), speed (0.8..1.2), filter ("none"|"cinematic"|"warm"|"bw"|"vintage"), format ("original"|"9:16"|"16:9"|"1:1"), caption (short Sinhala caption, maximum 70 characters). Do not invent events, people, identities, audio, dialogue, or facts. Prefer format "original" unless vertical social video is clearly appropriate. Do not include markdown.`;
   const result = await ai.models.generateContent({
