@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           ACTION="$(jq -r '.action // empty' .github/oracle-control/request.json)"
           REQUEST_ID="$(jq -r '.request_id // empty' .github/oracle-control/request.json)"
-          case "$ACTION" in status|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit|dnf-cache-mitigate|scheduler-audit|remove-stale-cron|inspect-baileys-source) ;; *) echo "Rejected operation"; exit 1 ;; esac
+          case "$ACTION" in status|video-studio-preflight|logs|connection-audit|auth-audit|restart|sshd-restart|oracle-agent-restart|rollback|remove-old|inspect-changes|inspect-guard-script|inspect-downloader-diff|checkpoint-downloader|patch-deploy-guard|deploy|restore-start|backup-restore-test|crash-audit|pm2-event-audit|access-audit|repair-pm2-startup|disable-unsupported-diagnostics|xvdl-diagnose|dnf-cache-audit|dnf-cache-mitigate|scheduler-audit|remove-stale-cron|inspect-baileys-source) ;; *) echo "Rejected operation"; exit 1 ;; esac
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]]
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_HOST"
@@ -429,6 +429,29 @@ jobs:
               print_status || true
               ;;
             status)
+              print_status
+              ;;
+            video-studio-preflight)
+              echo "Read-only Video Studio runtime dependency audit."
+              echo "=== FFMPEG ==="
+              FFMPEG="$(command -v ffmpeg || true)"
+              echo "FFMPEG_PATH=${FFMPEG:-MISSING}"
+              if [ -n "$FFMPEG" ]; then
+                ffmpeg -hide_banner -version | head -n 3
+                echo "=== REQUIRED FILTERS ==="
+                ffmpeg -hide_banner -filters 2>/dev/null | grep -E 'drawtext|subtitles|scale|fps' || true
+                echo "=== BUILD FEATURES ==="
+                ffmpeg -hide_banner -buildconf 2>/dev/null | grep -Ei 'freetype|fontconfig|fribidi|ass' || true
+              fi
+              echo "=== FONTS ==="
+              for FONT in /usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf /usr/share/fonts/noto/NotoSansSinhala-Regular.ttf; do
+                [ -s "$FONT" ] && echo "FONT_READY=$FONT"
+              done
+              command -v fc-match >/dev/null 2>&1 && fc-match Sinhala | head -n 1 || true
+              echo "=== MEMORY / DISK ==="
+              free -m
+              df -h /home/opc
+              echo "=== PM2 ==="
               print_status
               ;;
             auth-audit)
