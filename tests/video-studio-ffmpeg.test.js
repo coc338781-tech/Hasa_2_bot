@@ -28,7 +28,7 @@ test("FFmpeg applies a chained multi-edit job in one export", { skip: !ffmpegAva
   const input = await makeSample(dir);
   const output = path.join(dir, "edited.mp4");
   const operations = parseOperations("trim 00:00.5 00:01.5 | quality 480 | speed 0.8 | caption HASA STUDIO | filter cinematic | volume 70 | audiofadein 0.2 | format 9:16");
-  const plan = buildPlan(operations, input, output, dir, { videoStudio: {} }, true, 2);
+  const plan = buildPlan(operations, input, output, dir, { videoStudio: { ffmpegThreads: 1 } }, true, 2);
   await run("ffmpeg", plan.args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ok(fs.statSync(output).size > 1000);
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "json", output]);
@@ -44,7 +44,7 @@ test("music can be mixed with source audio without cutting the video short", { s
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=0.5", music]);
   const output = path.join(dir, "music-edited.mp4");
   const operations = parseOperations("music " + music + " | musicvolume 30 | volume 70");
-  const plan = buildPlan(operations, input, output, dir, { videoStudio: {} }, true, 2);
+  const plan = buildPlan(operations, input, output, dir, { videoStudio: { ffmpegThreads: 1 } }, true, 2);
   await run("ffmpeg", plan.args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ok(fs.statSync(output).size > 1000);
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", output]);
@@ -59,7 +59,7 @@ test("voice-over audio is mixed and padded to the video duration", { skip: !ffmp
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=660:duration=0.4", voiceover]);
   const output = path.join(dir, "voiceover-edited.mp4");
   const operations = [{ name: "voiceoverfile", value: voiceover }];
-  const plan = buildPlan(operations, input, output, dir, { videoStudio: {} }, true, 2);
+  const plan = buildPlan(operations, input, output, dir, { videoStudio: { ffmpegThreads: 1 } }, true, 2);
   await run("ffmpeg", plan.args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ok(fs.statSync(output).size > 1000);
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", output]);
@@ -72,7 +72,7 @@ test("GIF export produces an MP4 video suitable for WhatsApp GIF playback", { sk
   const input = await makeSample(dir);
   const output = path.join(dir, "animated.mp4");
   const plan = buildPlan([{ name: "gif", value: "" }], input, output, dir,
-    { videoStudio: {} }, true, 2);
+    { videoStudio: { ffmpegThreads: 1 } }, true, 2);
   await run("ffmpeg", plan.args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ok(fs.statSync(output).size > 1000);
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=format_name:stream=codec_name,codec_type", "-of", "json", output]);
