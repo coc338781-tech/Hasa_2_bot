@@ -19,16 +19,16 @@ jobs:
           node-version: 20
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-core cmake build-essential
       - run: npm install
-      - name: Build Whisper.cpp and download multilingual base model
+      - name: Build Whisper.cpp and download low-memory multilingual tiny model
         run: |
           git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git /tmp/whisper.cpp
           cmake -S /tmp/whisper.cpp -B /tmp/whisper.cpp/build -DWHISPER_BUILD_TESTS=OFF
           cmake --build /tmp/whisper.cpp/build --config Release -j2
-          bash /tmp/whisper.cpp/models/download-ggml-model.sh base
+          bash /tmp/whisper.cpp/models/download-ggml-model.sh tiny
       - run: npm run check
       - name: Live Gemini and Whisper Video Studio smoke tests
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           WHISPER_BINARY: /tmp/whisper.cpp/build/bin/whisper-cli
-          WHISPER_MODEL: /tmp/whisper.cpp/models/ggml-base.bin
+          WHISPER_MODEL: /tmp/whisper.cpp/models/ggml-tiny.bin
         run: node scripts/gemini-video-studio-smoke.js
