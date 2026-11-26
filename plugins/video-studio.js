@@ -33,7 +33,7 @@ const HELP = `🎬 *HASA VIDEO STUDIO*
 *Options:*
 quality 480|720|1080 | speed 0.25-4 | compress low/medium/high
 caption <සිංහල/English> | text <text> | textposition top/middle/bottom
-subtitle auto (Whisper model අවශ්‍යයි)
+subtitle auto (Whisper model අවශ්‍යයි)\nvoiceover <සිංහල text> (Gemini TTS)
 trim <start> <end> | mute | volume 0-200 | pitch 0.5-2
 music <https URL>| music remove | musicvolume 0-100
 format 9:16|16:9|1:1 | crop | rotate 90|180|270
@@ -140,6 +140,7 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   let trimStart = null, trimEnd = null;
   let reverse = false, gif = false, extractAudio = false;
   let musicPath = null;
+  let voiceoverPath = null;
   let musicVolume = 0.25;
   let textColor = "white", fontSize = 36, textPosition = "bottom";
   let brightness = 0, contrast = 1, saturation = 1;
@@ -169,10 +170,13 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
         if (times.length !== 2) throw new Error("trim 00:05 00:25 ලෙස දෙන්න.");
         trimStart = parseTime(times[0]); trimEnd = parseTime(times[1]);
         if (trimEnd <= trimStart) throw new Error("Trim end එක start එකට වඩා පසුව තිබිය යුතුයි.");
-        args.push("-ss", String(trimStart), "-to", String(trimEnd));
         audioMode = "encode";
         break;
       }
+      case "voiceoverfile":
+        if (!v || !v.startsWith(workDir + path.sep) || !fs.existsSync(v)) throw new Error("Voice-over file එක හමු වුණේ නැහැ.");
+        voiceoverPath = v;
+        break;
       case "subtitlefile":
         if (!v || !v.startsWith(workDir + path.sep) || !fs.existsSync(v)) throw new Error("Subtitle file එක හමු වුණේ නැහැ.");
         filters.push("subtitles=filename='" + escapeFilterPath(v) + "':force_style='FontName=Noto Sans Sinhala,FontSize=22,Alignment=2,MarginV=40'");
@@ -330,6 +334,8 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
   if (audioFadeOut && effectiveDuration > audioFadeOut) audioFilters.push("afade=t=out:st=" + (effectiveDuration - audioFadeOut) + ":d=" + audioFadeOut);
 
   if (extractAudio) {
+    if (trimStart !== null) args.splice(4, 0, "-ss", String(trimStart));
+    if (trimEnd !== null) args.push("-t", String(trimEnd - trimStart));
     if (muteOriginal) throw new Error("Mute සහ MP3 extraction එක එකම Job එකක කළ නොහැක.");
     if (!hasAudio) throw new Error("මේ වීඩියෝ එකේ Audio track එකක් නැහැ.");
     args.push("-vn");
@@ -356,9 +362,21 @@ export function buildPlan(operations, input, output, workDir, config, hasAudio, 
     filters.push("drawtext=" + fontPart + "textfile='" + textfile + "':fontcolor=" + color + ":fontsize=" + size + ":borderw=2:bordercolor=black:x=(w-text_w)/2:y=" + y);
   }
 
+  if (trimStart !== null) args.splice(4, 0, "-ss", String(trimStart));
+  if (trimEnd !== null) args.push("-t", String(trimEnd - trimStart));
+  if (voiceoverPath && musicPath) throw new Error("Voice-over සහ Music file එකම Job එකක දැනට එකතු කළ නොහැක.");
   if (!gif && filters.length) args.push("-vf", filters.join(","));
   if (gif) {
     args.push("-an", "-vf", [...filters, "fps=12,scale=480:-1:flags=lanczos"].join(","));
+  } else if (voiceoverPath) {
+    args.push("-i", voiceoverPath);
+    if (hasAudio && !muteOriginal) {
+      const sourceFilters = audioFilters.length ? audioFilters.join(",") + "," : "";
+      args.push("-filter_complex", "[0:a]" + sourceFilters + "anull[original];[1:a]apad=whole_dur=" + effectiveDuration + "[voice];[original][voice]amix=inputs=2:duration=first:dropout_transition=1[aout]", "-map", "0:v:0", "-map", "[aout]");
+    } else {
+      args.push("-filter_complex", "[1:a]apad=whole_dur=" + effectiveDuration + "[voice]", "-map", "0:v:0", "-map", "[voice]");
+    }
+    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-c:a", "aac");
   } else if (musicPath) {
     args.push("-stream_loop", "-1", "-i", musicPath);
     if (hasAudio && !muteOriginal) {
@@ -452,6 +470,41 @@ async function getAiAutoEdit(input, workDir, config) {
   return generated;
 }
 
+
+async function generateVoiceover(text, destination, config) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("AI Voice Over සඳහා .env තුළ GEMINI_API_KEY සකසන්න.");
+  if (!text || text.length > 1200) throw new Error("Voice-over Text එක අක්ෂර 1,200කට අඩු විය යුතුයි.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+  try {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(config.videoStudio?.ttsModel || "gemini-3.8-flash-tts") +
+      ":generateContent", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            languageCode: config.videoStudio?.ttsLanguage || "si-LK",
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: config.videoStudio?.ttsVoice || "Kore" } }
+          }
+        }
+      }),
+      signal: controller.signal
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || "Gemini TTS request failed (" + response.status + ").");
+    const audio = data.candidates?.[0]?.content?.parts?.find(part => part.inlineData?.data)?.inlineData?.data;
+    if (!audio) throw new Error("Gemini TTS වෙතින් Audio එකක් ලැබුණේ නැහැ.");
+    fs.writeFileSync(destination, Buffer.from(audio, "base64"), { mode: 0o600 });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function processJob(job) {
   const { sock, jid, message, video, config } = job;
   let operations = job.operations;
@@ -463,6 +516,13 @@ async function processJob(job) {
     await downloadMedia(video, "video", input, config.videoStudio?.maxInputBytes || MAX_INPUT_BYTES);
     const info = await probe(input, config.videoStudio?.maxDurationSeconds || MAX_DURATION);
     if (!info.streams.some(s => s.codec_type === "video")) throw new Error("Video track එකක් හමු වුණේ නැහැ.");
+    const voiceover = operations.find(x => x.name === "voiceover");
+    if (voiceover) {
+      const voiceoverFile = path.join(dir, "voiceover.wav");
+      await generateVoiceover(voiceover.value, voiceoverFile, config);
+      operations = operations.filter(x => x.name !== "voiceover");
+      operations.push({ name: "voiceoverfile", value: voiceoverFile });
+    }
     const autoSubtitle = operations.filter(x => x.name === "subtitle" && x.value.toLowerCase() === "auto");
     if (autoSubtitle.length) {
       const model = config.videoStudio?.whisperModel;
