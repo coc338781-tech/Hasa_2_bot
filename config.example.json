@@ -1,6 +1,8 @@
 {
   "prefix": ".",
-  "owner": ["947XXXXXXXX"],
+  "owner": [
+    "947XXXXXXXX"
+  ],
   "botName": "Hasa_2_bot",
   "autoReply": false,
   "autoStatusSeen": true,
@@ -18,5 +20,22 @@
   "autoVoice": false,
   "autoVoiceText": "Hello, I received your voice message.",
   "fastMode": true,
-  "downloadDir": "downloads"
+  "downloadDir": "downloads",
+  "videoStudio": {
+    "enabled": true,
+    "ownerOnly": true,
+    "fontFile": "/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf",
+    "maxDurationSeconds": 900,
+    "maxDimension": 1920,
+    "maxInputBytes": 188743680,
+    "whisperBinary": "whisper-cli",
+    "whisperModel": "",
+    "whisperLanguage": "si",
+    "whisperThreads": 1,
+    "aiModel": "gemini-3.8-flash",
+    "ttsModel": "gemini-3.8-flash-tts",
+    "ttsVoice": "Kore",
+    "ttsStyle": "Natural, clear Sinhala narration with warm and friendly delivery",
+    "ffmpegThreads": 1
+  }
 }

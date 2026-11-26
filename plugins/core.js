@@ -53,6 +53,13 @@ const CATEGORIES = {
   "8": ["PERSONAL ASSISTANT", [
     ".personalhelp", ".contact <name or number>", ".today",
     ".sendto <name or number> | <message>", ".smartreply on/off"
+  ]],
+  "9": ["🎬 HASA VIDEO STUDIO", [
+    ".vedit help", ".vedit quality 1080 | speed 0.8 | caption සිංහල වාක්‍යය",
+    ".vedit trim 00:05 00:25 | mute | format 9:16",
+    ".vedit filter cinematic | brightness 0.1 | contrast 1.2",
+    ".vedit music <HTTPS audio URL> | musicvolume 25",
+    ".vedit rotate 90 | flip h | reverse", ".vedit pitch 1.2 | fps 30 | sharpen 1", ".vedit fadein 1 | fadeout 1", ".vedit blur 5 | compress medium | normalize", ".vedit thumbnail 00:05", ".vedit auto", ".vedit subtitle auto", ".vedit voiceover සිංහල වාක්‍යය", ".vedit gif", ".vedit extractaudio"
   ]]
 };
 
@@ -130,7 +137,8 @@ function makeMainMenu(config) {
     "5   AUTO REPLY",
     "6   OWNER & SETTINGS",
     "7   SUBBOT",
-    "8   PERSONAL ASSISTANT"
+    "8   PERSONAL ASSISTANT",
+    "9   🎬 HASA VIDEO STUDIO"
   ];
   return [
     "*HELLO! WELCOME TO HASA 2 BOT*",
@@ -158,7 +166,8 @@ function makeCommandList(config, prefix) {
     ["AI & PRANK COMMANDS", [prefix+"ai <question>", prefix+"hack"]],
     ["AUTO REPLY COMMANDS", [prefix+"addreply word-reply", prefix+"replacereply word-reply", prefix+"getreply", prefix+"removereply word", prefix+"resetreply"]],
     ["OWNER & BOT CONTROL", [prefix+"settings", prefix+"apply", "set 1.1 Bot Name", "set 1.3 Footer", "set 1.4 Alive Message", prefix+"autoreply on/off", prefix+"statusseen on/off", prefix+"statusreact green|random|off", prefix+"antidelete on/off", prefix+"viewonce on/off", prefix+"aichat on/off", prefix+"groupcmd on/off", prefix+"composing on/off", prefix+"autovoice on/off"]],
-    ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]]
+    ["SUBBOT COMMANDS", [prefix+"subbot <number>", prefix+"subcheck", prefix+"getsubbot", prefix+"stopsubbot", prefix+"restartsubbot", prefix+"delsubbot", prefix+"helpsubbot"]],
+    ["🎬 HASA VIDEO STUDIO", [prefix+"vedit help", prefix+"vedit quality 1080 | speed 0.8 | caption <text>", prefix+"vedit trim 00:05 00:25 | mute | format 9:16", prefix+"vedit filter cinematic | brightness 0.1", prefix+"vedit music <HTTPS audio URL>", prefix+"vedit reverse", prefix+"vedit pitch 1.2 | fps 30 | sharpen 1", prefix+"vedit fadein 1 | fadeout 1", prefix+"vedit blur 5 | compress medium | normalize", prefix+"vedit thumbnail 00:05", prefix+"vedit auto", prefix+"vedit subtitle auto", prefix+"vedit voiceover <Sinhala text>", prefix+"vedit gif", prefix+"vedit extractaudio"]]
   ];
   return [
     "*HELLO! HASA 2 BOT COMMAND LIST*",
