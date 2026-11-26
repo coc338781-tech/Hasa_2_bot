@@ -94,7 +94,7 @@ try {
       const subtitleFile = await generateWhisperSubtitles(speechVideo, dir, config);
       const subtitles = fs.readFileSync(subtitleFile, "utf8");
       const subtitleLines = subtitles.split(/\r?\n/).map(line => line.trim()).filter(line =>
-        line && !/^\d+$/.test(line) && !/^\d{2}:\d{2}:\d{3},\d{3}\s+-->/.test(line)
+        line && !/^\d+$/.test(line) && !/^\d{2}:\d{2}:\d{2},\d{3}\s+-->/.test(line)
       );
       if (!subtitles.trim() || !/\d{2}:\d{2}:\d{2},\d{3}\s+-->\s+\d{2}:\d{2}:\d{2},\d{3}/.test(subtitles) || !subtitleLines.length) {
         throw new Error("Whisper did not produce a valid timed SRT subtitle with recognized text.");
