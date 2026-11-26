@@ -115,8 +115,7 @@ test("FFmpeg uses single-thread filters and encoders by default", () => {
   const plan = buildPlan([{ name: "quality", value: "720" }], "/tmp/input.mp4", "/tmp/output.mp4", "/tmp", {}, true, 2);
   assert.ok(plan.args.includes("-filter_threads"));
   assert.equal(plan.args[plan.args.indexOf("-filter_threads") + 1], "1");
-  assert.ok(plan.args.includes("-filter_complex_threads"));
-  assert.equal(plan.args[plan.args.indexOf("-filter_complex_threads") + 1], "1");
+  assert.ok(!plan.args.includes("-filter_complex_threads"));
   assert.equal(plan.args[plan.args.indexOf("-threads") + 1], "1");
 });
 
