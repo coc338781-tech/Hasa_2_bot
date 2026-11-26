@@ -53,7 +53,7 @@ test("Gemini TTS audio extraction reads Interactions API model output", () => {
 
 test("GIF export is encoded as WhatsApp-compatible MP4 playback", () => {
   const plan = buildPlan([{ name: "gif", value: "" }], "/tmp/input.mp4", "/tmp/output.mp4",
-    "/tmp", { videoStudio: {} }, true, 2);
+    "/tmp", { videoStudio: { ffmpegThreads: 1 } }, true, 2);
   assert.equal(plan.outputFormat, "gif");
   assert.ok(plan.args.includes("libx264"));
   assert.ok(plan.args.includes("yuv420p"));
