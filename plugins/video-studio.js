@@ -456,7 +456,10 @@ export async function getAiAutoEdit(input, workDir, config) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("AI Auto Edit සඳහා .env තුළ GEMINI_API_KEY සකසන්න.");
   const contactSheet = path.join(workDir, "video-contact-sheet.jpg");
-  await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vf", "fps=1/3,scale=320:-1,tile=3x3", "-frames:v", "1", "-q:v", "4", contactSheet], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+  const videoInfo = await probe(input, config.videoStudio?.maxDurationSeconds || MAX_DURATION);
+  // Sample nine evenly spaced frames across the full clip, not just its opening 27 seconds.
+  const sampleRate = (9 / videoInfo.duration).toFixed(8);
+  await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vf", "fps=" + sampleRate + ",scale=320:-1,tile=3x3", "-frames:v", "1", "-q:v", "4", contactSheet], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
   if (!fs.existsSync(contactSheet)) throw new Error("AI analysis සඳහා Video preview එකක් සකස් කළ නොහැක.");
   const imageData = fs.readFileSync(contactSheet).toString("base64");
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 45000 } });
