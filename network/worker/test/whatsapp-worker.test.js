@@ -4,13 +4,28 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createWhatsAppWorker } from "../src/whatsapp-worker.js";
-function fakeBaileys() {
+function fakeBaileys({ registerOnOpen = true, saveFails = false } = {}) {
   const sockets = [];
+  const state = { creds: { registered: false }, keys: {} };
   return { sockets, default(options) {
     const handlers = new Map();
-    const socket = { options, ev: { on(name, fn) { handlers.set(name, fn); } }, async requestPairingCode(phone) { socket.requestedPhone = phone; return "ABCD-EFGH"; }, end() { socket.ended = true; }, emit(name, value) { return handlers.get(name)?.(value); } };
+    const socket = {
+      options,
+      ev: { on(name, fn) { handlers.set(name, fn); } },
+      async requestPairingCode(phone) { socket.requestedPhone = phone; return "ABCD-EFGH"; },
+      end() { socket.ended = true; },
+      emit(name, value) {
+        if (name === "connection.update" && value?.connection === "open" && registerOnOpen) {
+          state.creds.registered = true;
+          state.creds.me = { id: "94771234567:1@s.whatsapp.net" };
+        }
+        return handlers.get(name)?.(value);
+      }
+    };
     sockets.push(socket); return socket;
-  }, async useMultiFileAuthState() { return { state: { creds: { registered: false }, keys: {} }, saveCreds: async () => {} }; } };
+  }, async useMultiFileAuthState() {
+    return { state, saveCreds: async () => { if (saveFails) throw new Error("disk_write_failed"); } };
+  } };
 }
 test("worker generates a real pairing code after Baileys readiness and never puts it in status", async () => {
   const root = await mkdtemp(join(tmpdir(), "hasa-worker-")), baileys = fakeBaileys(), codes = [], statuses = [];
@@ -62,4 +77,32 @@ test("worker recovers an existing registered session only for the same WhatsApp 
     await worker.stopAll();
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("worker never reports paired when the WhatsApp socket opens without registered credentials", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hasa-worker-")), baileys = fakeBaileys({ registerOnOpen: false }), statuses = [];
+  const worker = createWhatsAppWorker({ dataDir: root, baileys, pairingTimeoutMs: 60_000, onStatus: async item => statuses.push(item) });
+  const id = "44444444-4444-4444-8444-444444444444";
+  try {
+    await worker.startPairing({ instanceId: id, phone: "+94771234567" });
+    await baileys.sockets[0].emit("connection.update", { qr: "readiness-signal" });
+    await baileys.sockets[0].emit("connection.update", { connection: "open" });
+    assert.ok(statuses.some(item => item.status === "failed" && item.failureCode === "whatsapp_registration_not_confirmed"));
+    assert.equal(statuses.some(item => item.status === "paired"), false);
+    assert.equal(worker.activeCount, 0);
+  } finally { await worker.stopAll(); await rm(root, { recursive: true, force: true }); }
+});
+
+test("worker never reports paired when WhatsApp credentials cannot be persisted", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hasa-worker-")), baileys = fakeBaileys({ saveFails: true }), statuses = [];
+  const worker = createWhatsAppWorker({ dataDir: root, baileys, pairingTimeoutMs: 60_000, onStatus: async item => statuses.push(item) });
+  const id = "55555555-5555-4555-8555-555555555555";
+  try {
+    await worker.startPairing({ instanceId: id, phone: "+94771234567" });
+    await baileys.sockets[0].emit("connection.update", { qr: "readiness-signal" });
+    await baileys.sockets[0].emit("connection.update", { connection: "open" });
+    assert.ok(statuses.some(item => item.status === "failed" && item.failureCode === "whatsapp_credentials_save_failed"));
+    assert.equal(statuses.some(item => item.status === "paired"), false);
+    assert.equal(worker.activeCount, 0);
+  } finally { await worker.stopAll(); await rm(root, { recursive: true, force: true }); }
 });
