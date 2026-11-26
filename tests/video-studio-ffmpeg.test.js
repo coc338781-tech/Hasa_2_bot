@@ -65,3 +65,19 @@ test("voice-over audio is mixed and padded to the video duration", { skip: !ffmp
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", output]);
   assert.ok(Number(stdout.trim()) >= 1.8);
 });
+
+test("GIF export produces an MP4 video suitable for WhatsApp GIF playback", { skip: !ffmpegAvailable }, async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hasa-video-gif-test-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const input = await makeSample(dir);
+  const output = path.join(dir, "animated.mp4");
+  const plan = buildPlan([{ name: "gif", value: "" }], input, output, dir,
+    { videoStudio: {} }, true, 2);
+  await run("ffmpeg", plan.args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
+  assert.ok(fs.statSync(output).size > 1000);
+  const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=format_name:stream=codec_name,codec_type", "-of", "json", output]);
+  const data = JSON.parse(stdout);
+  assert.match(data.format.format_name, /mp4/);
+  assert.ok(data.streams.some(stream => stream.codec_type === "video" && stream.codec_name === "h264"));
+  assert.ok(!data.streams.some(stream => stream.codec_type === "audio"));
+});
