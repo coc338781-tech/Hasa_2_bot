@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseOperations, parseTime } from "../plugins/video-studio.js";
+import { parseOperations, parseTime, buildTtsInteractionRequest, extractTtsAudio } from "../plugins/video-studio.js";
 
 test("parseOperations keeps multi-word Sinhala captions and splits chained edits", () => {
   assert.deepEqual(parseOperations("quality 1080 | speed 0.8 | caption අද මගේ ලස්සන දවස | mute"), [
@@ -27,4 +27,26 @@ test("parseTime accepts seconds and mm:ss and hh:mm:ss", () => {
 test("parseTime rejects malformed timestamps", () => {
   assert.throws(() => parseTime("1:2:3:4"), /Time/);
   assert.throws(() => parseTime("abc"), /Time/);
+});
+
+test("Gemini 3.8 TTS uses the documented Interactions API request schema", () => {
+  const request = buildTtsInteractionRequest("ආයුබෝවන්", {
+    videoStudio: { ttsModel: "gemini-3.8-flash-tts", ttsVoice: "Kore", ttsStyle: "warm Sinhala narration" }
+  });
+  assert.equal(request.model, "gemini-3.8-flash-tts");
+  assert.deepEqual(request.input[0].content[0], {
+    type: "text",
+    text: "ආයුබෝවන්",
+    annotations: [{ type: "speech_metadata", style: "warm Sinhala narration" }]
+  });
+  assert.deepEqual(request.generation_config.speech_config, [{ voice: "Kore" }]);
+  assert.deepEqual(request.response_format, { type: "audio" });
+});
+
+test("Gemini TTS audio extraction reads Interactions API model output", () => {
+  assert.equal(extractTtsAudio({
+    steps: [{ type: "model_output", content: [{ type: "audio", data: "UklGRg==" }] }]
+  }), "UklGRg==");
+  assert.equal(extractTtsAudio({ output_audio: { data: "UklGRg==" } }), "UklGRg==");
+  assert.equal(extractTtsAudio({ steps: [] }), null);
 });
