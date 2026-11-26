@@ -63,3 +63,10 @@ For AI text, image questions, and voice transcription, add `GEMINI_API_KEY=your_
 - GitHub Actions runs the test suite before checking the restricted Oracle deployment connection.
 - Oracle deployment is enabled only when the repository variable `ORACLE_DEPLOY_ENABLED` is set to `true`.
 - The restricted deploy script validates the application and rolls back the release if deployment checks fail.
+
+
+## HASA Video Studio
+
+Requires system `ffmpeg` and `ffprobe`. Sinhala captions use the Noto Sinhala font when installed at `/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf`. Reply to a WhatsApp video with `.vedit help`; chain operations with ` | ` to perform one final encode. Jobs are queued one at a time, source files are limited to 180 MB / 15 minutes / 1920 px, and FFmpeg threads default to one for low-memory VPS use. The feature is owner-only by default.
+
+Optional Gemini visual auto-edit and Sinhala voice-over require `GEMINI_API_KEY` in the private server environment. Whisper Sinhala subtitles are local and require a Whisper.cpp binary plus the multilingual tiny model; they remain unavailable until those are installed and configured.
