@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { getAiAutoEdit, generateVoiceover } from "../plugins/video-studio.js";
+import { getAiAutoEdit, generateVoiceover, generateWhisperSubtitles } from "../plugins/video-studio.js";
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -20,7 +20,11 @@ try {
       ttsModel: "gemini-3.8-flash-tts",
       ttsVoice: "Kore",
       ttsStyle: "Natural, clear Sinhala narration with warm and friendly delivery",
-      fontFile: "/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf"
+      fontFile: "/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf",
+      whisperBinary: process.env.WHISPER_BINARY || "whisper-cli",
+      whisperModel: process.env.WHISPER_MODEL || "",
+      whisperLanguage: "si",
+      whisperThreads: 2
     }
   };
 
@@ -61,8 +65,31 @@ try {
     console.error("FAIL: " + failures[failures.length - 1]);
   }
 
-  if (failures.length) throw new Error("LIVE GEMINI SMOKE TEST FAILED: " + failures.join(" | "));
-  console.log("LIVE GEMINI SMOKE TEST PASSED.");
+  console.log("TEST 3/3: Whisper.cpp Sinhala speech-to-text subtitles...");
+  try {
+    if (!config.videoStudio.whisperModel || !fs.existsSync(config.videoStudio.whisperModel)) {
+      throw new Error("WHISPER_MODEL is missing or does not exist.");
+    }
+    const speechVideo = path.join(dir, "sinhala-speech-video.mp4");
+    execFileSync("ffmpeg", [
+      "-hide_banner", "-loglevel", "error", "-y",
+      "-i", video, "-i", voice,
+      "-map", "0:v:0", "-map", "1:a:0",
+      "-c:v", "copy", "-c:a", "aac", "-shortest", speechVideo
+    ], { stdio: "pipe" });
+    const subtitleFile = await generateWhisperSubtitles(speechVideo, dir, config);
+    const subtitles = fs.readFileSync(subtitleFile, "utf8");
+    if (!subtitles.trim() || !/\d{2}:\d{2}:\d{2},\d{3}\s+-->\s+\d{2}:\d{2}:\d{2},\d{3}/.test(subtitles)) {
+      throw new Error("Whisper did not produce a valid timed SRT subtitle file.");
+    }
+    console.log("PASS: Whisper.cpp generated Sinhala SRT subtitles (" + fs.statSync(subtitleFile).size + " bytes).");
+  } catch (error) {
+    failures.push("Whisper Sinhala subtitles: " + (error.message || error));
+    console.error("FAIL: " + failures[failures.length - 1]);
+  }
+
+  if (failures.length) throw new Error("VIDEO STUDIO LIVE SMOKE TEST FAILED: " + failures.join(" | "));
+  console.log("VIDEO STUDIO LIVE SMOKE TEST PASSED.");
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }
